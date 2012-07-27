@@ -373,19 +373,19 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
         return retval;
     }
 
-    @Override
+//    @Override
     public String getName()
     {
         return NAME;
     }
 
-    @Override
+//    @Override
     public List<Event> getEvents()
     {
         return EVENTS;
     }
 
-    @Override
+//    @Override
     public void onEvent(Event event, Object source, Object data)
     {
         XWikiContext context = (XWikiContext) data;
