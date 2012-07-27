@@ -58,7 +58,7 @@ import com.xpn.xwiki.util.AbstractXWikiRunnable;
 import com.xpn.xwiki.web.Utils;
 
 /**
- * @version $Id: 3238819addfe10aba464ebfee0f9b26bf2ac4ae6 $
+ * @version $Id: ced4ee86b2d2cf5830598a4a3aefcea8394d60e6 $
  */
 public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
 {
@@ -76,7 +76,7 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
 
     private static final List<Event> EVENTS = Arrays.<Event> asList(new DocumentUpdatedEvent(),
         new DocumentCreatedEvent(), new DocumentDeletedEvent(), new AttachmentAddedEvent(),
-        new AttachmentDeletedEvent());
+        new AttachmentDeletedEvent(), new AttachmentUpdatedEvent());
 
     /**
      * Collecting all the fields for using up in search
@@ -373,32 +373,19 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
         return retval;
     }
 
-    /**
-     * {@inheritDoc}
-     * 
-     * @see org.xwiki.observation.EventListener#getName()
-     */
+    @Override
     public String getName()
     {
         return NAME;
     }
 
-    /**
-     * {@inheritDoc}
-     * 
-     * @see org.xwiki.observation.EventListener#getEvents()
-     */
+    @Override
     public List<Event> getEvents()
     {
         return EVENTS;
     }
 
-    /**
-     * {@inheritDoc}
-     * 
-     * @see org.xwiki.observation.EventListener#onEvent(org.xwiki.observation.event.Event, java.lang.Object,
-     *      java.lang.Object)
-     */
+    @Override
     public void onEvent(Event event, Object source, Object data)
     {
         XWikiContext context = (XWikiContext) data;

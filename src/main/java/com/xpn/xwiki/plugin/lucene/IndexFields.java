@@ -28,7 +28,7 @@ import org.apache.commons.lang3.time.FastDateFormat;
  * Contains constants naming the Lucene index fields used by this Plugin and some helper methods for proper handling of
  * special field values like dates.
  * 
- * @version $Id: bf270743f6f3960152e10e537de869761be2d9d1 $
+ * @version $Id: c5240610a807da9be47eebfeb002872449773cb6 $
  */
 public abstract class IndexFields
 {
@@ -116,6 +116,11 @@ public abstract class IndexFields
     public static final String DOCUMENT_CREATIONDATE = "creationdate";
 
     /**
+     * Document hidden flag.
+     */
+    public static final String DOCUMENT_HIDDEN = "hidden";
+
+    /**
      * Fulltext content, not stored (and can therefore not be restored from the index).
      */
     public static final String FULLTEXT = "ft";
@@ -147,6 +152,11 @@ public abstract class IndexFields
         }
 
         return null;
+    }
+
+    public static final boolean stringToBoolean(String booleanValue)
+    {
+        return Boolean.parseBoolean(booleanValue);
     }
 
     private IndexFields()

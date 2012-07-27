@@ -27,7 +27,7 @@ import com.xpn.xwiki.XWikiException;
 import com.xpn.xwiki.doc.XWikiDocument;
 
 /**
- * @version $Id: 7c23f9b324ea7c699b602c536b765a8a9a3363c9 $
+ * @version $Id: 3ad189dae804eab651627fa472fb56a11b072ff5 $
  */
 public class TestXWikiDocument extends XWikiDocument
 {
@@ -36,23 +36,12 @@ public class TestXWikiDocument extends XWikiDocument
         super(documentReference);
     }
 
-    /**
-     * {@inheritDoc}
-     * 
-     * @see com.xpn.xwiki.doc.XWikiDocument#getTranslatedDocument(java.lang.String, com.xpn.xwiki.XWikiContext)
-     */
     @Override
     public XWikiDocument getTranslatedDocument(String language, XWikiContext context) throws XWikiException
     {
         return this;
     }
 
-    /**
-     * {@inheritDoc}
-     * 
-     * @see com.xpn.xwiki.doc.XWikiDocument#getRenderedTitle(org.xwiki.rendering.syntax.Syntax,
-     *      com.xpn.xwiki.XWikiContext)
-     */
     @Override
     public String getRenderedTitle(Syntax outputSyntax, XWikiContext context)
     {

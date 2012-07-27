@@ -71,7 +71,7 @@ import com.xpn.xwiki.web.Utils;
  * for searching documents, with the possiblity to sort by one or several document fields (besides the default sort by
  * relevance), filter by one or several languages, and search in one, several or all virtual wikis.
  * 
- * @version $Id: 455e3d0619e513b72610b8105385b167b3d7528e $
+ * @version $Id: 9aef164ef88b71e1e854f4180a35cfdd838c2d5c $
  * @deprecated the plugin technology is deprecated
  */
 @Deprecated
@@ -142,11 +142,6 @@ public class LucenePlugin extends XWikiDefaultPlugin
         return new LucenePluginApi((LucenePlugin) plugin, context);
     }
 
-    /**
-     * {@inheritDoc}
-     * 
-     * @see java.lang.Object#finalize()
-     */
     @Override
     protected void finalize() throws Throwable
     {
@@ -599,11 +594,6 @@ public class LucenePlugin extends XWikiDefaultPlugin
         LOGGER.debug("Lucene plugin initialized.");
     }
 
-    /**
-     * {@inheritDoc}
-     * 
-     * @see com.xpn.xwiki.plugin.XWikiDefaultPlugin#flushCache(com.xpn.xwiki.XWikiContext)
-     */
     @Override
     public void flushCache(XWikiContext context)
     {

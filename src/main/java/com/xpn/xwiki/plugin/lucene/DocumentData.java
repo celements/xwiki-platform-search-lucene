@@ -42,7 +42,7 @@ import com.xpn.xwiki.web.Utils;
  * Holds all data but the content of a wiki page to be indexed. The content is retrieved at indexing time, which should
  * save us some memory especially when rebuilding an index for a big wiki.
  * 
- * @version $Id: 4fa5469f1233d209d4bacf061f66cb9659f513ea $
+ * @version $Id: c77f17cedef64c75388de38d1f5bff305224acbc $
  */
 public class DocumentData extends AbstractDocumentData
 {
@@ -55,7 +55,7 @@ public class DocumentData extends AbstractDocumentData
     /** Reference serializer which removes the wiki prefix. */
     @SuppressWarnings("unchecked")
     private EntityReferenceSerializer<String> localEntityReferenceSerializer =
-        Utils.getComponent(EntityReferenceSerializer.class, "local");
+        Utils.getComponent(EntityReferenceSerializer.TYPE_STRING, "local");
 
     public DocumentData(final XWikiDocument doc, final XWikiContext context, final boolean deleted)
     {
@@ -68,7 +68,7 @@ public class DocumentData extends AbstractDocumentData
     }
 
     /**
-     * @return a string containing the result of {@link AbstractIndexData#getFullText} plus the full text content of
+     * Append a string containing the result of {@link AbstractIndexData#getFullText} plus the full text content of
      *         this document (in the given language)
      */
     @Override
@@ -158,31 +158,12 @@ public class DocumentData extends AbstractDocumentData
             // Do not index passwords
         } else if (prop instanceof StaticListClass && ((StaticListClass) prop).isMultiSelect()) {
             indexStaticList(luceneDoc, baseObject, (StaticListClass) prop, propertyName, context);
-        } else if (prop instanceof DateClass) {
-            // Date properties are indexed the same as document dates: formatted through IndexFields.dateToString() and
-            // untokenized, to be able to sort by their values.
-            luceneDoc.add(new Field(fieldFullName, getContentAsDate(baseObject, propertyName), Field.Store.YES,
-                Field.Index.UN_TOKENIZED));
         } else {
             StringBuilder sb = new StringBuilder();
             getObjectContentAsText(sb, baseObject, propertyName, context);
             addFieldToDocument(fieldFullName, sb.toString(), Field.Store.YES, Field.Index.ANALYZED,
                 OBJECT_PROPERTY_BOOST, luceneDoc);
         }
-    }
-
-    private String getContentAsDate(BaseObject baseObject, String propertyName) 
-    {
-        try {
-            Date date = baseObject.getDateValue(propertyName);
-            if (date != null) {
-                return IndexFields.dateToString(date);
-            }            
-        } catch (Exception e) {
-            LOG.error("error getting content from  XWiki Objects ", e);
-            e.printStackTrace();
-        }
-        return "";
     }
 
     private void indexStaticList(Document luceneDoc, BaseObject baseObject, StaticListClass prop, String propertyName,
