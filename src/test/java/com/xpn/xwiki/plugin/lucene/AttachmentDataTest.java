@@ -19,91 +19,115 @@
  */
 package com.xpn.xwiki.plugin.lucene;
 
+import static org.easymock.EasyMock.*;
+import static org.junit.Assert.*;
+
+import java.io.File;
 import java.io.IOException;
 
-import org.jmock.Mock;
-import org.xwiki.display.internal.DisplayConfiguration;
+import javax.servlet.ServletContext;
+
+import org.junit.Before;
+import org.junit.Test;
+import org.xwiki.environment.Environment;
+import org.xwiki.environment.internal.ServletEnvironment;
 import org.xwiki.model.reference.DocumentReference;
 
+import com.celements.common.test.AbstractBridgedComponentTestCase;
 import com.xpn.xwiki.doc.XWikiAttachment;
 import com.xpn.xwiki.doc.XWikiDocument;
-import com.xpn.xwiki.test.AbstractBridgedXWikiComponentTestCase;
 
 /**
  * Unit tests for {@link AttachmentData}.
  * 
  * @version $Id: 6235ccd3b45c79ed04c8c9ef57f99a45e11fbc01 $
  */
-public class AttachmentDataTest extends AbstractBridgedXWikiComponentTestCase
-{
-    private XWikiDocument document;
+public class AttachmentDataTest extends AbstractBridgedComponentTestCase {
+  private XWikiDocument document;
 
-    private XWikiAttachment attachment;
+  private XWikiAttachment attachment;
 
-    private AttachmentData attachmentData;
+  private AttachmentData attachmentData;
 
-    @Override
-    protected void setUp() throws Exception
-    {
-        super.setUp();
+  private ServletContext servletContext;
 
-        this.document = new XWikiDocument(new DocumentReference("wiki", "space", "page"));
-        this.attachment = new XWikiAttachment(this.document, "filename");
-        this.document.getAttachmentList().add(this.attachment);
+  @Before
+  public void setUp_AttachmentDataTest() throws Exception {
+    this.document = new XWikiDocument(new DocumentReference("wiki", "space", "page"));
+    this.attachment = new XWikiAttachment(this.document, "filename");
+    this.document.getAttachmentList().add(this.attachment);
 
-        this.attachmentData = new AttachmentData(this.attachment, getContext(), false);
-    }
+    this.attachmentData = new AttachmentData(this.attachment, getContext(), false);
+    ServletEnvironment env = (ServletEnvironment)getComponentManager().getInstance(
+        Environment.class);
+    servletContext = createMock(ServletContext.class);
+    env.setServletContext(servletContext);
+    expect(servletContext.getAttribute(eq("javax.servlet.context.tempdir"))).andReturn(
+        new File("./", "")).anyTimes();
+  }
 
-    @Override
-    protected void registerComponents() throws Exception
-    {
-        super.registerComponents();
+  private void assertGetFullText(String expect, String filename) throws IOException {
+    this.attachment.setFilename(filename);
+    this.attachment.setContent(getClass().getResourceAsStream("/" + filename));
 
-        // Setup display configuration.
-        Mock mockDisplayConfiguration = registerMockComponent(DisplayConfiguration.class);
-        mockDisplayConfiguration.stubs().method("getDocumentDisplayerHint").will(returnValue("default"));
-        mockDisplayConfiguration.stubs().method("getTitleHeadingDepth").will(returnValue(2));
-    }
+    this.attachmentData.setFilename(filename);
 
-    private void assertGetFullText(String expect, String filename) throws IOException
-    {
-        this.attachment.setFilename(filename);
-        this.attachment.setContent(getClass().getResourceAsStream("/" + filename));
+    String fullText = this.attachmentData.getFullText(this.document, getContext());
 
-        this.attachmentData.setFilename(filename);
+    assertEquals("Wrong attachment content indexed", expect, fullText);
+  }
 
-        String fullText = this.attachmentData.getFullText(this.document, getContext());
+  @Test
+  public void testGetFullTextFromTxt() throws IOException {
+    replayAll();
+    assertGetFullText("text content\n", "txt.txt");
+    verifyAll();
+  }
 
-        assertEquals("Wrong attachment content indexed", expect, fullText);
-    }
+  @Test
+  public void testGetFullTextFromMSOffice97() throws IOException {
+    replayAll();
+    assertGetFullText("ms office 97 content\n\n", "msoffice97.doc");
+    verifyAll();
+  }
 
-    public void testGetFullTextFromTxt() throws IOException
-    {
-        assertGetFullText("text content\n", "txt.txt");
-    }
+  @Test
+  public void testGetFullTextFromOpenXML() throws IOException {
+    replayAll();
+    assertGetFullText("openxml content\n", "openxml.docx");
+    verifyAll();
+  }
 
-    public void testGetFullTextFromMSOffice97() throws IOException
-    {
-        assertGetFullText("ms office 97 content\n\n", "msoffice97.doc");
-    }
+  @Test
+  public void testGetFullTextFromOpenDocument() throws IOException {
+    replayAll();
+    assertGetFullText("opendocument content\n", "opendocument.odt");
+    verifyAll();
+  }
 
-    public void testGetFullTextFromOpenXML() throws IOException
-    {
-        assertGetFullText("openxml content\n", "openxml.docx");
-    }
+  @Test
+  public void testGetFullTextFromPDF() throws IOException {
+    replayAll();
+    assertGetFullText("\npdf content\n\n\n", "pdf.pdf");
+    verifyAll();
+  }
 
-    public void testGetFullTextFromOpenDocument() throws IOException
-    {
-        assertGetFullText("opendocument content\n", "opendocument.odt");
-    }
+  @Test
+  public void testGetFullTextFromZIP() throws IOException {
+    replayAll();
+    assertGetFullText("zip.txt\nzip content\n\n\n\n", "zip.zip");
+    verifyAll();
+  }
 
-    public void testGetFullTextFromPDF() throws IOException
-    {
-        assertGetFullText("\npdf content\n\n\n", "pdf.pdf");
-    }
 
-    public void testGetFullTextFromZIP() throws IOException
-    {
-        assertGetFullText("zip.txt\nzip content\n\n\n\n", "zip.zip");
-    }
+  private void replayAll(Object ... mocks) {
+    replay(mocks);
+    replay(servletContext);
+  }
+
+  private void verifyAll(Object ... mocks) {
+    verify(mocks);
+    verify(servletContext);
+  }
+
 }
