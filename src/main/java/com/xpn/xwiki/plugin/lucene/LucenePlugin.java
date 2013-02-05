@@ -506,16 +506,16 @@ public class LucenePlugin extends XWikiDefaultPlugin
         int indexingInterval;
         try {
             indexingInterval = 1000 * (int) context.getWiki().ParamAsLong(PROP_INDEXING_INTERVAL, 30);
-        } catch (NumberFormatException e) {
-            LOGGER.warn("Invalid indexing interval in configuration.");
+        } catch (NumberFormatException exp) {
+            LOGGER.warn("Invalid indexing interval in configuration.", exp);
             indexingInterval = 30000;
         }
 
         int maxQueueSize;
         try {
             maxQueueSize = (int) context.getWiki().ParamAsLong(LucenePlugin.PROP_MAX_QUEUE_SIZE, 1000);
-        } catch (NumberFormatException e) {
-            LOGGER.warn("Invalid max queue size in configuration.");
+        } catch (NumberFormatException exp) {
+            LOGGER.warn("Invalid max queue size in configuration.", exp);
             maxQueueSize = 1000;
         }
 
