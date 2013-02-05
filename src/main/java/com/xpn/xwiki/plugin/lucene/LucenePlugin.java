@@ -531,8 +531,8 @@ public class LucenePlugin extends XWikiDefaultPlugin
         boolean needInitialRebuild = true;
         try {
             needInitialRebuild = !IndexReader.indexExists(directory);
-        } catch (IOException e) {
-            LOGGER.warn("Failed to check if index exists: {}", e.getMessage());
+        } catch (IOException exp) {
+            LOGGER.warn("Failed to check if index exists: {}", exp);
         }
 
         IndexRebuilder indexRebuilder = new IndexRebuilder(indexUpdater, context);
