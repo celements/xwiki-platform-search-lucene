@@ -37,7 +37,8 @@ public class TestXWikiDocument extends XWikiDocument
     }
 
     @Override
-    public XWikiDocument getTranslatedDocument(String language, XWikiContext context) throws XWikiException
+    public XWikiDocument getTranslatedDocument(String language, XWikiContext context
+        ) throws XWikiException
     {
         return this;
     }

@@ -318,8 +318,8 @@ public abstract class AbstractDocumentData extends AbstractIndexData
     @Override
     public String getDocumentFullName()
     {
-        return Utils.<EntityReferenceSerializer<String>> getComponent(EntityReferenceSerializer.TYPE_STRING, "local")
-            .serialize(getEntityReference());
+        return (String)Utils.getComponent(EntityReferenceSerializer.class, "local"
+            ).serialize(getEntityReference());
     }
 
     public String getVersion()
@@ -350,7 +350,7 @@ public abstract class AbstractDocumentData extends AbstractIndexData
     @Override
     public String getFullName()
     {
-        return Utils.<EntityReferenceSerializer<String>> getComponent(EntityReferenceSerializer.TYPE_STRING).serialize(
+        return (String)Utils.getComponent(EntityReferenceSerializer.class).serialize(
             getEntityReference());
     }
 

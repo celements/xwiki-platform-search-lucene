@@ -158,13 +158,13 @@ public abstract class AbstractIndexData
 
     public String getDocumentFullName()
     {
-        return Utils.<EntityReferenceSerializer<String>> getComponent(EntityReferenceSerializer.TYPE_STRING, "local")
+        return (String)Utils.getComponent(EntityReferenceSerializer.class, "local")
             .serialize(getEntityReference());
     }
 
     public String getFullName()
     {
-        return Utils.<EntityReferenceSerializer<String>> getComponent(EntityReferenceSerializer.TYPE_STRING).serialize(
+        return (String)Utils.getComponent(EntityReferenceSerializer.class).serialize(
             getEntityReference());
     }
 

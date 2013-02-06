@@ -19,6 +19,9 @@
  */
 package com.xpn.xwiki.plugin.lucene;
 
+import static org.easymock.EasyMock.*;
+import static org.junit.Assert.*;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.Collections;
@@ -38,24 +41,24 @@ import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.store.LockObtainFailedException;
 import org.apache.lucene.util.Version;
-import org.jmock.Mock;
-import org.jmock.core.Invocation;
-import org.jmock.core.stub.CustomStub;
+import org.junit.Before;
+import org.junit.Test;
 import org.xwiki.model.reference.DocumentReference;
+import org.xwiki.rendering.syntax.Syntax;
 
+import com.celements.common.test.AbstractBridgedComponentTestCase;
 import com.xpn.xwiki.XWiki;
 import com.xpn.xwiki.XWikiContext;
 import com.xpn.xwiki.doc.XWikiDocument;
 import com.xpn.xwiki.store.XWikiStoreInterface;
-import com.xpn.xwiki.test.AbstractBridgedXWikiComponentTestCase;
 
 /**
  * Unit tests for {@link IndexUpdater}.
  * 
  * @version $Id: 5f372b2802536fc296cc8ceb6eba31bdf3528d0a $
  */
-public class IndexUpdaterTest extends AbstractBridgedXWikiComponentTestCase
-{
+public class IndexUpdaterTest extends AbstractBridgedComponentTestCase {
+
     private final static String INDEXDIR = "target/lucenetest";
 
     private final Semaphore rebuildDone = new Semaphore(0);
@@ -64,9 +67,9 @@ public class IndexUpdaterTest extends AbstractBridgedXWikiComponentTestCase
 
     private final Semaphore writeBlockerAcquiresLock = new Semaphore(0);
 
-    private Mock mockXWiki;
+    private XWiki mockXWiki;
 
-    private Mock mockXWikiStoreInterface;
+    private XWikiStoreInterface mockXWikiStoreInterface;
 
     private XWikiDocument loremIpsum;
 
@@ -118,49 +121,45 @@ public class IndexUpdaterTest extends AbstractBridgedXWikiComponentTestCase
         }
     }
 
-    @Override
-    protected void setUp() throws Exception
+    @Before
+    public void setUp_IndexUpdaterTest() throws Exception
     {
-        super.setUp();
+        loremIpsum = new TestXWikiDocument(new DocumentReference("wiki", "Lorem", "Ipsum"));
+        loremIpsum.setSyntax(Syntax.XWIKI_1_0);
+        loremIpsum.setAuthor("User");
+        loremIpsum.setCreator("User");
+        loremIpsum.setDate(new Date(0));
+        loremIpsum.setCreationDate(new Date(0));
+        loremIpsum.setTitle("Lorem Ipsum");
+        loremIpsum.setContent(
+            "Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
+          + " Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat."
+          + " Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur."
+          + " Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.");
 
-        this.loremIpsum = new TestXWikiDocument(new DocumentReference("wiki", "Lorem", "Ipsum"));
-        this.loremIpsum.setAuthor("User");
-        this.loremIpsum.setCreator("User");
-        this.loremIpsum.setDate(new Date(0));
-        this.loremIpsum.setCreationDate(new Date(0));
-        this.loremIpsum.setTitle("Lorem Ipsum");
-        this.loremIpsum
-            .setContent("Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
-                + " Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat."
-                + " Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur."
-                + " Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.");
+        mockXWikiStoreInterface = createMock(XWikiStoreInterface.class);
+        mockXWikiStoreInterface.cleanUp(anyObject(XWikiContext.class));
+        expectLastCall().anyTimes();
 
-        this.mockXWikiStoreInterface = mock(XWikiStoreInterface.class);
-        this.mockXWikiStoreInterface.stubs().method("cleanUp");
-
-        this.mockXWiki = mock(XWiki.class);
-        this.mockXWiki.stubs().method("getDocument").with(eq(this.loremIpsum.getDocumentReference()), ANYTHING)
-            .will(returnValue(this.loremIpsum));
-        this.mockXWiki.stubs().method("Param").with(ANYTHING, ANYTHING).will(new CustomStub("Implements XWiki.Param")
-        {
-            public Object invoke(Invocation invocation) throws Throwable
-            {
-                return invocation.parameterValues.get(1);
-            }
-        });
-        this.mockXWiki.stubs().method("Param").with(eq(LucenePlugin.PROP_INDEX_DIR))
-            .will(returnValue(IndexUpdaterTest.INDEXDIR));
-        this.mockXWiki.stubs().method("checkAccess").will(returnValue(true));
-        this.mockXWiki.stubs().method("isVirtualMode").will(returnValue(false));
-        this.mockXWiki.stubs().method("getStore").will(returnValue(this.mockXWikiStoreInterface.proxy()));
-        this.mockXWiki.stubs().method("search").will(returnValue(Collections.EMPTY_LIST));
-
-        getContext().setWiki((XWiki) this.mockXWiki.proxy());
+        mockXWiki = createMock(XWiki.class);
+        expect(mockXWiki.getDocument(eq(this.loremIpsum.getDocumentReference()),
+            anyObject(XWikiContext.class))).andReturn(loremIpsum).anyTimes();
+        expect(mockXWiki.Param(anyObject(String.class), anyObject(String.class))
+            ).andReturn("").anyTimes();
+        expect(mockXWiki.Param(eq(LucenePlugin.PROP_INDEX_DIR))).andReturn(
+            IndexUpdaterTest.INDEXDIR).anyTimes();
+        expect(mockXWiki.search(anyObject(String.class), anyObject(XWikiContext.class))
+            ).andReturn(Collections.emptyList()).anyTimes();
+        expect(mockXWiki.isVirtualMode()).andReturn(false).anyTimes();
+        expect(mockXWiki.getStore()).andReturn(this.mockXWikiStoreInterface).anyTimes();
+        getContext().setWiki(mockXWiki);
         getContext().setDatabase("wiki");
     }
 
+    @Test
     public void testCreateIndex() throws IOException
     {
+      replayAll();
         File f = new File(INDEXDIR);
 
         if (!f.exists()) {
@@ -177,10 +176,13 @@ public class IndexUpdaterTest extends AbstractBridgedXWikiComponentTestCase
         this.rebuildDone.acquireUninterruptibly();
 
         assertTrue(IndexReader.indexExists(directory));
+        verifyAll();
     }
 
+    @Test
     public void testIndexUpdater() throws Exception
     {
+      replayAll();
         File f = new File(INDEXDIR);
         Directory directory;
         if (!f.exists()) {
@@ -231,10 +233,13 @@ public class IndexUpdaterTest extends AbstractBridgedXWikiComponentTestCase
         SearchResults results = plugin.getSearchResultsFromIndexes("Ipsum", "target/lucenetest", null, getContext());
 
         assertEquals(1, results.getTotalHitcount());
+        verifyAll();
     }
 
+    @Test
     public void testLock() throws IOException
     {
+      replayAll();
         Directory directory;
         File f = new File(INDEXDIR);
         int indexingInterval;
@@ -318,5 +323,17 @@ public class IndexUpdaterTest extends AbstractBridgedXWikiComponentTestCase
             new IndexWriter(indexUpdater.getDirectory(), new StandardAnalyzer(Version.LUCENE_34),
                 MaxFieldLength.LIMITED);
         w.close();
+        verifyAll();
+    }
+
+
+    private void replayAll(Object ... mocks) {
+      replay(mocks);
+      replay(mockXWiki, mockXWikiStoreInterface);
+    }
+
+    private void verifyAll(Object ... mocks) {
+      verify(mocks);
+      verify(mockXWiki, mockXWikiStoreInterface);
     }
 }
