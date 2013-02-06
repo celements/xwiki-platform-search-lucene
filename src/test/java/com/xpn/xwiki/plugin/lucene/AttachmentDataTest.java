@@ -36,6 +36,7 @@ import org.xwiki.model.reference.DocumentReference;
 import com.celements.common.test.AbstractBridgedComponentTestCase;
 import com.xpn.xwiki.doc.XWikiAttachment;
 import com.xpn.xwiki.doc.XWikiDocument;
+import com.xpn.xwiki.plugin.lucene.internal.AttachmentData;
 
 /**
  * Unit tests for {@link AttachmentData}.

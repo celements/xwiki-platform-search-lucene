@@ -21,6 +21,7 @@ package com.xpn.xwiki.plugin.lucene;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -55,6 +56,7 @@ import org.apache.lucene.util.Version;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.xwiki.context.Execution;
+import org.xwiki.environment.Environment;
 import org.xwiki.observation.ObservationManager;
 
 import com.xpn.xwiki.XWikiContext;
@@ -63,6 +65,9 @@ import com.xpn.xwiki.doc.XWikiAttachment;
 import com.xpn.xwiki.doc.XWikiDocument;
 import com.xpn.xwiki.plugin.XWikiDefaultPlugin;
 import com.xpn.xwiki.plugin.XWikiPluginInterface;
+import com.xpn.xwiki.plugin.lucene.internal.IndexFields;
+import com.xpn.xwiki.plugin.lucene.internal.IndexRebuilder;
+import com.xpn.xwiki.plugin.lucene.internal.IndexUpdater;
 import com.xpn.xwiki.web.Utils;
 
 /**
@@ -92,6 +97,11 @@ public class LucenePlugin extends XWikiDefaultPlugin
     public static final String PROP_MAX_QUEUE_SIZE = "xwiki.plugins.lucene.maxQueueSize";
 
     private static final String DEFAULT_ANALYZER = "org.apache.lucene.analysis.standard.StandardAnalyzer";
+
+    /**
+     * Used to get the temporary directory.
+     */
+    private Environment environment = Utils.getComponent((Type) Environment.class);
 
     /**
      * The Lucene text analyzer, can be configured in <tt>xwiki.cfg</tt> using the key {@link #PROP_ANALYZER} (
@@ -481,7 +491,7 @@ public class LucenePlugin extends XWikiDefaultPlugin
 
         this.indexDirs = context.getWiki().Param(PROP_INDEX_DIR);
         if (StringUtils.isEmpty(this.indexDirs)) {
-            File workDir = context.getWiki().getWorkSubdirectory("lucene", context);
+            File workDir = getLuceneWorkDirectory();
             this.indexDirs = workDir.getAbsolutePath();
         }
         String indexDir = StringUtils.split(this.indexDirs, ",")[0];
@@ -570,7 +580,7 @@ public class LucenePlugin extends XWikiDefaultPlugin
         if (this.indexDirs == null) {
             this.indexDirs = context.getWiki().Param(PROP_INDEX_DIR);
             if (StringUtils.isEmpty(this.indexDirs)) {
-                File workDir = context.getWiki().getWorkSubdirectory("lucene", context);
+                File workDir = getLuceneWorkDirectory();
                 this.indexDirs = workDir.getAbsolutePath();
             }
         }
@@ -668,7 +678,7 @@ public class LucenePlugin extends XWikiDefaultPlugin
     /**
      * Opens the searchers for the configured index Dirs after closing any already existing ones.
      */
-    protected synchronized void openSearchers(XWikiContext context)
+    public synchronized void openSearchers(XWikiContext context)
     {
         try {
             closeSearchers(this.searchers);
@@ -730,8 +740,20 @@ public class LucenePlugin extends XWikiDefaultPlugin
     /**
      * Handle a corrupt index by clearing it and rebuilding from scratch.
      */
-    void handleCorruptIndex(XWikiContext context) throws IOException
+    public void handleCorruptIndex(XWikiContext context) throws IOException
     {
         rebuildIndex(context);
+    }
+
+    /**
+     * @return the Lucene work directory where to store Lucene index files
+     */
+    private File getLuceneWorkDirectory()
+    {
+        File dir = new File(this.environment.getPermanentDirectory().getAbsolutePath(), "lucene");
+        if (!dir.exists()) {
+            dir.mkdir();
+        }
+        return dir;
     }
 }
