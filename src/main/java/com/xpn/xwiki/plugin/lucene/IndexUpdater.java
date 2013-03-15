@@ -389,7 +389,8 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
     public void onEvent(Event event, Object source, Object data)
     {
         XWikiContext context = (XWikiContext) data;
-
+        LOGGER.debug("IndexUpdater: onEvent for [" + event.getClass() + "] on ["
+            + source.toString() + "].");
         try {
             if (event instanceof DocumentUpdatedEvent || event instanceof DocumentCreatedEvent) {
                 queueDocument((XWikiDocument) source, context, false);
