@@ -165,8 +165,12 @@ public abstract class AbstractDocumentData extends AbstractIndexData
         }
 
         if (StringUtils.isNotBlank(this.creator)) {
+          LOGGER.debug("Add creator [" + this.creator + "] for doc ["
+              + doc.getDocumentReference() + "].");
             addFieldToDocument(IndexFields.DOCUMENT_CREATOR, this.creator, Field.Store.YES, Field.Index.NOT_ANALYZED,
                 CREATOR_BOOST, luceneDoc);
+        } else {
+          LOGGER.debug("no creator found for doc [" + doc.getDocumentReference() + "].");
         }
 
         if (getType() != null) {
