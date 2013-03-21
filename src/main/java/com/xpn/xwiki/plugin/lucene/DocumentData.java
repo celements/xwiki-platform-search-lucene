@@ -190,7 +190,6 @@ public class DocumentData extends AbstractDocumentData {
       }
     } catch (Exception e) {
       LOGGER.error("error getting content from  XWiki Objects ", e);
-      e.printStackTrace();
     }
     return "";
   }
