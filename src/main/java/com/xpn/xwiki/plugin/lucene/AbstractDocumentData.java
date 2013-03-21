@@ -147,78 +147,85 @@ public abstract class AbstractDocumentData extends AbstractIndexData
         addDocumentDataToLuceneDocument(luceneDoc, doc, context);
     }
 
-    public void addDocumentDataToLuceneDocument(Document luceneDoc, XWikiDocument doc, XWikiContext context)
-    {
-        // Keyword fields: stored and indexed, but not tokenized
-        addFieldToDocument(IndexFields.DOCUMENT_ID, getId(), Field.Store.YES, Field.Index.NOT_ANALYZED, ID_BOOST,
-            luceneDoc);
+  public void addDocumentDataToLuceneDocument(Document luceneDoc, XWikiDocument doc,
+      XWikiContext context) {
+    LOGGER.trace("addDocumentDataToLuceneDocument: id [" + getId() + "], lang ["
+        + getLanguage() + "], wiki [" + getWiki() + "], author [" + this.author
+        + "], creator [" + this.creator + "], type [" + getType() + "], date ["
+        + this.modificationDate + "], creationDate [" + this.creationDate + "], title ["
+        + this.documentTitle + "], name [" + getDocumentName() + "], space ["
+        + getDocumentSpace() + "], fullname [" + getFullName() + "], hidden ["
+        + doc.isHidden().toString() + "].");
+    // Keyword fields: stored and indexed, but not tokenized
+    addFieldToDocument(IndexFields.DOCUMENT_ID, getId(), Field.Store.YES,
+        Field.Index.NOT_ANALYZED, ID_BOOST, luceneDoc);
 
-        addFieldToDocument(IndexFields.DOCUMENT_LANGUAGE, getLanguage(), Field.Store.YES, Field.Index.NOT_ANALYZED,
-            LANGUAGE_BOOST, luceneDoc);
+    addFieldToDocument(IndexFields.DOCUMENT_LANGUAGE, getLanguage(), Field.Store.YES,
+        Field.Index.NOT_ANALYZED, LANGUAGE_BOOST, luceneDoc);
 
-        addFieldToDocument(IndexFields.DOCUMENT_WIKI, getWiki(), Field.Store.YES, Field.Index.NOT_ANALYZED, WIKI_BOOST,
-            luceneDoc);
+    addFieldToDocument(IndexFields.DOCUMENT_WIKI, getWiki(), Field.Store.YES,
+        Field.Index.NOT_ANALYZED, WIKI_BOOST, luceneDoc);
 
-        if (StringUtils.isNotBlank(this.author)) {
-            addFieldToDocument(IndexFields.DOCUMENT_AUTHOR, this.author, Field.Store.YES, Field.Index.NOT_ANALYZED,
-                AUTHOR_BOOST, luceneDoc);
-        }
-
-        if (StringUtils.isNotBlank(this.creator)) {
-          LOGGER.debug("Add creator [" + this.creator + "] for doc ["
-              + doc.getDocumentReference() + "].");
-            addFieldToDocument(IndexFields.DOCUMENT_CREATOR, this.creator, Field.Store.YES, Field.Index.NOT_ANALYZED,
-                CREATOR_BOOST, luceneDoc);
-        } else {
-          LOGGER.debug("no creator found for doc [" + doc.getDocumentReference() + "].");
-        }
-
-        if (getType() != null) {
-            addFieldToDocument(IndexFields.DOCUMENT_TYPE, getType(), Field.Store.YES, Field.Index.NOT_ANALYZED,
-                TYPE_BOOST, luceneDoc);
-        }
-        if (this.modificationDate != null) {
-            addFieldToDocument(IndexFields.DOCUMENT_DATE, IndexFields.dateToString(this.modificationDate),
-                Field.Store.YES, Field.Index.NOT_ANALYZED, DATE_BOOST, luceneDoc);
-        }
-        if (this.creationDate != null) {
-            addFieldToDocument(IndexFields.DOCUMENT_CREATIONDATE, IndexFields.dateToString(this.creationDate),
-                Field.Store.YES, Field.Index.NOT_ANALYZED, CREATION_DATE_BOOST, luceneDoc);
-        }
-
-        // Short text fields: tokenized and indexed, stored in the index
-        if (StringUtils.isNotBlank(this.documentTitle)) {
-            addFieldToDocument(IndexFields.DOCUMENT_TITLE, this.documentTitle, Field.Store.YES, Field.Index.ANALYZED,
-                TITLE_BOOST, luceneDoc);
-        }
-        addFieldToDocument(IndexFields.DOCUMENT_NAME, getDocumentName(), Field.Store.YES, Field.Index.ANALYZED,
-            NAME_BOOST, luceneDoc);
-
-        addFieldToDocument(IndexFields.DOCUMENT_SPACE, getDocumentSpace(), Field.Store.YES, Field.Index.ANALYZED,
-            SPACE_BOOST, luceneDoc);
-
-        // Old alias for the Space, reduce the importance so that a space hit doesn't score double
-        addFieldToDocument(IndexFields.DOCUMENT_WEB, getDocumentSpace(), Field.Store.YES, Field.Index.NOT_ANALYZED,
-            0.1f, luceneDoc);
-
-        addFieldToDocument(IndexFields.DOCUMENT_FULLNAME, getDocumentFullName(), Field.Store.YES, Field.Index.ANALYZED,
-            FULL_NAME_BOOST, luceneDoc);
-
-        addFieldToDocument(IndexFields.DOCUMENT_HIDDEN, doc.isHidden().toString(), Field.Store.YES,
-            Field.Index.NOT_ANALYZED, HIDDEN_BOOST, luceneDoc);
-
-        // Large text fields: tokenized and indexed, but not stored
-        // No reconstruction of the original content will be possible from the search result
-        try {
-            final String ft = getFullText(doc, context);
-            if (ft != null) {
-                addFieldToDocument(IndexFields.FULLTEXT, ft, Field.Store.NO, Field.Index.ANALYZED, CONTENT_BOOST,
-                    luceneDoc);
-            }
-        } catch (Exception e) {
-            LOGGER.error("Error extracting fulltext for document [{}]", this.toString(), e);
-        }
+    if (StringUtils.isNotBlank(this.author)) {
+      addFieldToDocument(IndexFields.DOCUMENT_AUTHOR, this.author, Field.Store.YES,
+          Field.Index.NOT_ANALYZED, AUTHOR_BOOST, luceneDoc);
     }
+
+    if (StringUtils.isNotBlank(this.creator)) {
+      addFieldToDocument(IndexFields.DOCUMENT_CREATOR, this.creator, Field.Store.YES,
+          Field.Index.NOT_ANALYZED, CREATOR_BOOST, luceneDoc);
+    }
+
+    if (getType() != null) {
+      addFieldToDocument(IndexFields.DOCUMENT_TYPE, getType(), Field.Store.YES,
+          Field.Index.NOT_ANALYZED, TYPE_BOOST, luceneDoc);
+    }
+    if (this.modificationDate != null) {
+      addFieldToDocument(IndexFields.DOCUMENT_DATE, IndexFields.dateToString(
+          this.modificationDate), Field.Store.YES, Field.Index.NOT_ANALYZED, DATE_BOOST,
+          luceneDoc);
+    }
+    if (this.creationDate != null) {
+      addFieldToDocument(IndexFields.DOCUMENT_CREATIONDATE, IndexFields.dateToString(
+          this.creationDate), Field.Store.YES, Field.Index.NOT_ANALYZED,
+          CREATION_DATE_BOOST, luceneDoc);
+    }
+
+    // Short text fields: tokenized and indexed, stored in the index
+    if (StringUtils.isNotBlank(this.documentTitle)) {
+      addFieldToDocument(IndexFields.DOCUMENT_TITLE, this.documentTitle, Field.Store.YES,
+          Field.Index.ANALYZED, TITLE_BOOST, luceneDoc);
+    }
+    addFieldToDocument(IndexFields.DOCUMENT_NAME, getDocumentName(), Field.Store.YES,
+        Field.Index.ANALYZED, NAME_BOOST, luceneDoc);
+
+    addFieldToDocument(IndexFields.DOCUMENT_SPACE, getDocumentSpace(), Field.Store.YES,
+        Field.Index.ANALYZED, SPACE_BOOST, luceneDoc);
+
+    // Old alias for the Space, reduce the importance so that a space hit
+    // doesn't score double
+    addFieldToDocument(IndexFields.DOCUMENT_WEB, getDocumentSpace(), Field.Store.YES,
+        Field.Index.NOT_ANALYZED, 0.1f, luceneDoc);
+
+    addFieldToDocument(IndexFields.DOCUMENT_FULLNAME, getDocumentFullName(),
+        Field.Store.YES, Field.Index.ANALYZED, FULL_NAME_BOOST, luceneDoc);
+
+    addFieldToDocument(IndexFields.DOCUMENT_HIDDEN, doc.isHidden().toString(),
+        Field.Store.YES, Field.Index.NOT_ANALYZED, HIDDEN_BOOST, luceneDoc);
+
+    // Large text fields: tokenized and indexed, but not stored
+    // No reconstruction of the original content will be possible from the
+    // search result
+    try {
+      final String ft = getFullText(doc, context);
+      if (ft != null) {
+        addFieldToDocument(IndexFields.FULLTEXT, ft, Field.Store.NO,
+            Field.Index.ANALYZED, CONTENT_BOOST, luceneDoc);
+      }
+    } catch (Exception e) {
+      LOGGER.error("Error extracting fulltext for document [{}]", this.toString(), e);
+    }
+  }
 
     /**
      * @return string unique to this document across all languages and virtual wikis
