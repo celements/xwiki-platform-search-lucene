@@ -171,7 +171,6 @@ public class DocumentData extends AbstractDocumentData {
       // Date properties are indexed the same as document dates: formatted
       // through IndexFields.dateToString() and
       // untokenized, to be able to sort by their values.
-      //FIXME UN_TOKENIZED does not exist! maybe NOT_ANALYZED??
       luceneDoc.add(new Field(fieldFullName, getContentAsDate(baseObject, propertyName),
           Field.Store.YES, Field.Index.NOT_ANALYZED));
     } else {
