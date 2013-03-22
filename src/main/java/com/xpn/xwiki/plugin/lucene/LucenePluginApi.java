@@ -184,7 +184,7 @@ public class LucenePluginApi extends PluginApi<LucenePlugin>
             return getProtectedPlugin().getSearchResults(query, (String) null, indexDirs, languages, this.context);
         } catch (Exception ex) {
             LOGGER.error("Failed to search: query=[{}], indexDirs=[{}], languages=[{}]",
-                new Object[] {query, indexDirs, languages, ex});
+                new Object[] {query, indexDirs, languages, ex}, ex);
         }
 
         return null;
