@@ -161,19 +161,19 @@ public abstract class AbstractDocumentData extends AbstractIndexData
         Field.Index.NOT_ANALYZED, ID_BOOST, luceneDoc);
 
     addFieldToDocument(IndexFields.DOCUMENT_LANGUAGE, getLanguage(), Field.Store.YES,
-        Field.Index.NOT_ANALYZED, LANGUAGE_BOOST, luceneDoc);
+        Field.Index.ANALYZED, LANGUAGE_BOOST, luceneDoc);
 
     addFieldToDocument(IndexFields.DOCUMENT_WIKI, getWiki(), Field.Store.YES,
         Field.Index.NOT_ANALYZED, WIKI_BOOST, luceneDoc);
 
     if (StringUtils.isNotBlank(this.author)) {
       addFieldToDocument(IndexFields.DOCUMENT_AUTHOR, this.author, Field.Store.YES,
-          Field.Index.NOT_ANALYZED, AUTHOR_BOOST, luceneDoc);
+          Field.Index.ANALYZED, AUTHOR_BOOST, luceneDoc);
     }
 
     if (StringUtils.isNotBlank(this.creator)) {
       addFieldToDocument(IndexFields.DOCUMENT_CREATOR, this.creator, Field.Store.YES,
-          Field.Index.NOT_ANALYZED, CREATOR_BOOST, luceneDoc);
+          Field.Index.ANALYZED, CREATOR_BOOST, luceneDoc);
     }
 
     if (getType() != null) {
