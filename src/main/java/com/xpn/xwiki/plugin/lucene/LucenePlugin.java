@@ -22,6 +22,7 @@ package com.xpn.xwiki.plugin.lucene;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 
@@ -408,7 +409,9 @@ public class LucenePlugin extends XWikiDefaultPlugin
         // <languageQuery>
         BooleanQuery bQuery = new BooleanQuery();
         Query parsedQuery = null;
-
+        
+        LOGGER.debug("buildQuery for [{}] with languages [{}]", query, languages);
+        
         // for object search
         if (query.startsWith("PROP ")) {
             String property = query.substring(0, query.indexOf(":"));
@@ -434,11 +437,14 @@ public class LucenePlugin extends XWikiDefaultPlugin
             for (int i = 0; i < flags.length; i++) {
                 flags[i] = BooleanClause.Occur.SHOULD;
             }
+            LOGGER.debug("init MultiFieldQueryParser with [{}] and analyzer {}", 
+                Arrays.toString(fields), analyzer.getClass());
             QueryParser parser = new MultiFieldQueryParser(Version.LUCENE_34, fields, this.analyzer);
             parsedQuery = parser.parse(query);
             // Since the sub-queries are OR-ed, each sub-query score is normally divided by the number of sub-queries,
             // which would cause extra-small scores whenever there's a hit on only one sub-query;
             // compensate this by boosting the whole outer query
+            LOGGER.debug("parsed query {}", parsedQuery.toString());
             parsedQuery.setBoost(fields.length);
             bQuery.add(parsedQuery, BooleanClause.Occur.MUST);
         }
