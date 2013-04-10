@@ -381,8 +381,9 @@ public class LucenePlugin extends XWikiDefaultPlugin
     }
     
     int getResultLimit(XWikiContext context) {
-      return Integer.parseInt(context.getWiki().Param("xwiki.plugins.lucene.resultLimit", 
-          "1000"));
+      String limitParam = context.getWiki().Param("xwiki.plugins.lucene.resultLimit", 
+          "1000");
+      return Integer.parseInt(limitParam);
     }
 
     /**

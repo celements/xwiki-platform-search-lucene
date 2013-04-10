@@ -144,6 +144,8 @@ public class IndexUpdaterTest extends AbstractBridgedComponentTestCase {
         mockXWiki = createMock(XWiki.class);
         expect(mockXWiki.getDocument(eq(this.loremIpsum.getDocumentReference()),
             anyObject(XWikiContext.class))).andReturn(loremIpsum).anyTimes();
+        expect(mockXWiki.Param(eq("xwiki.plugins.lucene.resultLimit"), eq("1000"))
+            ).andReturn("123").anyTimes();
         expect(mockXWiki.Param(anyObject(String.class), anyObject(String.class))
             ).andReturn("").anyTimes();
         expect(mockXWiki.Param(eq(LucenePlugin.PROP_INDEX_DIR))).andReturn(
@@ -180,8 +182,7 @@ public class IndexUpdaterTest extends AbstractBridgedComponentTestCase {
     }
 
     @Test
-    public void testIndexUpdater() throws Exception
-    {
+    public void testIndexUpdater() throws Exception {
       replayAll();
         File f = new File(INDEXDIR);
         Directory directory;
@@ -229,7 +230,7 @@ public class IndexUpdaterTest extends AbstractBridgedComponentTestCase {
         TopDocs t = searcher.search(q, null, 10);
 
         assertEquals(1, t.totalHits);
-
+        
         SearchResults results = plugin.getSearchResultsFromIndexes("Ipsum", "target/lucenetest", null, getContext());
 
         assertEquals(1, results.getTotalHitcount());
