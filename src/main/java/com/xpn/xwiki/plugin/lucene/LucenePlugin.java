@@ -369,15 +369,20 @@ public class LucenePlugin extends XWikiDefaultPlugin
         // Perform the actual search
         TopDocsCollector< ? extends ScoreDoc> results;
         if (sort != null) {
-            results = TopFieldCollector.create(sort, 1000, true, true, false, false);
+            results = TopFieldCollector.create(sort, getResultLimit(context), true, true, false, false);
         } else {
-            results = TopScoreDocCollector.create(1000, false);
+            results = TopScoreDocCollector.create(getResultLimit(context), false);
         }
         searcher.search(q, results);
         LOGGER.debug("query [{}] returned {} hits", q, results.getTotalHits());
 
         // Transform the raw Lucene search results into XWiki-aware results
         return new SearchResults(results, searcher, new com.xpn.xwiki.api.XWiki(context.getWiki(), context), context);
+    }
+    
+    int getResultLimit(XWikiContext context) {
+      return Integer.parseInt(context.getWiki().Param("xwiki.plugins.lucene.resultLimit", 
+          "1000"));
     }
 
     /**
