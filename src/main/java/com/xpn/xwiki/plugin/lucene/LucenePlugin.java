@@ -362,8 +362,10 @@ public class LucenePlugin extends XWikiDefaultPlugin
         MultiSearcher searcher = new MultiSearcher(indexes);
 
         // Enhance the base query with wiki names and languages.
+        LOGGER.debug("build query for [{}]", query);
         Query q = buildQuery(query, virtualWikiNames, languages);
-
+        LOGGER.debug("query is [{}]", q);
+        
         // Perform the actual search
         TopDocsCollector< ? extends ScoreDoc> results;
         if (sort != null) {
