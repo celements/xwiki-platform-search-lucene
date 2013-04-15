@@ -31,8 +31,8 @@ import java.util.concurrent.Semaphore;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexWriter;
-import org.apache.lucene.index.Term;
 import org.apache.lucene.index.IndexWriter.MaxFieldLength;
+import org.apache.lucene.index.Term;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.TermQuery;
@@ -59,281 +59,266 @@ import com.xpn.xwiki.store.XWikiStoreInterface;
  */
 public class IndexUpdaterTest extends AbstractBridgedComponentTestCase {
 
-    private final static String INDEXDIR = "target/lucenetest";
+  private final static String INDEXDIR = "target/lucenetest";
 
-    private final Semaphore rebuildDone = new Semaphore(0);
+  private final Semaphore rebuildDone = new Semaphore(0);
 
-    private final Semaphore writeBlockerWait = new Semaphore(0);
+  private final Semaphore writeBlockerWait = new Semaphore(0);
 
-    private final Semaphore writeBlockerAcquiresLock = new Semaphore(0);
+  private final Semaphore writeBlockerAcquiresLock = new Semaphore(0);
 
-    private XWiki mockXWiki;
+  private XWiki mockXWiki;
 
-    private XWikiStoreInterface mockXWikiStoreInterface;
+  private XWikiStoreInterface mockXWikiStoreInterface;
 
-    private XWikiDocument loremIpsum;
+  private XWikiDocument loremIpsum;
 
-    private class TestIndexRebuilder extends IndexRebuilder
-    {
-        TestIndexRebuilder(IndexUpdater indexUpdater, XWikiContext context)
-        {
-            super(indexUpdater, context);
-        }
-
-        @Override
-        protected void runInternal()
-        {
-            super.runInternal();
-
-            IndexUpdaterTest.this.rebuildDone.release();
-        }
+  private class TestIndexRebuilder extends IndexRebuilder {
+    TestIndexRebuilder(IndexUpdater indexUpdater, XWikiContext context) {
+      super(indexUpdater, context);
     }
 
-    private class TestIndexUpdater extends IndexUpdater
-    {
-        TestIndexUpdater(Directory directory, int indexingInterval, int maxQueueSize, LucenePlugin plugin,
-            XWikiContext context)
-        {
-            super(directory, indexingInterval, maxQueueSize, plugin, context);
-        }
+    @Override
+    protected void runInternal() {
+      super.runInternal();
 
-        @Override
-        protected void runInternal()
-        {
-            if (Thread.currentThread().getName().equals("writerBlocker")) {
-                try {
-                    IndexWriter writer = openWriter(true);
-                    Thread.sleep(5000);
-                    writer.close();
-                } catch (Exception e) {
-                }
-            } else if (Thread.currentThread().getName().equals("permanentBlocker")) {
-                try {
-                    IndexWriter writer = openWriter(false);
-                    IndexUpdaterTest.this.writeBlockerAcquiresLock.release();
-                    IndexUpdaterTest.this.writeBlockerWait.acquireUninterruptibly();
-                    writer.close();
-                } catch (Exception e) {
-                }
-            } else {
-                super.runInternal();
-            }
-        }
+      IndexUpdaterTest.this.rebuildDone.release();
+    }
+  }
+
+  private class TestIndexUpdater extends IndexUpdater {
+    TestIndexUpdater(Directory directory, int indexingInterval, int maxQueueSize,
+        LucenePlugin plugin, XWikiContext context) {
+      super(directory, indexingInterval, maxQueueSize, plugin, context);
     }
 
-    @Before
-    public void setUp_IndexUpdaterTest() throws Exception
-    {
-        loremIpsum = new TestXWikiDocument(new DocumentReference("wiki", "Lorem", "Ipsum"));
-        loremIpsum.setSyntax(Syntax.XWIKI_1_0);
-        loremIpsum.setAuthor("User");
-        loremIpsum.setCreator("User");
-        loremIpsum.setDate(new Date(0));
-        loremIpsum.setCreationDate(new Date(0));
-        loremIpsum.setTitle("Lorem Ipsum");
-        loremIpsum.setContent(
-            "Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
-          + " Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat."
-          + " Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur."
-          + " Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.");
+    @Override
+    protected void runInternal() {
+      if (Thread.currentThread().getName().equals("writerBlocker")) {
+        try {
+          IndexWriter writer = openWriter(true);
+          Thread.sleep(5000);
+          writer.close();
+        } catch (Exception e) {
+        }
+      } else if (Thread.currentThread().getName().equals("permanentBlocker")) {
+        try {
+          IndexWriter writer = openWriter(false);
+          IndexUpdaterTest.this.writeBlockerAcquiresLock.release();
+          IndexUpdaterTest.this.writeBlockerWait.acquireUninterruptibly();
+          writer.close();
+        } catch (Exception e) {
+        }
+      } else {
+        super.runInternal();
+      }
+    }
+  }
 
-        mockXWikiStoreInterface = createMock(XWikiStoreInterface.class);
-        mockXWikiStoreInterface.cleanUp(anyObject(XWikiContext.class));
-        expectLastCall().anyTimes();
+  @Before
+  public void setUp_IndexUpdaterTest() throws Exception {
+    loremIpsum = new TestXWikiDocument(new DocumentReference("wiki", "Lorem", "Ipsum"));
+    loremIpsum.setSyntax(Syntax.XWIKI_1_0);
+    loremIpsum.setAuthor("User");
+    loremIpsum.setCreator("User");
+    loremIpsum.setDate(new Date(0));
+    loremIpsum.setCreationDate(new Date(0));
+    loremIpsum.setTitle("Lorem Ipsum");
+    loremIpsum.setContent("Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed"
+        + " do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad"
+        + " minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex"
+        + " ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate"
+        + " velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat"
+        + " cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est"
+        + " laborum.");
 
-        mockXWiki = createMock(XWiki.class);
-        expect(mockXWiki.getDocument(eq(this.loremIpsum.getDocumentReference()),
+    mockXWikiStoreInterface = createMockAndAddToDefault(XWikiStoreInterface.class);
+    mockXWikiStoreInterface.cleanUp(anyObject(XWikiContext.class));
+    expectLastCall().anyTimes();
+
+    mockXWiki = getWikiMock();
+    expect(
+        mockXWiki.getDocument(eq(this.loremIpsum.getDocumentReference()),
             anyObject(XWikiContext.class))).andReturn(loremIpsum).anyTimes();
-        expect(mockXWiki.Param(anyObject(String.class), anyObject(String.class))
-            ).andReturn("").anyTimes();
-        expect(mockXWiki.Param(eq(LucenePlugin.PROP_INDEX_DIR))).andReturn(
-            IndexUpdaterTest.INDEXDIR).anyTimes();
-        expect(mockXWiki.search(anyObject(String.class), anyObject(XWikiContext.class))
-            ).andReturn(Collections.emptyList()).anyTimes();
-        expect(mockXWiki.isVirtualMode()).andReturn(false).anyTimes();
-        expect(mockXWiki.getStore()).andReturn(this.mockXWikiStoreInterface).anyTimes();
-        getContext().setWiki(mockXWiki);
-        getContext().setDatabase("wiki");
+    expect(mockXWiki.Param(eq("xwiki.plugins.lucene.resultLimit"), eq("1000"))).andReturn(
+        "1000").anyTimes();
+    expect(mockXWiki.Param(anyObject(String.class), anyObject(String.class))).andReturn(
+        "").anyTimes();
+    expect(mockXWiki.Param(eq(LucenePlugin.PROP_INDEX_DIR))).andReturn(
+        IndexUpdaterTest.INDEXDIR).anyTimes();
+    expect(mockXWiki.search(anyObject(String.class), anyObject(XWikiContext.class))
+        ).andReturn(Collections.emptyList()).anyTimes();
+    expect(mockXWiki.isVirtualMode()).andReturn(false).anyTimes();
+    expect(mockXWiki.getStore()).andReturn(this.mockXWikiStoreInterface).anyTimes();
+    getContext().setWiki(mockXWiki);
+    getContext().setDatabase("wiki");
+  }
+
+  @Test
+  public void testCreateIndex() throws IOException {
+    replayDefault();
+    File f = new File(INDEXDIR);
+
+    if (!f.exists()) {
+      f.mkdirs();
     }
 
-    @Test
-    public void testCreateIndex() throws IOException
-    {
-      replayAll();
-        File f = new File(INDEXDIR);
+    Directory directory = FSDirectory.open(f);
 
-        if (!f.exists()) {
-            f.mkdirs();
-        }
+    LucenePlugin plugin = new LucenePlugin("Monkey", "Monkey", getContext());
+    IndexUpdater indexUpdater = new TestIndexUpdater(directory, 100, 1000, plugin,
+        getContext());
+    IndexRebuilder indexRebuilder = new TestIndexRebuilder(indexUpdater, getContext());
+    indexRebuilder.startRebuildIndex(getContext());
 
-        Directory directory = FSDirectory.open(f);
+    this.rebuildDone.acquireUninterruptibly();
 
-        LucenePlugin plugin = new LucenePlugin("Monkey", "Monkey", getContext());
-        IndexUpdater indexUpdater = new TestIndexUpdater(directory, 100, 1000, plugin, getContext());
-        IndexRebuilder indexRebuilder = new TestIndexRebuilder(indexUpdater, getContext());
-        indexRebuilder.startRebuildIndex(getContext());
+    assertTrue(IndexReader.indexExists(directory));
+    verifyDefault();
+  }
 
-        this.rebuildDone.acquireUninterruptibly();
+  @Test
+  public void testIndexUpdater() throws Exception {
+    replayDefault();
+    File f = new File(INDEXDIR);
+    Directory directory;
+    if (!f.exists()) {
+      f.mkdirs();
+    }
+    directory = FSDirectory.open(f);
 
-        assertTrue(IndexReader.indexExists(directory));
-        verifyAll();
+    int indexingInterval;
+    indexingInterval = 100;
+    int maxQueueSize;
+    maxQueueSize = 1000;
+
+    LucenePlugin plugin = new LucenePlugin("Monkey", "Monkey", getContext());
+    IndexUpdater indexUpdater = new TestIndexUpdater(directory, indexingInterval,
+        maxQueueSize, plugin, getContext());
+    IndexRebuilder indexRebuilder = new TestIndexRebuilder(indexUpdater, getContext());
+    Thread writerBlocker = new Thread(indexUpdater, "writerBlocker");
+    writerBlocker.start();
+    plugin.init(indexUpdater, indexRebuilder, getContext());
+
+    indexUpdater.cleanIndex();
+
+    Thread indexUpdaterThread = new Thread(indexUpdater, "Lucene Index Updater");
+    indexUpdaterThread.start();
+
+    indexUpdater.queueDocument(this.loremIpsum.clone(), getContext(), false);
+    indexUpdater.queueDocument(this.loremIpsum.clone(), getContext(), false);
+
+    try {
+      Thread.sleep(1000);
+      indexUpdater.doExit();
+    } catch (InterruptedException e) {
+    }
+    while (true) {
+      try {
+        indexUpdaterThread.join();
+        break;
+      } catch (InterruptedException e) {
+      }
     }
 
-    @Test
-    public void testIndexUpdater() throws Exception
-    {
-      replayAll();
-        File f = new File(INDEXDIR);
-        Directory directory;
-        if (!f.exists()) {
-            f.mkdirs();
-        }
-        directory = FSDirectory.open(f);
+    Query q = new TermQuery(new Term(IndexFields.DOCUMENT_ID,
+        "wiki:Lorem.Ipsum.default"));
+    IndexSearcher searcher = new IndexSearcher(directory, true);
+    TopDocs t = searcher.search(q, null, 10);
 
-        int indexingInterval;
-        indexingInterval = 100;
-        int maxQueueSize;
-        maxQueueSize = 1000;
+    assertEquals(1, t.totalHits);
 
-        LucenePlugin plugin = new LucenePlugin("Monkey", "Monkey", getContext());
-        IndexUpdater indexUpdater =
-            new TestIndexUpdater(directory, indexingInterval, maxQueueSize, plugin, getContext());
-        IndexRebuilder indexRebuilder = new TestIndexRebuilder(indexUpdater, getContext());
-        Thread writerBlocker = new Thread(indexUpdater, "writerBlocker");
-        writerBlocker.start();
-        plugin.init(indexUpdater, indexRebuilder, getContext());
+    SearchResults results = plugin.getSearchResultsFromIndexes("Ipsum",
+        "target/lucenetest", null, getContext());
 
+    assertEquals(1, results.getTotalHitcount());
+    verifyDefault();
+  }
+
+  @Test
+  public void testLock() throws IOException {
+    replayDefault();
+    Directory directory;
+    File f = new File(INDEXDIR);
+    int indexingInterval;
+    indexingInterval = 100;
+    int maxQueueSize;
+    maxQueueSize = 1000;
+
+    if (!f.exists()) {
+      f.mkdirs();
+    }
+    directory = FSDirectory.open(f);
+
+    LucenePlugin plugin = new LucenePlugin("Monkey", "Monkey", getContext());
+
+    final IndexUpdater indexUpdater = new TestIndexUpdater(directory, indexingInterval,
+        maxQueueSize, plugin, getContext());
+
+    plugin.init(indexUpdater, getContext());
+
+    Thread permanentBlocker = new Thread(indexUpdater, "permanentBlocker");
+    permanentBlocker.start();
+    this.writeBlockerAcquiresLock.acquireUninterruptibly();
+
+    assertTrue(IndexWriter.isLocked(indexUpdater.getDirectory()));
+
+    final boolean[] doneCleaningIndex = { false };
+
+    Thread indexCleaner = new Thread(new Runnable() {
+      public void run() {
         indexUpdater.cleanIndex();
 
-        Thread indexUpdaterThread = new Thread(indexUpdater, "Lucene Index Updater");
-        indexUpdaterThread.start();
+        doneCleaningIndex[0] = true;
+      }
+    }, "indexCleaner");
 
-        indexUpdater.queueDocument(this.loremIpsum.clone(), getContext(), false);
-        indexUpdater.queueDocument(this.loremIpsum.clone(), getContext(), false);
+    indexCleaner.start();
 
-        try {
-            Thread.sleep(1000);
-            indexUpdater.doExit();
-        } catch (InterruptedException e) {
-        }
-        while (true) {
-            try {
-                indexUpdaterThread.join();
-                break;
-            } catch (InterruptedException e) {
-            }
-        }
-
-        Query q = new TermQuery(new Term(IndexFields.DOCUMENT_ID, "wiki:Lorem.Ipsum.default"));
-        IndexSearcher searcher = new IndexSearcher(directory, true);
-        TopDocs t = searcher.search(q, null, 10);
-
-        assertEquals(1, t.totalHits);
-
-        SearchResults results = plugin.getSearchResultsFromIndexes("Ipsum", "target/lucenetest", null, getContext());
-
-        assertEquals(1, results.getTotalHitcount());
-        verifyAll();
+    try {
+      Thread.sleep(5000);
+    } catch (InterruptedException e) {
     }
 
-    @Test
-    public void testLock() throws IOException
-    {
-      replayAll();
-        Directory directory;
-        File f = new File(INDEXDIR);
-        int indexingInterval;
-        indexingInterval = 100;
-        int maxQueueSize;
-        maxQueueSize = 1000;
+    assertFalse(doneCleaningIndex[0]);
 
-        if (!f.exists()) {
-            f.mkdirs();
-        }
-        directory = FSDirectory.open(f);
+    boolean wasActuallyLocked = false;
 
-        LucenePlugin plugin = new LucenePlugin("Monkey", "Monkey", getContext());
-
-        final IndexUpdater indexUpdater =
-            new TestIndexUpdater(directory, indexingInterval, maxQueueSize, plugin, getContext());
-
-        plugin.init(indexUpdater, getContext());
-
-        Thread permanentBlocker = new Thread(indexUpdater, "permanentBlocker");
-        permanentBlocker.start();
-        this.writeBlockerAcquiresLock.acquireUninterruptibly();
-
-        assertTrue(IndexWriter.isLocked(indexUpdater.getDirectory()));
-
-        final boolean[] doneCleaningIndex = {false};
-
-        Thread indexCleaner = new Thread(new Runnable()
-        {
-            public void run()
-            {
-                indexUpdater.cleanIndex();
-
-                doneCleaningIndex[0] = true;
-            }
-        }, "indexCleaner");
-
-        indexCleaner.start();
-
-        try {
-            Thread.sleep(5000);
-        } catch (InterruptedException e) {
-        }
-
-        assertFalse(doneCleaningIndex[0]);
-
-        boolean wasActuallyLocked = false;
-
-        try {
-            if (!IndexWriter.isLocked(indexUpdater.getDirectory())) {
-                new IndexWriter(indexUpdater.getDirectory(), new StandardAnalyzer(Version.LUCENE_34),
-                    MaxFieldLength.LIMITED);
-            } else {
-                wasActuallyLocked = true;
-            }
-            // assert(IndexWriter.isLocked(indexUpdater.getDirectory()));
-        } catch (LockObtainFailedException e) {
-            /*
-             * Strange, the isLocked method appears to be unreliable.
-             */
-            wasActuallyLocked = true;
-        }
-
-        assertTrue(wasActuallyLocked);
-
-        this.writeBlockerWait.release();
-
-        while (true) {
-            try {
-                indexCleaner.join();
-                break;
-            } catch (InterruptedException e) {
-            }
-        }
-
-        assertTrue(doneCleaningIndex[0]);
-
-        assertFalse(IndexWriter.isLocked(indexUpdater.getDirectory()));
-
-        IndexWriter w =
-            new IndexWriter(indexUpdater.getDirectory(), new StandardAnalyzer(Version.LUCENE_34),
-                MaxFieldLength.LIMITED);
-        w.close();
-        verifyAll();
+    try {
+      if (!IndexWriter.isLocked(indexUpdater.getDirectory())) {
+        new IndexWriter(indexUpdater.getDirectory(), new StandardAnalyzer(
+            Version.LUCENE_34), MaxFieldLength.LIMITED);
+      } else {
+        wasActuallyLocked = true;
+      }
+      // assert(IndexWriter.isLocked(indexUpdater.getDirectory()));
+    } catch (LockObtainFailedException e) {
+      /*
+       * Strange, the isLocked method appears to be unreliable.
+       */
+      wasActuallyLocked = true;
     }
 
+    assertTrue(wasActuallyLocked);
 
-    private void replayAll(Object ... mocks) {
-      replay(mocks);
-      replay(mockXWiki, mockXWikiStoreInterface);
+    this.writeBlockerWait.release();
+
+    while (true) {
+      try {
+        indexCleaner.join();
+        break;
+      } catch (InterruptedException e) {
+      }
     }
 
-    private void verifyAll(Object ... mocks) {
-      verify(mocks);
-      verify(mockXWiki, mockXWikiStoreInterface);
-    }
+    assertTrue(doneCleaningIndex[0]);
+
+    assertFalse(IndexWriter.isLocked(indexUpdater.getDirectory()));
+
+    IndexWriter w = new IndexWriter(indexUpdater.getDirectory(), new StandardAnalyzer(
+        Version.LUCENE_34), MaxFieldLength.LIMITED);
+    w.close();
+    verifyDefault();
+  }
+
 }

@@ -30,6 +30,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.xwiki.model.reference.EntityReferenceSerializer;
 
+import com.celements.web.plugin.cmd.PlainTextCommand;
 import com.xpn.xwiki.XWikiContext;
 import com.xpn.xwiki.doc.XWikiDocument;
 import com.xpn.xwiki.objects.BaseObject;
@@ -60,9 +61,11 @@ public class DocumentData extends AbstractDocumentData {
   /** The importance of an object property. **/
   private static final float OBJECT_PROPERTY_BOOST = 0.75f;
 
+  private PlainTextCommand plainTextCmd = new PlainTextCommand();
+
   /** Reference serializer which removes the wiki prefix. */
   private EntityReferenceSerializer<String> localEntityReferenceSerializer =
-    Utils.getComponent(EntityReferenceSerializer.class, "local");
+      Utils.getComponent(EntityReferenceSerializer.class, "local");
 
   public DocumentData(final XWikiDocument doc, final XWikiContext context,
       final boolean deleted) {
@@ -84,10 +87,12 @@ public class DocumentData extends AbstractDocumentData {
     super.getFullText(sb, doc, context);
 
     sb.append(" ");
-    sb.append(StringUtils.lowerCase(doc.getContent()));
+    //TODO should it be rendered maybe by plainPageType view?
+    sb.append(StringUtils.lowerCase(plainTextCmd.convertToPlainText(doc.getContent())));
     sb.append(" ");
 
-    getObjectFullText(sb, doc, context);
+    //XXX removing xwiki adding all properties to fulltext. What should it be good for? 
+    // getObjectFullText(sb, doc, context);
   }
 
   /**
@@ -96,7 +101,8 @@ public class DocumentData extends AbstractDocumentData {
    * full text content (values of title,category,content and extract )
    * XWiki.ArticleClass Object, as far as it could be extracted.
    */
-  private void getObjectFullText(StringBuilder sb, XWikiDocument doc, XWikiContext context) {
+  private void getObjectFullText(StringBuilder sb, XWikiDocument doc,
+      XWikiContext context) {
     getObjectContentAsText(sb, doc, context);
   }
 
@@ -143,8 +149,9 @@ public class DocumentData extends AbstractDocumentData {
     for (List<BaseObject> objects : doc.getXObjects().values()) {
       for (BaseObject obj : objects) {
         if (obj != null) {
-          addFieldToDocument(IndexFields.OBJECT, this.localEntityReferenceSerializer
-              .serialize(obj.getXClassReference()).toLowerCase(), Field.Store.YES,
+          addFieldToDocument(IndexFields.OBJECT,
+              this.localEntityReferenceSerializer.serialize(obj.getXClassReference()
+                  ).toLowerCase(), Field.Store.YES,
               Field.Index.NOT_ANALYZED, CLASSNAME_BOOST, luceneDoc);
           Object[] propertyNames = obj.getPropertyNames();
           for (int i = 0; i < propertyNames.length; i++) {

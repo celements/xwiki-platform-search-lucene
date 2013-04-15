@@ -41,111 +41,119 @@ import com.xpn.xwiki.web.Utils;
  * @version $Id: 97f3293fd1c3899d5edca377a2eb32905295a78a $
  * @since 1.23
  */
-public abstract class AbstractDocumentData extends AbstractIndexData
-{
-    private static final Logger LOGGER = LoggerFactory.getLogger(AbstractDocumentData.class);
+public abstract class AbstractDocumentData extends AbstractIndexData {
 
-    /** The importance of the document ID. **/
-    protected static final float ID_BOOST = 0.1f;
+  private static final Logger LOGGER = LoggerFactory.getLogger(
+      AbstractDocumentData.class);
 
-    /** The importance of the document language. **/
-    protected static final float LANGUAGE_BOOST = 0.1f;
+  /** The importance of the document ID. **/
+  protected static final float ID_BOOST = 0.1f;
 
-    /** The importance of the entity type. **/
-    protected static final float TYPE_BOOST = 0.1f;
+  /** The importance of the document language. **/
+  protected static final float LANGUAGE_BOOST = 0.1f;
 
-    /** The importance of the document's wiki. **/
-    protected static final float WIKI_BOOST = 0.1f;
+  /** The importance of the entity type. **/
+  protected static final float TYPE_BOOST = 0.1f;
 
-    /** The importance of the document's space. **/
-    protected static final float SPACE_BOOST = 0.5f;
+  /** The importance of the document's wiki. **/
+  protected static final float WIKI_BOOST = 0.1f;
 
-    /** The importance of the document's name. **/
-    protected static final float NAME_BOOST = 2.5f;
+  /** The importance of the document's space. **/
+  protected static final float SPACE_BOOST = 0.5f;
 
-    /** The importance of the document full name. **/
-    protected static final float FULL_NAME_BOOST = 2f;
+  /** The importance of the document's name. **/
+  protected static final float NAME_BOOST = 2.5f;
 
-    /** The importance of the document title. **/
-    protected static final float TITLE_BOOST = 3f;
+  /** The importance of the document full name. **/
+  protected static final float FULL_NAME_BOOST = 2f;
 
-    /** The importance of the full document content. **/
-    protected static final float CONTENT_BOOST = 2f;
+  /** The importance of the document title. **/
+  protected static final float TITLE_BOOST = 3f;
 
-    /** The importance of the document creator username. **/
-    protected static final float CREATOR_BOOST = 0.25f;
+  /** The importance of the full document content. **/
+  protected static final float CONTENT_BOOST = 2f;
 
-    /** The importance of the last document author username. **/
-    protected static final float AUTHOR_BOOST = 0.25f;
+  /** The importance of the document creator username. **/
+  protected static final float CREATOR_BOOST = 0.25f;
 
-    /** The importance of the document creation date. **/
-    protected static final float CREATION_DATE_BOOST = 0.2f;
+  /** The importance of the last document author username. **/
+  protected static final float AUTHOR_BOOST = 0.25f;
 
-    /** The importance of the document last modification date. **/
-    protected static final float DATE_BOOST = 0.1f;
+  /** The importance of the document creation date. **/
+  protected static final float CREATION_DATE_BOOST = 0.2f;
 
-    /** The importance of the document hidden flag. **/
-    protected static final float HIDDEN_BOOST = 0.01f;
+  /** The importance of the document last modification date. **/
+  protected static final float DATE_BOOST = 0.1f;
 
-    private String version;
+  /** The importance of the document hidden flag. **/
+  protected static final float HIDDEN_BOOST = 0.01f;
 
-    private String documentTitle;
+  private String version;
 
-    private String author;
+  private String documentTitle;
 
-    private String creator;
+  private String author;
 
-    private String language;
+  private String creator;
 
-    private Date creationDate;
+  private String language;
 
-    private Date modificationDate;
+  private Date creationDate;
 
-    public AbstractDocumentData(String type, XWikiDocument doc, XWikiContext context, boolean deleted)
-    {
-        super(type, doc.getDocumentReference(), deleted);
+  private Date modificationDate;
 
-        setVersion(doc.getVersion());
-        setDocumentTitle(doc.getRenderedTitle(Syntax.PLAIN_1_0, context));
-        setLanguage(doc.getLanguage());
+  public AbstractDocumentData(String type, XWikiDocument doc, XWikiContext context,
+      boolean deleted) {
+    super(type, doc.getDocumentReference(), deleted);
+
+    setVersion(doc.getVersion());
+    setDocumentTitle(doc.getRenderedTitle(Syntax.PLAIN_1_0, context));
+    setLanguage(doc.getLanguage());
+  }
+
+  /**
+   * Adds this documents data to a lucene Document instance for indexing.
+   * <p>
+   * <strong>Short introduction to Lucene field types </strong>
+   * </p>
+   * <p>
+   * Which type of Lucene field is used determines what Lucene does with data
+   * and how we can use it for searching and showing search results:
+   * </p>
+   * <ul>
+   * <li>Keyword fields don't get tokenized, but are searchable and stored in
+   * the index. This is perfect for fields you want to search in
+   * programmatically (like ids and such), and date fields. Since all
+   * user-entered queries are tokenized, letting the user search these fields
+   * makes almost no sense, except of queries for date fields, where
+   * tokenization is useless.</li>
+   * <li>the stored text fields are used for short texts which should be
+   * searchable by the user, and stored in the index for reconstruction. Perfect
+   * for document names, titles, abstracts.</li>
+   * <li>the unstored field takes the biggest part of the content - the full
+   * text. It is tokenized and indexed, but not stored in the index. This makes
+   * sense, since when the user wants to see the full content, he clicks the
+   * link to vie the full version of a document, which is then delivered by
+   * xwiki.</li>
+   * </ul>
+   * 
+   * @param luceneDoc
+   *          if not null, this controls which translated version of the content
+   *          will be indexed. If null, the content in the default language will
+   *          be used.
+   */
+  @Override
+  public void addDataToLuceneDocument(Document luceneDoc, XWikiContext context)
+      throws XWikiException {
+    // FIXME Is it not possible to obtain the right translation directly?
+    XWikiDocument doc = context.getWiki().getDocument(getDocumentReference(), context);
+
+    if (getLanguage() != null && !getLanguage().equals("")) {
+      doc = doc.getTranslatedDocument(getLanguage(), context);
     }
 
-    /**
-     * Adds this documents data to a lucene Document instance for indexing.
-     * <p>
-     * <strong>Short introduction to Lucene field types </strong>
-     * </p>
-     * <p>
-     * Which type of Lucene field is used determines what Lucene does with data and how we can use it for searching and
-     * showing search results:
-     * </p>
-     * <ul>
-     * <li>Keyword fields don't get tokenized, but are searchable and stored in the index. This is perfect for fields
-     * you want to search in programmatically (like ids and such), and date fields. Since all user-entered queries are
-     * tokenized, letting the user search these fields makes almost no sense, except of queries for date fields, where
-     * tokenization is useless.</li>
-     * <li>the stored text fields are used for short texts which should be searchable by the user, and stored in the
-     * index for reconstruction. Perfect for document names, titles, abstracts.</li>
-     * <li>the unstored field takes the biggest part of the content - the full text. It is tokenized and indexed, but
-     * not stored in the index. This makes sense, since when the user wants to see the full content, he clicks the link
-     * to vie the full version of a document, which is then delivered by xwiki.</li>
-     * </ul>
-     * 
-     * @param luceneDoc if not null, this controls which translated version of the content will be indexed. If null, the
-     *            content in the default language will be used.
-     */
-    @Override
-    public void addDataToLuceneDocument(Document luceneDoc, XWikiContext context) throws XWikiException
-    {
-        // FIXME Is it not possible to obtain the right translation directly?
-        XWikiDocument doc = context.getWiki().getDocument(getDocumentReference(), context);
-
-        if (getLanguage() != null && !getLanguage().equals("")) {
-            doc = doc.getTranslatedDocument(getLanguage(), context);
-        }
-
-        addDocumentDataToLuceneDocument(luceneDoc, doc, context);
-    }
+    addDocumentDataToLuceneDocument(luceneDoc, doc, context);
+  }
 
   public void addDocumentDataToLuceneDocument(Document luceneDoc, XWikiDocument doc,
       XWikiContext context) {
@@ -181,14 +189,14 @@ public abstract class AbstractDocumentData extends AbstractIndexData
           Field.Index.NOT_ANALYZED, TYPE_BOOST, luceneDoc);
     }
     if (this.modificationDate != null) {
-      addFieldToDocument(IndexFields.DOCUMENT_DATE, IndexFields.dateToString(
-          this.modificationDate), Field.Store.YES, Field.Index.NOT_ANALYZED, DATE_BOOST,
-          luceneDoc);
+      addFieldToDocument(IndexFields.DOCUMENT_DATE,
+          IndexFields.dateToString(this.modificationDate), Field.Store.YES,
+          Field.Index.NOT_ANALYZED, DATE_BOOST, luceneDoc);
     }
     if (this.creationDate != null) {
-      addFieldToDocument(IndexFields.DOCUMENT_CREATIONDATE, IndexFields.dateToString(
-          this.creationDate), Field.Store.YES, Field.Index.NOT_ANALYZED,
-          CREATION_DATE_BOOST, luceneDoc);
+      addFieldToDocument(IndexFields.DOCUMENT_CREATIONDATE,
+          IndexFields.dateToString(this.creationDate), Field.Store.YES,
+          Field.Index.NOT_ANALYZED, CREATION_DATE_BOOST, luceneDoc);
     }
 
     // Short text fields: tokenized and indexed, stored in the index
@@ -227,181 +235,169 @@ public abstract class AbstractDocumentData extends AbstractIndexData
     }
   }
 
-    /**
-     * @return string unique to this document across all languages and virtual wikis
-     */
-    @Override
-    public String getId()
-    {
-        StringBuilder retval = new StringBuilder();
+  /**
+   * @return string unique to this document across all languages and virtual
+   *         wikis
+   */
+  @Override
+  public String getId() {
+    StringBuilder retval = new StringBuilder();
 
-        retval.append(getFullName());
-        retval.append(".");
-        retval.append(getLanguage());
+    retval.append(getFullName());
+    retval.append(".");
+    retval.append(getLanguage());
 
-        return retval.toString();
+    return retval.toString();
+  }
+
+  @Override
+  public Term getTerm() {
+    return new Term(IndexFields.DOCUMENT_ID, getId());
+  }
+
+  /**
+   * @return String of documentName, documentWeb, author and creator
+   */
+  @Override
+  public String getFullText(XWikiDocument doc, XWikiContext context) {
+    StringBuilder sb = new StringBuilder();
+
+    getFullText(sb, doc, context);
+
+    return sb.toString();
+  }
+
+  @Override
+  protected void getFullText(StringBuilder sb, XWikiDocument doc, XWikiContext context) {
+  }
+
+  /**
+   * @param author
+   *          The author to set.
+   */
+  public void setAuthor(String author) {
+    this.author = author;
+  }
+
+  /**
+   * @param version
+   *          the version of the document
+   */
+  public void setVersion(String version) {
+    this.version = version;
+  }
+
+  /**
+   * @param documentTitle
+   *          the document title
+   */
+  public void setDocumentTitle(String documentTitle) {
+    this.documentTitle = documentTitle;
+  }
+
+  /**
+   * @param modificationDate
+   *          The modificationDate to set.
+   */
+  public void setModificationDate(Date modificationDate) {
+    this.modificationDate = modificationDate;
+  }
+
+  public String getDocumentTitle() {
+    return this.documentTitle;
+  }
+
+  public DocumentReference getDocumentReference() {
+    return (DocumentReference) getEntityReference();
+  }
+
+  @Override
+  public String getDocumentName() {
+    return getEntityName(EntityType.DOCUMENT);
+  }
+
+  @Override
+  public String getDocumentSpace() {
+    return getEntityName(EntityType.SPACE);
+  }
+
+  @Override
+  public String getWiki() {
+    return getEntityName(EntityType.WIKI);
+  }
+
+  @Override
+  public String getDocumentFullName() {
+    return (String) Utils.getComponent(EntityReferenceSerializer.class, "local")
+        .serialize(getEntityReference());
+  }
+
+  public String getVersion() {
+    return this.version;
+  }
+
+  public Date getCreationDate() {
+    return this.creationDate;
+  }
+
+  public void setCreationDate(Date creationDate) {
+    this.creationDate = creationDate;
+  }
+
+  public String getCreator() {
+    return this.creator;
+  }
+
+  public void setCreator(String creator) {
+    this.creator = creator;
+  }
+
+  @Override
+  public String getFullName() {
+    return (String) Utils.getComponent(EntityReferenceSerializer.class).serialize(
+        getEntityReference());
+  }
+
+  public String getLanguage() {
+    return this.language;
+  }
+
+  public void setLanguage(String lang) {
+    if (!StringUtils.isEmpty(lang)) {
+      this.language = lang;
+    } else {
+      this.language = "default";
     }
+  }
 
-    @Override
-    public Term getTerm()
-    {
-        return new Term(IndexFields.DOCUMENT_ID, getId());
-    }
+  // Object
 
-    /**
-     * @return String of documentName, documentWeb, author and creator
-     */
-    @Override
-    public String getFullText(XWikiDocument doc, XWikiContext context)
-    {
-        StringBuilder sb = new StringBuilder();
+  @Override
+  public String toString() {
+    return getId();
+  }
 
-        getFullText(sb, doc, context);
-
-        return sb.toString();
-    }
-
-    @Override
-    protected void getFullText(StringBuilder sb, XWikiDocument doc, XWikiContext context)
-    {
-    }
-
-    /**
-     * @param author The author to set.
-     */
-    public void setAuthor(String author)
-    {
-        this.author = author;
-    }
-
-    /**
-     * @param version the version of the document
-     */
-    public void setVersion(String version)
-    {
-        this.version = version;
-    }
-
-    /**
-     * @param documentTitle the document title
-     */
-    public void setDocumentTitle(String documentTitle)
-    {
-        this.documentTitle = documentTitle;
-    }
-
-    /**
-     * @param modificationDate The modificationDate to set.
-     */
-    public void setModificationDate(Date modificationDate)
-    {
-        this.modificationDate = modificationDate;
-    }
-
-    public String getDocumentTitle()
-    {
-        return this.documentTitle;
-    }
-
-    public DocumentReference getDocumentReference()
-    {
-        return (DocumentReference) getEntityReference();
-    }
-
-    @Override
-    public String getDocumentName()
-    {
-        return getEntityName(EntityType.DOCUMENT);
-    }
-
-    @Override
-    public String getDocumentSpace()
-    {
-        return getEntityName(EntityType.SPACE);
-    }
-
-    @Override
-    public String getWiki()
-    {
-        return getEntityName(EntityType.WIKI);
-    }
-
-    @Override
-    public String getDocumentFullName()
-    {
-        return (String)Utils.getComponent(EntityReferenceSerializer.class, "local"
-            ).serialize(getEntityReference());
-    }
-
-    public String getVersion()
-    {
-        return this.version;
-    }
-
-    public Date getCreationDate()
-    {
-        return this.creationDate;
-    }
-
-    public void setCreationDate(Date creationDate)
-    {
-        this.creationDate = creationDate;
-    }
-
-    public String getCreator()
-    {
-        return this.creator;
-    }
-
-    public void setCreator(String creator)
-    {
-        this.creator = creator;
-    }
-
-    @Override
-    public String getFullName()
-    {
-        return (String)Utils.getComponent(EntityReferenceSerializer.class).serialize(
-            getEntityReference());
-    }
-
-    public String getLanguage()
-    {
-        return this.language;
-    }
-
-    public void setLanguage(String lang)
-    {
-        if (!StringUtils.isEmpty(lang)) {
-            this.language = lang;
-        } else {
-            this.language = "default";
-        }
-    }
-
-    // Object
-
-    @Override
-    public String toString()
-    {
-        return getId();
-    }
-
-    /**
-     * Indexes data into a Lucene field and adds it to the specified Lucene document.
-     * 
-     * @param fieldName the target field name under which to index this data
-     * @param value the data to index
-     * @param howToStore whether or not to store this field
-     * @param howToIndex how to index the data: analyzed or not
-     * @param boost how much to weight hits on this field in search results
-     * @param luceneDoc the Lucene document to which the resulting field should be added
-     */
-    protected static void addFieldToDocument(String fieldName, String value, Field.Store howToStore,
-        Field.Index howToIndex, float boost, Document luceneDoc)
-    {
-        Field f = new Field(fieldName, value, howToStore, howToIndex);
-        f.setBoost(boost);
-        luceneDoc.add(f);
-    }
+  /**
+   * Indexes data into a Lucene field and adds it to the specified Lucene
+   * document.
+   * 
+   * @param fieldName
+   *          the target field name under which to index this data
+   * @param value
+   *          the data to index
+   * @param howToStore
+   *          whether or not to store this field
+   * @param howToIndex
+   *          how to index the data: analyzed or not
+   * @param boost
+   *          how much to weight hits on this field in search results
+   * @param luceneDoc
+   *          the Lucene document to which the resulting field should be added
+   */
+  protected static void addFieldToDocument(String fieldName, String value,
+      Field.Store howToStore, Field.Index howToIndex, float boost, Document luceneDoc) {
+    Field f = new Field(fieldName, value, howToStore, howToIndex);
+    f.setBoost(boost);
+    luceneDoc.add(f);
+  }
 }

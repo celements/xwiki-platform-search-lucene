@@ -428,6 +428,9 @@ public class LucenePlugin extends XWikiDefaultPlugin
             bQuery.add(parsedQuery, BooleanClause.Occur.MUST);
         } else if (query.startsWith("MULTI ")) {
             // for fulltext search
+            //XXX several problems in Multi search:
+            //XXX 1. prefix "MULTI " not removed
+            //XXX 2. IndexUpdater.fields after restart empty
             List<String> fieldList = IndexUpdater.fields;
             String[] fields = fieldList.toArray(new String[fieldList.size()]);
             BooleanClause.Occur[] flags = new BooleanClause.Occur[fields.length];
