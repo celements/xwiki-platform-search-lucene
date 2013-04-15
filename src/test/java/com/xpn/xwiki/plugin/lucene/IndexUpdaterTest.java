@@ -140,8 +140,8 @@ public class IndexUpdaterTest extends AbstractBridgedComponentTestCase {
     expect(
         mockXWiki.getDocument(eq(this.loremIpsum.getDocumentReference()),
             anyObject(XWikiContext.class))).andReturn(loremIpsum).anyTimes();
-    expect(mockXWiki.Param(eq("xwiki.plugins.lucene.resultLimit"), eq("1000"))).andReturn(
-        "1000").anyTimes();
+    expect(mockXWiki.Param(eq("xwiki.plugins.lucene.resultLimit"), eq("1000"))
+        ).andReturn("123").anyTimes();
     expect(mockXWiki.Param(anyObject(String.class), anyObject(String.class))).andReturn(
         "").anyTimes();
     expect(mockXWiki.Param(eq(LucenePlugin.PROP_INDEX_DIR))).andReturn(
