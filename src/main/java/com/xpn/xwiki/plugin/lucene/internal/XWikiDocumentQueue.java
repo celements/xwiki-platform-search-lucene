@@ -26,12 +26,13 @@ import org.apache.commons.collections.Buffer;
 import org.apache.commons.collections.BufferUnderflowException;
 import org.apache.commons.collections.buffer.UnboundedFifoBuffer;
 
+
 /**
  * This class represents a Queue (FirstInFirstOut) for XWikiDocument objects. It is used during indexing of the wiki.
  * The index is updated whenever the processing queue is not empty. This class is threadsafe, as usually several threads
  * add elements and one thread removes them for processing.
  * 
- * @version $Id: 04187bfc92c5273f46dd5d519cfd1835df839dd6 $
+ * @version $Id: 485e8616729657782d4e0904fa02cea80c65cbb1 $
  */
 public class XWikiDocumentQueue
 {

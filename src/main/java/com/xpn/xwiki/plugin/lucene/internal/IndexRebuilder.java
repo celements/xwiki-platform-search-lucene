@@ -26,18 +26,19 @@ import java.util.Collections;
 import java.util.List;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.search.BooleanClause;
 import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.search.IndexSearcher;
-import org.apache.lucene.search.Searcher;
 import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.store.Directory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.xwiki.context.Execution;
+import org.xwiki.context.ExecutionContext;
 import org.xwiki.model.reference.DocumentReference;
 
 import com.xpn.xwiki.XWiki;
@@ -78,7 +79,7 @@ import com.xpn.xwiki.web.Utils;
  * </ul>
  * </p>
  * 
- * @version $Id: 5bb91a92a5990405edd8203dff5b4e24103af5c3 $
+ * @version $Id: 7614cb7efce6a81bc45bf0927ac6a06cb6610ace $
  */
 public class IndexRebuilder extends AbstractXWikiRunnable
 {
@@ -117,10 +118,18 @@ public class IndexRebuilder extends AbstractXWikiRunnable
      */
     private boolean onlyNew = false;
 
+    private XWikiContext xwikiContext;
+
+    @Override
+    protected void declareProperties(ExecutionContext executionContext)
+    {
+        xwikiContext.declareInExecutionContext(executionContext);
+    }
+
+
     public IndexRebuilder(IndexUpdater indexUpdater, XWikiContext context)
     {
-        super(XWikiContext.EXECUTIONCONTEXT_KEY, context.clone());
-
+        this.xwikiContext = context.clone();
         this.indexUpdater = indexUpdater;
     }
 
@@ -149,8 +158,12 @@ public class IndexRebuilder extends AbstractXWikiRunnable
                 } else {
                     try {
                         IndexWriter writer = this.indexUpdater.openWriter(false);
-                        for (String wiki : wikis) {
-                            writer.deleteDocuments(new Term(IndexFields.DOCUMENT_WIKI, wiki));
+                        try {
+                            for (String wiki : wikis) {
+                                writer.deleteDocuments(new Term(IndexFields.DOCUMENT_WIKI, wiki));
+                            }
+                        } finally {
+                            writer.close();
                         }
                     } catch (IOException ex) {
                         LOGGER.warn("Failed to clean wiki index: {}", ex.getMessage());
@@ -293,7 +306,7 @@ public class IndexRebuilder extends AbstractXWikiRunnable
             context.setDatabase(wikiName);
 
             // If only not already indexed document has to be indexed create a Searcher to find out
-            Searcher searcher = this.onlyNew ? createSearcher(this.indexUpdater.getDirectory(), context) : null;
+            IndexSearcher searcher = this.onlyNew ? createSearcher(this.indexUpdater.getDirectory(), context) : null;
 
             try {
                 String hql =
@@ -310,18 +323,10 @@ public class IndexRebuilder extends AbstractXWikiRunnable
 
                 retval = indexDocuments(wikiName, documents, searcher, context);
             } catch (XWikiException e) {
-                LOGGER.warn("Error getting document names for wiki [{}] and filter [{}]: {}.",
-                    new Object[] {wikiName, this.hqlFilter, e.getMessage()});
+                LOGGER.warn("Error getting document names for wiki [{}] and filter [{}]: {}.", new Object[] {wikiName,
+                this.hqlFilter, e.getMessage()});
 
                 return -1;
-            } finally {
-                if (searcher != null) {
-                    try {
-                        searcher.close();
-                    } catch (IOException e) {
-                        LOGGER.error("Failed to close searcher", e);
-                    }
-                }
             }
         } finally {
             context.setDatabase(database);
@@ -330,7 +335,7 @@ public class IndexRebuilder extends AbstractXWikiRunnable
         return retval;
     }
 
-    private int indexDocuments(String wikiName, List<Object[]> documents, Searcher searcher, XWikiContext context)
+    private int indexDocuments(String wikiName, List<Object[]> documents, IndexSearcher searcher, XWikiContext context)
         throws InterruptedException
     {
         int retval = 0;
@@ -344,8 +349,8 @@ public class IndexRebuilder extends AbstractXWikiRunnable
                 try {
                     retval += addTranslationOfDocument(documentReference, language, context);
                 } catch (XWikiException e) {
-                    LOGGER.error("Error fetching document [{}] for language [{}]",
-                        new Object[] {documentReference, language, e});
+                    LOGGER.error("Error fetching document [{}] for language [{}]", new Object[] {documentReference,
+                    language, e});
 
                     return retval;
                 }
@@ -408,12 +413,12 @@ public class IndexRebuilder extends AbstractXWikiRunnable
         return retval;
     }
 
-    public boolean isIndexed(DocumentReference documentReference, Searcher searcher)
+    public boolean isIndexed(DocumentReference documentReference, IndexSearcher searcher)
     {
         return isIndexed(documentReference, null, null, searcher);
     }
 
-    public boolean isIndexed(DocumentReference documentReference, String version, String language, Searcher searcher)
+    public boolean isIndexed(DocumentReference documentReference, String version, String language, IndexSearcher searcher)
     {
         boolean exists = false;
 
@@ -446,12 +451,12 @@ public class IndexRebuilder extends AbstractXWikiRunnable
         return exists;
     }
 
-    public Searcher createSearcher(Directory directory, XWikiContext context)
+    public IndexSearcher createSearcher(Directory directory, XWikiContext context)
     {
-        Searcher searcher = null;
-
+        IndexSearcher searcher = null;
+        
         try {
-            searcher = new IndexSearcher(directory, true);
+            searcher = new IndexSearcher(DirectoryReader.open(directory));
         } catch (Exception e) {
             LOGGER.error("Faild to create IndexSearcher for Lucene index [{}]", directory, e);
         }

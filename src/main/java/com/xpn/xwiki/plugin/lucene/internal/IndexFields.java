@@ -26,11 +26,12 @@ import org.apache.commons.lang3.time.FastDateFormat;
 
 import com.xpn.xwiki.plugin.lucene.SearchResult;
 
+
 /**
  * Contains constants naming the Lucene index fields used by this Plugin and some helper methods for proper handling of
  * special field values like dates.
  * 
- * @version $Id: c5240610a807da9be47eebfeb002872449773cb6 $
+ * @version $Id: b0c1621a704d9c3e6836aceeaf28398a90ec7eb2 $
  */
 public abstract class IndexFields
 {
@@ -67,6 +68,11 @@ public abstract class IndexFields
     public static final String DOCUMENT_SPACE = "space";
 
     /**
+     * Name of the space the document belongs to, untokenized for exact matches.
+     */
+    public static final String DOCUMENT_EXACTSPACE = "exactspace";
+
+    /**
      * FullName of the document (example : Main.WebHome)
      */
     public static final String DOCUMENT_FULLNAME = "fullname";
@@ -75,7 +81,7 @@ public abstract class IndexFields
      * Version of the document
      */
     public static final String DOCUMENT_VERSION = "version";
-    
+
     /**
      * Language of the document
      */
@@ -91,6 +97,8 @@ public abstract class IndexFields
      * Filename, only used for attachments
      */
     public static final String FILENAME = "filename";
+
+    public static final String MIMETYPE = "mimetype";
 
     /**
      * XWiki object type, only used for objects

@@ -22,8 +22,8 @@ package com.xpn.xwiki.plugin.lucene;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.ScoreDoc;
-import org.apache.lucene.search.Searcher;
 import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.search.TopDocsCollector;
 import org.slf4j.Logger;
@@ -42,13 +42,13 @@ import com.xpn.xwiki.web.Utils;
  * results the user executing the search is allowed to view.
  * </p>
  * 
- * @version $Id: 111c8d01d68749e3b4214a49238963ab10b70445 $
+ * @version $Id: 23e260cdcf03639ae67d1f926efbe447032e0e0a $
  */
 public class SearchResults extends Api
 {
     private final XWiki xwiki;
 
-    private final Searcher searcher;
+    private final IndexSearcher searcher;
 
     private final TopDocsCollector< ? extends ScoreDoc> results;
 
@@ -60,8 +60,7 @@ public class SearchResults extends Api
      * @param results Lucene search results
      * @param xwiki xwiki instance for access rights checking
      */
-    SearchResults(TopDocsCollector< ? extends ScoreDoc> results, Searcher searcher, XWiki xwiki,
-        XWikiContext context)
+    public SearchResults(TopDocsCollector< ? extends ScoreDoc> results, IndexSearcher searcher, XWiki xwiki, XWikiContext context)
     {
         super(context);
 
@@ -189,8 +188,9 @@ public class SearchResults extends Api
                 for (int i = 0; i < docs.scoreDocs.length; i++) {
                     SearchResult result = null;
                     try {
-                        result = new SearchResult(this.searcher.doc(docs.scoreDocs[i].doc), docs.scoreDocs[i].score,
-                            this.xwiki);
+                        result =
+                            new SearchResult(this.searcher.doc(docs.scoreDocs[i].doc), docs.scoreDocs[i].score,
+                                this.xwiki);
 
                         this.context.setDatabase(result.getWiki());
 

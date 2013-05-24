@@ -32,7 +32,7 @@ import com.xpn.xwiki.plugin.lucene.internal.IndexFields;
 /**
  * Result of a search. The Plugin will return a collection of these for display on the search page.
  * 
- * @version $Id: 412230dc664221304dd7aa81ce2d99857af3a35e $
+ * @version $Id: 9a9ea8363f6db3950db2f858d84a39266d36bb21 $
  */
 public class SearchResult
 {
@@ -108,8 +108,8 @@ public class SearchResult
                     this.url = document.getAttachmentURL(this.filename, "download");
                 }
             } catch (XWikiException e) {
-                LOGGER.error("error retrieving url for attachment [{}] of document [{}]",
-                    new Object[] {this.filename, fullDocName, e});
+                LOGGER.error("error retrieving url for attachment [{}] of document [{}]", new Object[] {this.filename,
+                fullDocName, e});
             }
         } else {
             this.objects = doc.getValues("object");

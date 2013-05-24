@@ -38,7 +38,7 @@ import com.xpn.xwiki.doc.XWikiDocument;
 import com.xpn.xwiki.web.Utils;
 
 /**
- * @version $Id: 97f3293fd1c3899d5edca377a2eb32905295a78a $
+ * @version $Id: 8abc509a099f9ae29647cd2b6a2397f9d4e1ab5c $
  * @since 1.23
  */
 public abstract class AbstractDocumentData extends AbstractIndexData
@@ -153,10 +153,10 @@ public abstract class AbstractDocumentData extends AbstractIndexData
         addFieldToDocument(IndexFields.DOCUMENT_ID, getId(), Field.Store.YES, Field.Index.NOT_ANALYZED, ID_BOOST,
             luceneDoc);
 
-        addFieldToDocument(IndexFields.DOCUMENT_LANGUAGE, getLanguage(), Field.Store.YES, Field.Index.NOT_ANALYZED,
+        addFieldToDocument(IndexFields.DOCUMENT_LANGUAGE, getLanguage(), Field.Store.YES, Field.Index.ANALYZED,
             LANGUAGE_BOOST, luceneDoc);
 
-        addFieldToDocument(IndexFields.DOCUMENT_WIKI, getWiki(), Field.Store.YES, Field.Index.NOT_ANALYZED, WIKI_BOOST,
+        addFieldToDocument(IndexFields.DOCUMENT_WIKI, getWiki(), Field.Store.YES, Field.Index.ANALYZED, WIKI_BOOST,
             luceneDoc);
 
         if (StringUtils.isNotBlank(this.author)) {
@@ -170,8 +170,8 @@ public abstract class AbstractDocumentData extends AbstractIndexData
         }
 
         if (getType() != null) {
-            addFieldToDocument(IndexFields.DOCUMENT_TYPE, getType(), Field.Store.YES, Field.Index.NOT_ANALYZED,
-                TYPE_BOOST, luceneDoc);
+            addFieldToDocument(IndexFields.DOCUMENT_TYPE, getType(), Field.Store.YES, Field.Index.ANALYZED, TYPE_BOOST,
+                luceneDoc);
         }
         if (this.modificationDate != null) {
             addFieldToDocument(IndexFields.DOCUMENT_DATE, IndexFields.dateToString(this.modificationDate),
@@ -191,6 +191,9 @@ public abstract class AbstractDocumentData extends AbstractIndexData
             NAME_BOOST, luceneDoc);
 
         addFieldToDocument(IndexFields.DOCUMENT_SPACE, getDocumentSpace(), Field.Store.YES, Field.Index.ANALYZED,
+            SPACE_BOOST, luceneDoc);
+
+        addFieldToDocument(IndexFields.DOCUMENT_EXACTSPACE, getDocumentSpace(), Field.Store.NO, Field.Index.ANALYZED,
             SPACE_BOOST, luceneDoc);
 
         // Old alias for the Space, reduce the importance so that a space hit doesn't score double

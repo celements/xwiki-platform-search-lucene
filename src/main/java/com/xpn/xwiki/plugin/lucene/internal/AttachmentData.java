@@ -25,7 +25,7 @@ import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
-import org.apache.lucene.document.Fieldable;
+import org.apache.lucene.index.IndexableField;
 import org.apache.tika.Tika;
 import org.apache.tika.metadata.Metadata;
 import org.slf4j.Logger;
@@ -41,7 +41,7 @@ import com.xpn.xwiki.plugin.lucene.LucenePlugin;
  * Holds all data but the content of an attachment to be indexed. The content is retrieved at indexing time, which
  * should save us some memory especially when rebuilding an index for a big wiki.
  * 
- * @version $Id: 685396ee5ad477e4d9192fc10ba72b3ba58de11f $
+ * @version $Id: 21dc7457ddfb16003c83315e43c29340cbb5838f $
  */
 public class AttachmentData extends AbstractDocumentData
 {
@@ -57,6 +57,9 @@ public class AttachmentData extends AbstractDocumentData
     /** How much to weight down fields from the owner document that are not that relevant for attachments. */
     private static final float IRRELEVANT_DOCUMENT_FIELD_BOOST = 0.1f;
 
+    /** The importance of the attachment mimetype. */
+    private static final float MIMETYPE_BOOST = 0.5f;
+
     /** Which fields are relevant for attachments as well and should be kept at their original importance. */
     private static final List<String> RELEVANT_DOCUMENT_FIELDS = new ArrayList<String>();
     static {
@@ -70,6 +73,8 @@ public class AttachmentData extends AbstractDocumentData
 
     private String filename;
 
+    private String mimetype;
+
     public AttachmentData(XWikiAttachment attachment, XWikiContext context, boolean deleted)
     {
         super(LucenePlugin.DOCTYPE_ATTACHMENT, attachment.getDoc(), context, deleted);
@@ -78,6 +83,7 @@ public class AttachmentData extends AbstractDocumentData
         setAuthor(attachment.getAuthor());
         setSize(attachment.getFilesize());
         setFilename(attachment.getFilename());
+        setMimeType(attachment.getMimeType(context));
     }
 
     public AttachmentData(XWikiDocument document, String filename, XWikiContext context, boolean deleted)
@@ -92,20 +98,26 @@ public class AttachmentData extends AbstractDocumentData
     {
         super.addDataToLuceneDocument(luceneDoc, context);
 
-        // Lower the importance of the fields inherited from the document
-        List<Fieldable> existingFields = luceneDoc.getFields();
-        for (Fieldable f : existingFields) {
-            if (!RELEVANT_DOCUMENT_FIELDS.contains(f.name())) {
-                f.setBoost(f.getBoost() * IRRELEVANT_DOCUMENT_FIELD_BOOST);
+        List<IndexableField> existingFields = luceneDoc.getFields();
+        for (IndexableField f : existingFields) {
+            if (Field.class.isAssignableFrom(f.getClass())) {
+                Field field = (Field) f;
+                if (!RELEVANT_DOCUMENT_FIELDS.contains(f.name())) {
+                    // Lower the importance of the fields inherited from the document
+                    field.setBoost(field.boost() * IRRELEVANT_DOCUMENT_FIELD_BOOST);
+                } else {
+                    // Decrease the global score of attachments
+                    field.setBoost(ATTACHMENT_GLOBAL_BOOST);
+                }
             }
         }
 
         if (this.filename != null) {
             addFieldToDocument(IndexFields.FILENAME, this.filename, Field.Store.YES, Field.Index.ANALYZED,
                 FILENAME_BOOST, luceneDoc);
+            addFieldToDocument(IndexFields.MIMETYPE, this.mimetype, Field.Store.YES, Field.Index.ANALYZED,
+                MIMETYPE_BOOST, luceneDoc);
         }
-        // Decrease the global score of attachments
-        luceneDoc.setBoost(ATTACHMENT_GLOBAL_BOOST);
     }
 
     /**
@@ -138,6 +150,23 @@ public class AttachmentData extends AbstractDocumentData
     public void setFilename(String filename)
     {
         this.filename = filename;
+    }
+
+    /**
+     * @return Returns the mimetype.
+     */
+
+    public String getMimeType()
+    {
+        return this.mimetype;
+    }
+
+    /**
+     * @param mimetype The mimetype to set.
+     */
+    public void setMimeType(String mimetype)
+    {
+        this.mimetype = mimetype;
     }
 
     /**

@@ -27,11 +27,11 @@ import java.util.Random;
 
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.document.Document;
-import org.apache.lucene.document.Fieldable;
 import org.apache.lucene.index.CorruptIndexException;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.IndexWriterConfig.OpenMode;
+import org.apache.lucene.index.IndexableField;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.LockObtainFailedException;
 import org.apache.lucene.util.Version;
@@ -42,6 +42,7 @@ import org.xwiki.bridge.event.DocumentDeletedEvent;
 import org.xwiki.bridge.event.DocumentUpdatedEvent;
 import org.xwiki.bridge.event.WikiDeletedEvent;
 import org.xwiki.context.Execution;
+import org.xwiki.context.ExecutionContext;
 import org.xwiki.model.reference.WikiReference;
 import org.xwiki.observation.EventListener;
 import org.xwiki.observation.event.Event;
@@ -59,7 +60,7 @@ import com.xpn.xwiki.util.AbstractXWikiRunnable;
 import com.xpn.xwiki.web.Utils;
 
 /**
- * @version $Id: ced4ee86b2d2cf5830598a4a3aefcea8394d60e6 $
+ * @version $Id: 65e5c247661c45e096c2eb977c5fc6b3a3b15ad9 $
  */
 public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
 {
@@ -116,9 +117,17 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
 
     private Analyzer analyzer;
 
+    private final XWikiContext xwikiContext;
+
+    @Override
+    protected void declareProperties(ExecutionContext executionContext)
+    {
+        xwikiContext.declareInExecutionContext(executionContext);
+    }
+
     public IndexUpdater(Directory directory, int indexingInterval, int maxQueueSize, LucenePlugin plugin, XWikiContext context)
     {
-        super(XWikiContext.EXECUTIONCONTEXT_KEY, context.clone());
+        this.xwikiContext = context.clone();
 
         this.plugin = plugin;
 
@@ -238,17 +247,20 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
             } catch (Exception e) {
                 LOGGER.error("error indexing documents", e);
             } finally {
-                context.getWiki().getStore().cleanUp(context);
+                try {
+                    context.getWiki().getStore().cleanUp(context);
+                } catch (Exception e) {
+                    LOGGER.error("Failed to cleanup hibernate session in lucene index updater.", e);
+                }
 
                 try {
-                    writer.optimize();
                     writer.close();
                 } catch (IOException e) {
-                    LOGGER.warn("Failed to close writer.", e);
+                    LOGGER.error("Failed to close writer.", e);
                 }
             }
 
-            this.plugin.openSearchers(context);
+            this.plugin.openIndexReaders(context);
         }
     }
 
@@ -256,7 +268,7 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
     {
         while (true) {
             try {
-                IndexWriterConfig cfg = new IndexWriterConfig(Version.LUCENE_34, this.analyzer);
+                IndexWriterConfig cfg = new IndexWriterConfig(Version.LUCENE_36, this.analyzer);
                 if (create) {
                     cfg.setOpenMode(OpenMode.CREATE);
                 }
@@ -284,7 +296,7 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
         data.addDataToLuceneDocument(luceneDoc, context);
 
         // collecting all the fields for using up in search
-        for (Fieldable field : luceneDoc.getFields()) {
+        for (IndexableField field : luceneDoc.getFields()) {
             if (!fields.contains(field.name())) {
                 fields.add(field.name());
             }
@@ -331,9 +343,8 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
             this.queue.add(new AttachmentData(attachment, context, deleted));
         } else {
             LOGGER.error("Invalid parameters given to {} attachment [{}] of document [{}]", new Object[] {
-                deleted ? "deleted" : "added",
-                attachment == null ? null : attachment.getFilename(),
-                attachment == null || attachment.getDoc() == null ? null : attachment.getDoc().getDocumentReference()});
+            deleted ? "deleted" : "added", attachment == null ? null : attachment.getFilename(),
+            attachment == null || attachment.getDoc() == null ? null : attachment.getDoc().getDocumentReference()});
         }
     }
 
@@ -342,8 +353,8 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
         if (document != null && attachmentName != null && context != null) {
             this.queue.add(new AttachmentData(document, attachmentName, context, deleted));
         } else {
-            LOGGER.error("Invalid parameters given to {} attachment [{}] of document [{}]",
-                new Object[] {(deleted ? "deleted" : "added"), attachmentName, document});
+            LOGGER.error("Invalid parameters given to {} attachment [{}] of document [{}]", new Object[] {
+            (deleted ? "deleted" : "added"), attachmentName, document});
         }
     }
 
@@ -374,19 +385,19 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
         return retval;
     }
 
-//    @Override
+    @Override
     public String getName()
     {
         return NAME;
     }
 
-//    @Override
+    @Override
     public List<Event> getEvents()
     {
         return EVENTS;
     }
 
-//    @Override
+    @Override
     public void onEvent(Event event, Object source, Object data)
     {
         XWikiContext context = (XWikiContext) data;
@@ -426,8 +437,11 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
 
         try {
             IndexWriter w = openWriter(false);
-            n = w.numDocs();
-            w.close();
+            try {
+                n = w.numDocs();
+            } finally {
+                w.close();
+            }
         } catch (IOException e) {
             LOGGER.error("Failed to get the number of documents in Lucene index writer", e);
         }

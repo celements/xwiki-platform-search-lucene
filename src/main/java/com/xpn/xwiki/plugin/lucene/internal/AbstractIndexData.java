@@ -31,7 +31,7 @@ import com.xpn.xwiki.doc.XWikiDocument;
 import com.xpn.xwiki.web.Utils;
 
 /**
- * @version $Id: 7078d17d13ffdd29d41a0b5367bbaf3ce545ba36 $
+ * @version $Id: 553abdcca2fb44c4a6ed86780351482eeaeca95a $
  * @since 1.23
  */
 public abstract class AbstractIndexData

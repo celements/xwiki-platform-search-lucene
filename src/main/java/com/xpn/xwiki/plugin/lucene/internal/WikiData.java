@@ -29,7 +29,7 @@ import com.xpn.xwiki.doc.XWikiDocument;
  * Holds all data but the content of a wiki page to be indexed. The content is retrieved at indexing time, which should
  * save us some memory especially when rebuilding an index for a big wiki.
  * 
- * @version $Id: 9b8dc406f6212de2110fb11415ee7dd66c0bbdb0 $
+ * @version $Id: eee1430289581a38fbdb188048eddf4a85f00e75 $
  */
 public class WikiData extends AbstractIndexData
 {
