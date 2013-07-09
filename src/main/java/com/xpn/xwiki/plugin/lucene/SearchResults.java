@@ -75,7 +75,8 @@ public class SearchResults extends Api {
     if (this.relevantResults == null) {
       this.relevantResults = new ArrayList<SearchResult>();
       TopDocs docs = this.results.topDocs();
-
+      LOGGER.debug("getRelevantResults: checking access to soreDocs ["
+          + docs.scoreDocs.length + "].");
       for (int i = 0; i < docs.scoreDocs.length; i++) {
         try {
           SearchResult result = new SearchResult(this.searcher.doc(docs.scoreDocs[i].doc),
@@ -90,16 +91,19 @@ public class SearchResults extends Api {
                     prefixedFullName)) {
               this.relevantResults.add(result);
             } else {
-              LOGGER.debug("skipping wrong type [" + result.getType() + "] for result ["
-                  + result.getDocumentReference() + "].");
+              LOGGER.debug("getRelevantResults: skipping wrong type [" + result.getType()
+                  + "] for result [" + result.getDocumentReference() + "].");
             }
           } else {
-            LOGGER.debug("skipping because no.");
+            LOGGER.debug("getRelevantResults: skipping because no.");
           }
         } catch (Exception e) {
-          LOGGER.error("Error getting search result", e);
+          LOGGER.error("getRelevantResults: Error getting search result", e);
         }
       }
+    } else {
+      LOGGER.debug("getRelevantResults: returning cached relevantResults ["
+          + relevantResults.size() + "].");
     }
 
     return this.relevantResults;
