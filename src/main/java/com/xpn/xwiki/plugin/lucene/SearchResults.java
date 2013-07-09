@@ -75,8 +75,10 @@ public class SearchResults extends Api {
     if (this.relevantResults == null) {
       this.relevantResults = new ArrayList<SearchResult>();
       TopDocs docs = this.results.topDocs();
-      LOGGER.debug("getRelevantResults: checking access to soreDocs ["
-          + docs.scoreDocs.length + "].");
+      LOGGER.debug("getRelevantResults: checking access to scoreDocs ["
+          + docs.scoreDocs.length + "] for results [" + results.getTotalHits()
+          + "] with class [" + results.getClass() + "] and id-Hash ["
+          + System.identityHashCode(results) + "].");
       for (int i = 0; i < docs.scoreDocs.length; i++) {
         try {
           SearchResult result = new SearchResult(this.searcher.doc(docs.scoreDocs[i].doc),
