@@ -1,5 +1,7 @@
 package com.xpn.xwiki.plugin.lucene;
 
+import java.io.IOException;
+
 import static org.easymock.EasyMock.*;
 import static org.junit.Assert.*;
 
@@ -52,6 +54,22 @@ public class SearcherProviderTest extends AbstractBridgedComponentTestCase {
     assertFalse(searcherProvider.internal_getConnectedThreads().isEmpty());
     assertTrue(searcherProvider.internal_getConnectedThreads().contains(
         Thread.currentThread()));
+    verifyDefault();
+  }
+
+  @Test
+  public void testConnect_onMarkClose_illegalState() throws Exception {
+    theMockSearcher.close();
+    expectLastCall().once();
+    replayDefault();
+    searcherProvider.markToClose();
+    try {
+      searcherProvider.connect();
+      fail("expecting illegal state exception if not connected before calling"
+          + " getSearchers");
+    } catch(IllegalStateException exp) {
+      //expected
+    }
     verifyDefault();
   }
 
