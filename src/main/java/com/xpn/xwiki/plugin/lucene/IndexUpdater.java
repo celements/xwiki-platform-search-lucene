@@ -206,7 +206,7 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
                         writer = openWriter(false);
                         break RETRY;
                     } catch (CorruptIndexException e) {
-                        this.plugin.handleCorruptIndex(context);
+                        this.plugin.handleCorruptIndex();
                     }
                 } catch (IOException e) {
                     LOGGER.error("Failed to open index", e);

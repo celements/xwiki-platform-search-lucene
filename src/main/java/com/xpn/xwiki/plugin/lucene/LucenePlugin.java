@@ -75,9 +75,7 @@ import com.xpn.xwiki.web.Utils;
  * one or several languages, and search in one, several or all virtual wikis.
  * 
  * @version $Id: 9aef164ef88b71e1e854f4180a35cfdd838c2d5c $
- * @deprecated the plugin technology is deprecated
  */
-@Deprecated
 public class LucenePlugin extends XWikiDefaultPlugin {
   private static final Logger LOGGER = LoggerFactory.getLogger(LucenePlugin.class);
 
@@ -113,11 +111,9 @@ public class LucenePlugin extends XWikiDefaultPlugin {
   private Thread indexUpdaterThread;
 
   /**
-   * List of Lucene indexes used for searching. By default there is only one
-   * such index for all the wiki. One searches is created for each entry in
-   * {@link #indexDirs}.
+   * The current searchers provider which is still set on keepAktiv.
    */
-  private Searcher[] searchers;
+  private SearcherProvider searcherProvider;
 
   /**
    * Comma separated list of directories holding Lucene index data. The first
@@ -156,8 +152,16 @@ public class LucenePlugin extends XWikiDefaultPlugin {
     super.finalize();
   }
 
+  /**
+   * @deprecated instead use rebuildIndex()
+   */
+  @Deprecated
   public int rebuildIndex(XWikiContext context) {
-    return this.indexRebuilder.startRebuildIndex(context);
+    return rebuildIndex();
+  }
+
+  public int rebuildIndex() {
+    return this.indexRebuilder.startRebuildIndex(getContext());
   }
 
   public int startIndex(Collection<String> wikis, String hqlFilter, boolean clearIndex,
@@ -187,12 +191,15 @@ public class LucenePlugin extends XWikiDefaultPlugin {
    */
   public SearchResults getSearchResultsFromIndexes(String query, String myIndexDirs,
       String languages, XWikiContext context) throws Exception {
-    Searcher[] mySearchers = createSearchers(myIndexDirs, context);
-    SearchResults retval = search(query, (String) null, null, languages, mySearchers,
-        context);
-    closeSearchers(mySearchers);
-
-    return retval;
+    SearcherProvider mySearchers = new SearcherProvider(createSearchers(myIndexDirs));
+    try {
+      SearchResults retval = search(query, (String) null, null, languages, mySearchers,
+          context);
+      return retval;
+    } finally {
+      mySearchers.disconnect();
+      mySearchers.markToClose();
+    }
   }
 
   /**
@@ -220,12 +227,15 @@ public class LucenePlugin extends XWikiDefaultPlugin {
    */
   public SearchResults getSearchResultsFromIndexes(String query, String[] sortFields,
       String myIndexDirs, String languages, XWikiContext context) throws Exception {
-    Searcher[] mySearchers = createSearchers(myIndexDirs, context);
-    SearchResults retval = search(query, sortFields, null, languages, mySearchers,
-        context);
-    closeSearchers(mySearchers);
-
-    return retval;
+    SearcherProvider mySearchers = new SearcherProvider(createSearchers(myIndexDirs));
+    try {
+      SearchResults retval = search(query, sortFields, null, languages, mySearchers,
+          context);
+      return retval;
+    } finally {
+      mySearchers.disconnect();
+      mySearchers.markToClose();
+    }
   }
 
   /**
@@ -254,11 +264,15 @@ public class LucenePlugin extends XWikiDefaultPlugin {
    */
   public SearchResults getSearchResultsFromIndexes(String query, String sortField,
       String myIndexDirs, String languages, XWikiContext context) throws Exception {
-    Searcher[] mySearchers = createSearchers(myIndexDirs, context);
-    SearchResults retval = search(query, sortField, null, languages, mySearchers, context);
-    closeSearchers(mySearchers);
-
-    return retval;
+    SearcherProvider mySearchers = new SearcherProvider(createSearchers(myIndexDirs));
+    try {
+      SearchResults retval = search(query, sortField, null, languages, mySearchers,
+          context);
+      return retval;
+    } finally {
+      mySearchers.disconnect();
+      mySearchers.markToClose();
+    }
   }
 
   /**
@@ -285,7 +299,8 @@ public class LucenePlugin extends XWikiDefaultPlugin {
    */
   public SearchResults getSearchResults(String query, String sortField,
       String virtualWikiNames, String languages, XWikiContext context) throws Exception {
-    return search(query, sortField, virtualWikiNames, languages, this.searchers, context);
+    return search(query, sortField, virtualWikiNames, languages, this.searcherProvider,
+        context);
   }
 
   /**
@@ -312,7 +327,8 @@ public class LucenePlugin extends XWikiDefaultPlugin {
    */
   public SearchResults getSearchResults(String query, String[] sortField,
       String virtualWikiNames, String languages, XWikiContext context) throws Exception {
-    return search(query, sortField, virtualWikiNames, languages, this.searchers, context);
+    return search(query, sortField, virtualWikiNames, languages, this.searcherProvider,
+        context);
   }
 
   /**
@@ -341,13 +357,13 @@ public class LucenePlugin extends XWikiDefaultPlugin {
    *           If the query is not valid.
    */
   private SearchResults search(String query, String sortField, String virtualWikiNames,
-      String languages, Searcher[] indexes, XWikiContext context) throws IOException,
-      ParseException {
+      String languages, SearcherProvider theSearcherProvider, XWikiContext context
+      ) throws IOException, ParseException {
     SortField sort = getSortField(sortField);
 
     // Perform the actual search
     return search(query, (sort != null) ? new Sort(sort) : null, virtualWikiNames,
-        languages, indexes, context);
+        languages, theSearcherProvider, context);
   }
 
   /**
@@ -376,8 +392,8 @@ public class LucenePlugin extends XWikiDefaultPlugin {
    *           If the query is not valid.
    */
   private SearchResults search(String query, String[] sortFields,
-      String virtualWikiNames, String languages, Searcher[] indexes, XWikiContext context)
-      throws IOException, ParseException {
+      String virtualWikiNames, String languages, SearcherProvider theSearcherProvider,
+      XWikiContext context) throws IOException, ParseException {
     // Turn the sorting field names into SortField objects.
     SortField[] sorts = null;
     if (sortFields != null && sortFields.length > 0) {
@@ -395,7 +411,7 @@ public class LucenePlugin extends XWikiDefaultPlugin {
 
     // Perform the actual search
     return search(query, (sorts != null) ? new Sort(sorts) : null, virtualWikiNames,
-        languages, indexes, context);
+        languages, theSearcherProvider, context);
   }
 
   /**
@@ -423,30 +439,35 @@ public class LucenePlugin extends XWikiDefaultPlugin {
    *           If the query is not valid.
    */
   private SearchResults search(String query, Sort sort, String virtualWikiNames,
-      String languages, Searcher[] indexes, XWikiContext context) throws IOException,
-      ParseException {
-    MultiSearcher searcher = new MultiSearcher(indexes);
-
-    // Enhance the base query with wiki names and languages.
-    LOGGER.debug("build query for [{}]", query);
-    Query q = buildQuery(query, virtualWikiNames, languages);
-    LOGGER.debug("query is [{}]", q);
-
-    // Perform the actual search
-    TopDocsCollector<? extends ScoreDoc> results;
-    if (sort != null) {
-      results = TopFieldCollector.create(sort, getResultLimit(context), true, true,
-          false, false);
-    } else {
-      results = TopScoreDocCollector.create(getResultLimit(context), false);
+      String languages, SearcherProvider theSearcherProvider, XWikiContext context
+      ) throws IOException, ParseException {
+    try {
+      theSearcherProvider.connect();
+      MultiSearcher searcher = new MultiSearcher(theSearcherProvider.getSearchers());
+  
+      // Enhance the base query with wiki names and languages.
+      LOGGER.debug("build query for [{}]", query);
+      Query q = buildQuery(query, virtualWikiNames, languages);
+      LOGGER.debug("query is [{}]", q);
+  
+      // Perform the actual search
+      TopDocsCollector<? extends ScoreDoc> results;
+      if (sort != null) {
+        results = TopFieldCollector.create(sort, getResultLimit(context), true, true,
+            false, false);
+      } else {
+        results = TopScoreDocCollector.create(getResultLimit(context), false);
+      }
+      searcher.search(q, results);
+      LOGGER.debug("search: query [{}] returned {} hits on result with hash-id ["
+          + System.identityHashCode(results) + "].", q, results.getTotalHits());
+  
+      // Transform the raw Lucene search results into XWiki-aware results
+      return new SearchResults(results, searcher, new com.xpn.xwiki.api.XWiki(
+          context.getWiki(), context), context);
+    } finally {
+      theSearcherProvider.disconnect();
     }
-    searcher.search(q, results);
-    LOGGER.debug("search: query [{}] returned {} hits on result with hash-id ["
-        + System.identityHashCode(results) + "].", q, results.getTotalHits());
-
-    // Transform the raw Lucene search results into XWiki-aware results
-    return new SearchResults(results, searcher, new com.xpn.xwiki.api.XWiki(
-        context.getWiki(), context), context);
   }
 
   int getResultLimit(XWikiContext context) {
@@ -650,18 +671,18 @@ public class LucenePlugin extends XWikiDefaultPlugin {
 
     try {
       @SuppressWarnings("unchecked")
-      Class<? extends Analyzer> clazz = (Class<? extends Analyzer>) Class.forName(context
-          .getWiki().Param(PROP_ANALYZER, DEFAULT_ANALYZER));
+      Class<? extends Analyzer> clazz = (Class<? extends Analyzer>) Class.forName(
+          context.getWiki().Param(PROP_ANALYZER, DEFAULT_ANALYZER));
       this.analyzer = clazz.getConstructor(Version.class).newInstance(Version.LUCENE_34);
     } catch (Exception e) {
       LOGGER.error("Error instantiating analyzer: {}", e.getMessage());
       LOGGER.warn("Using default analyzer class: " + DEFAULT_ANALYZER);
       try {
         @SuppressWarnings("unchecked")
-        Class<? extends Analyzer> clazz = (Class<? extends Analyzer>) Class
-            .forName(DEFAULT_ANALYZER);
-        this.analyzer = clazz.getConstructor(Version.class)
-            .newInstance(Version.LUCENE_34);
+        Class<? extends Analyzer> clazz = (Class<? extends Analyzer>) Class.forName(
+            DEFAULT_ANALYZER);
+        this.analyzer = clazz.getConstructor(Version.class).newInstance(
+            Version.LUCENE_34);
       } catch (Exception e1) {
         throw new RuntimeException("Instantiation of default analyzer "
             + DEFAULT_ANALYZER + " failed", e1);
@@ -702,8 +723,7 @@ public class LucenePlugin extends XWikiDefaultPlugin {
   public void flushCache(XWikiContext context) {
     // take care of crappy code calling #flushCache with no context...
     if (context == null) {
-      context = (XWikiContext) Utils.getComponent(Execution.class).getContext()
-          .getProperty(XWikiContext.EXECUTIONCONTEXT_KEY);
+      context = getContext();
     }
 
     if (this.indexUpdater != null) {
@@ -727,7 +747,8 @@ public class LucenePlugin extends XWikiDefaultPlugin {
     this.indexRebuilder = null;
 
     try {
-      closeSearchers(this.searchers);
+      this.searcherProvider.markToClose();
+      this.searcherProvider = null;
     } catch (IOException e) {
       LOGGER.warn("Cannot close searchers: {}", e.getMessage());
     }
@@ -745,7 +766,7 @@ public class LucenePlugin extends XWikiDefaultPlugin {
    *          searchers for.
    * @return Array of searchers
    */
-  public Searcher[] createSearchers(String indexDirs, XWikiContext context)
+  public Searcher[] createSearchers(String indexDirs)
       throws Exception {
     String[] dirs = StringUtils.split(indexDirs, ",");
     List<IndexSearcher> searchersList = new ArrayList<IndexSearcher>();
@@ -764,7 +785,7 @@ public class LucenePlugin extends XWikiDefaultPlugin {
           searchersList.add(new IndexSearcher(d, true));
           break;
         } catch (CorruptIndexException e) {
-          handleCorruptIndex(context);
+          handleCorruptIndex();
         }
       }
     }
@@ -778,26 +799,16 @@ public class LucenePlugin extends XWikiDefaultPlugin {
    */
   protected synchronized void openSearchers(XWikiContext context) {
     try {
-      closeSearchers(this.searchers);
-      this.searchers = createSearchers(this.indexDirs, context);
+      if (this.searcherProvider != null) {
+        this.searcherProvider.markToClose();
+        this.searcherProvider = null;
+      }
+      this.searcherProvider = new SearcherProvider(createSearchers(this.indexDirs));
     } catch (Exception e) {
       LOGGER.error("Error opening searchers for index dirs [{}]", context.getWiki()
           .Param(PROP_INDEX_DIR), e);
       throw new RuntimeException("Error opening searchers for index dirs "
           + context.getWiki().Param(PROP_INDEX_DIR), e);
-    }
-  }
-
-  /**
-   * @throws IOException
-   */
-  protected static void closeSearchers(Searcher[] searchers) throws IOException {
-    if (searchers != null) {
-      for (int i = 0; i < searchers.length; i++) {
-        if (searchers[i] != null) {
-          searchers[i].close();
-        }
-      }
     }
   }
 
@@ -832,7 +843,13 @@ public class LucenePlugin extends XWikiDefaultPlugin {
   /**
    * Handle a corrupt index by clearing it and rebuilding from scratch.
    */
-  void handleCorruptIndex(XWikiContext context) throws IOException {
-    rebuildIndex(context);
+  void handleCorruptIndex() throws IOException {
+    rebuildIndex();
   }
+
+  private XWikiContext getContext() {
+    return (XWikiContext) Utils.getComponent(Execution.class).getContext(
+        ).getProperty(XWikiContext.EXECUTIONCONTEXT_KEY);
+  }
+
 }
