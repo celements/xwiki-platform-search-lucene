@@ -20,6 +20,7 @@
 package com.xpn.xwiki.plugin.lucene;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import org.apache.lucene.search.ScoreDoc;
@@ -228,9 +229,12 @@ public class SearchResults extends Api {
       return relResults;
     } else {
       resultcount = getRelevantResults().size();
-
-      return getRelevantResults().subList(listStartIndex,
-          listEndIndex < resultcount ? listEndIndex : resultcount);
+      int theListEndIndex = listEndIndex < resultcount ? listEndIndex : resultcount;
+      if (listStartIndex <= theListEndIndex) {
+        return getRelevantResults().subList(listStartIndex, theListEndIndex);
+      } else {
+        return Collections.emptyList();
+      }
     }
   }
 
