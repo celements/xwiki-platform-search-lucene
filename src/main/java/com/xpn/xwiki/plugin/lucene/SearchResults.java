@@ -19,6 +19,7 @@
  */
 package com.xpn.xwiki.plugin.lucene;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -34,6 +35,7 @@ import org.xwiki.model.reference.EntityReferenceSerializer;
 import com.xpn.xwiki.XWikiContext;
 import com.xpn.xwiki.api.Api;
 import com.xpn.xwiki.api.XWiki;
+import com.xpn.xwiki.plugin.lucene.searcherProvider.SearcherProvider;
 import com.xpn.xwiki.web.Utils;
 
 /**
@@ -51,6 +53,8 @@ public class SearchResults extends Api {
 
   private final Searcher searcher;
 
+  private final SearcherProvider searcherProvider;
+
   private final TopDocsCollector<? extends ScoreDoc> results;
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SearchResults.class);
@@ -60,48 +64,59 @@ public class SearchResults extends Api {
   /**
    * @param results
    *          Lucene search results
+   * @param searcher 
    * @param xwiki
    *          xwiki instance for access rights checking
    */
   SearchResults(TopDocsCollector<? extends ScoreDoc> results, Searcher searcher,
-      XWiki xwiki, XWikiContext context) {
+      SearcherProvider theSearcherProvider, XWiki xwiki, XWikiContext context) {
     super(context);
 
     this.results = results;
     this.searcher = searcher;
+    this.searcherProvider = theSearcherProvider;
+    this.searcherProvider.connectSearchResults(this);
     this.xwiki = xwiki;
   }
 
   private List<SearchResult> getRelevantResults() {
     if (this.relevantResults == null) {
       this.relevantResults = new ArrayList<SearchResult>();
-      TopDocs docs = this.results.topDocs();
-      LOGGER.debug("getRelevantResults: checking access to scoreDocs ["
-          + docs.scoreDocs.length + "] for results [" + results.getTotalHits()
-          + "] with class [" + results.getClass() + "] and id-Hash ["
-          + System.identityHashCode(results) + "].");
-      for (int i = 0; i < docs.scoreDocs.length; i++) {
-        try {
-          SearchResult result = new SearchResult(this.searcher.doc(docs.scoreDocs[i].doc),
-              docs.scoreDocs[i].score, this.xwiki);
-
-          if (result.isWikiContent()) {
-            String prefixedFullName = ((EntityReferenceSerializer<String>
-                ) Utils.getComponent(EntityReferenceSerializer.class)).serialize(
-                    result.getDocumentReference());
-            if (this.xwiki.exists(result.getDocumentReference())
-                && this.xwiki.hasAccessLevel("view", this.context.getUser(),
-                    prefixedFullName)) {
-              this.relevantResults.add(result);
+      try {
+        TopDocs docs = this.results.topDocs();
+        LOGGER.debug("getRelevantResults: checking access to scoreDocs ["
+            + docs.scoreDocs.length + "] for results [" + results.getTotalHits()
+            + "] with class [" + results.getClass() + "] and id-Hash ["
+            + System.identityHashCode(results) + "].");
+        for (int i = 0; i < docs.scoreDocs.length; i++) {
+          try {
+            SearchResult result = new SearchResult(this.searcher.doc(docs.scoreDocs[i].doc),
+                docs.scoreDocs[i].score, this.xwiki);
+  
+            if (result.isWikiContent()) {
+              String prefixedFullName = ((EntityReferenceSerializer<String>
+                  ) Utils.getComponent(EntityReferenceSerializer.class)).serialize(
+                      result.getDocumentReference());
+              if (this.xwiki.exists(result.getDocumentReference())
+                  && this.xwiki.hasAccessLevel("view", this.context.getUser(),
+                      prefixedFullName)) {
+                this.relevantResults.add(result);
+              } else {
+                LOGGER.debug("getRelevantResults: skipping wrong type [" + result.getType()
+                    + "] for result [" + result.getDocumentReference() + "].");
+              }
             } else {
-              LOGGER.debug("getRelevantResults: skipping wrong type [" + result.getType()
-                  + "] for result [" + result.getDocumentReference() + "].");
+              LOGGER.debug("getRelevantResults: skipping because no.");
             }
-          } else {
-            LOGGER.debug("getRelevantResults: skipping because no.");
+          } catch (Exception e) {
+            LOGGER.error("getRelevantResults: Error getting search result", e);
           }
-        } catch (Exception e) {
-          LOGGER.error("getRelevantResults: Error getting search result", e);
+        }
+      } finally {
+        try {
+          searcherProvider.cleanUpSearchResults(this);
+        } catch (IOException exp) {
+          LOGGER.error("Failed to cleanUpSearchResults on searchProvider.", exp);
         }
       }
     } else {
@@ -258,4 +273,10 @@ public class SearchResults extends Api {
   public int getTotalHitcount() {
     return this.results.getTotalHits();
   }
+
+  @Override
+  protected void finalize() throws Throwable {
+    searcherProvider.cleanUpSearchResults(this);
+  }
+
 }

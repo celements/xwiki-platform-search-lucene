@@ -64,6 +64,8 @@ import com.xpn.xwiki.doc.XWikiAttachment;
 import com.xpn.xwiki.doc.XWikiDocument;
 import com.xpn.xwiki.plugin.XWikiDefaultPlugin;
 import com.xpn.xwiki.plugin.XWikiPluginInterface;
+import com.xpn.xwiki.plugin.lucene.searcherProvider.ISearcherProviderRole;
+import com.xpn.xwiki.plugin.lucene.searcherProvider.SearcherProvider;
 import com.xpn.xwiki.web.Utils;
 
 /**
@@ -191,7 +193,8 @@ public class LucenePlugin extends XWikiDefaultPlugin {
    */
   public SearchResults getSearchResultsFromIndexes(String query, String myIndexDirs,
       String languages, XWikiContext context) throws Exception {
-    SearcherProvider mySearchers = new SearcherProvider(createSearchers(myIndexDirs));
+    SearcherProvider mySearchers = getSearcherProviderManager().createSearchProvider(
+        createSearchers(myIndexDirs));
     try {
       SearchResults retval = search(query, (String) null, null, languages, mySearchers,
           context);
@@ -227,7 +230,8 @@ public class LucenePlugin extends XWikiDefaultPlugin {
    */
   public SearchResults getSearchResultsFromIndexes(String query, String[] sortFields,
       String myIndexDirs, String languages, XWikiContext context) throws Exception {
-    SearcherProvider mySearchers = new SearcherProvider(createSearchers(myIndexDirs));
+    SearcherProvider mySearchers = getSearcherProviderManager().createSearchProvider(
+        createSearchers(myIndexDirs));
     try {
       SearchResults retval = search(query, sortFields, null, languages, mySearchers,
           context);
@@ -264,7 +268,8 @@ public class LucenePlugin extends XWikiDefaultPlugin {
    */
   public SearchResults getSearchResultsFromIndexes(String query, String sortField,
       String myIndexDirs, String languages, XWikiContext context) throws Exception {
-    SearcherProvider mySearchers = new SearcherProvider(createSearchers(myIndexDirs));
+    SearcherProvider mySearchers = getSearcherProviderManager().createSearchProvider(
+        createSearchers(myIndexDirs));
     try {
       SearchResults retval = search(query, sortField, null, languages, mySearchers,
           context);
@@ -463,8 +468,8 @@ public class LucenePlugin extends XWikiDefaultPlugin {
           + System.identityHashCode(results) + "].", q, results.getTotalHits());
   
       // Transform the raw Lucene search results into XWiki-aware results
-      return new SearchResults(results, searcher, new com.xpn.xwiki.api.XWiki(
-          context.getWiki(), context), context);
+      return new SearchResults(results, searcher, theSearcherProvider,
+          new com.xpn.xwiki.api.XWiki(context.getWiki(), context), context);
     } finally {
       theSearcherProvider.disconnect();
     }
@@ -803,7 +808,8 @@ public class LucenePlugin extends XWikiDefaultPlugin {
         this.searcherProvider.markToClose();
         this.searcherProvider = null;
       }
-      this.searcherProvider = new SearcherProvider(createSearchers(this.indexDirs));
+      this.searcherProvider = getSearcherProviderManager().createSearchProvider(
+          createSearchers(this.indexDirs));
     } catch (Exception e) {
       LOGGER.error("Error opening searchers for index dirs [{}]", context.getWiki()
           .Param(PROP_INDEX_DIR), e);
@@ -850,6 +856,10 @@ public class LucenePlugin extends XWikiDefaultPlugin {
   private XWikiContext getContext() {
     return (XWikiContext) Utils.getComponent(Execution.class).getContext(
         ).getProperty(XWikiContext.EXECUTIONCONTEXT_KEY);
+  }
+
+  private ISearcherProviderRole getSearcherProviderManager() {
+    return Utils.getComponent(ISearcherProviderRole.class);
   }
 
 }
