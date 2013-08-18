@@ -69,7 +69,7 @@ public class SearcherProviderManager implements ISearcherProviderRole, EventList
       getAllSearcherProvider().remove(removeSP);
     }
     LOGGER.info("onEvent finish: remaining [" + getAllSearcherProvider().size()
-        + " searchProviders.");
+        + "] searchProviders.");
   }
 
   public Vector<SearcherProvider> getAllSearcherProvider() {
