@@ -69,7 +69,7 @@ public class SearcherProviderManager implements ISearcherProviderRole, EventList
       getAllSearcherProvider().remove(removeSP);
     }
     LOGGER.info("onEvent finish: remaining [" + getAllSearcherProvider().size()
-        + "] searchProviders.");
+        + "] searchProviders. removed [" + searcherProviderToRemove.size() + "].");
   }
 
   public Vector<SearcherProvider> getAllSearcherProvider() {
@@ -82,6 +82,8 @@ public class SearcherProviderManager implements ISearcherProviderRole, EventList
   public SearcherProvider createSearchProvider(Searcher[] theSearchers) {
     SearcherProvider newSearcherProvider = new SearcherProvider(theSearchers);
     getAllSearcherProvider().add(newSearcherProvider);
+    LOGGER.debug("createSearchProvider: returning new SearchProvider and added to list ["
+        + getAllSearcherProvider().size() + "].");
     return newSearcherProvider;
   }
 
