@@ -25,10 +25,14 @@ import java.util.HashSet;
 import java.util.Set;
 
 import org.apache.lucene.search.Searcher;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.xpn.xwiki.plugin.lucene.SearchResults;
 
 public class SearcherProvider {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(SearcherProvider.class);
 
   /**
    * List of Lucene indexes used for searching. By default there is only one
@@ -48,6 +52,7 @@ public class SearcherProvider {
     this.markToClose = false;
     this.connectedThreads = new HashSet<Thread>();
     this.connectedSearchResultsMap = new HashMap<Thread, Set<SearchResults>>();
+    LOGGER.debug("create searcherProvider: [" + System.identityHashCode(this) + "].");
   }
 
   HashMap<Thread, Set<SearchResults>> internal_getConnectedSearchResults() {
@@ -63,6 +68,8 @@ public class SearcherProvider {
       throw new IllegalStateException("you may not connect to a SearchProvider"
           + " marked to close.");
     }
+    LOGGER.debug("connect searcherProvider [" + System.identityHashCode(this) + "] to ["
+        + Thread.currentThread() + "].");
     connectedThreads.add(Thread.currentThread());
   }
 
@@ -84,6 +91,9 @@ public class SearcherProvider {
 
   public void disconnect() throws IOException {
     if (connectedThreads.remove(Thread.currentThread())) {
+      LOGGER.debug("disconnect searcherProvider [" + System.identityHashCode(this)
+          + "] to [" + Thread.currentThread() + "], markedToClose [" + isMarkedToClose()
+          + "].");
       closeIfIdle();
     }
   }
@@ -94,6 +104,8 @@ public class SearcherProvider {
 
   public void markToClose() throws IOException {
     if (!this.markToClose) {
+      LOGGER.debug("markToClose searcherProvider [" + System.identityHashCode(this)
+          + "].");
       this.markToClose = true;
       closeIfIdle();
     }
@@ -115,6 +127,7 @@ public class SearcherProvider {
    */
   void closeSearchers() throws IOException {
     if (this.searchers != null) {
+      LOGGER.debug("closeSearchers: for [" + System.identityHashCode(this) + "].");
       for (int i = 0; i < this.searchers.length; i++) {
         if (this.searchers[i] != null) {
           this.searchers[i].close();
