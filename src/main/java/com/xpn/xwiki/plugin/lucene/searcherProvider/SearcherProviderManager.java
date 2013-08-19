@@ -54,6 +54,8 @@ public class SearcherProviderManager implements ISearcherProviderRole, EventList
   public void onEvent(Event event, Object source, Object data) {
     LOGGER.debug("onEvent called for event [" + event + "], source [" + source
         + "], data [" + data + "].");
+    LOGGER.trace("onEvent start: remaining [" + getAllSearcherProvider().size()
+        + "] searchProviders.");
     Vector<SearcherProvider> searcherProviderToRemove = new Vector<SearcherProvider>();
     for (SearcherProvider searcherProvider : getAllSearcherProvider()) {
       try {
