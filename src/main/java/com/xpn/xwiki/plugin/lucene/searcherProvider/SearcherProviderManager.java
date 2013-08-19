@@ -40,7 +40,7 @@ public class SearcherProviderManager implements ISearcherProviderRole {
   private Vector<SearcherProvider> allSearcherProvider;
 
   public void closeAllForCurrentThread() {
-    LOGGER.debug("onEvent start in manager [" + System.identityHashCode(this)
+    LOGGER.debug("closeAllForCurrentThread start in manager [" + System.identityHashCode(this)
         + "]: remaining [" + getAllSearcherProvider().size()
         + "] searchProviders.");
     Vector<SearcherProvider> searcherProviderToRemove = new Vector<SearcherProvider>();
@@ -62,7 +62,7 @@ public class SearcherProviderManager implements ISearcherProviderRole {
     for (SearcherProvider removeSP : searcherProviderToRemove) {
       getAllSearcherProvider().remove(removeSP);
     }
-    LOGGER.info("onEvent finish in manager [" + System.identityHashCode(this)
+    LOGGER.info("closeAllForCurrentThread finish in manager [" + System.identityHashCode(this)
         + "]: remaining [" + getAllSearcherProvider().size()
         + "] searchProviders. removed [" + searcherProviderToRemove.size() + "].");
   }
