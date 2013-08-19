@@ -47,7 +47,8 @@ public class SearcherProviderManager implements ISearcherProviderRole, EventList
 
   public List<Event> getEvents() {
     return Arrays.asList((Event)new ActionExecutionEvent("view"),
-        (Event)new ActionExecutionEvent("edit"));
+        (Event)new ActionExecutionEvent("edit"), (Event)new ActionExecutionEvent("admin"),
+        (Event)new ActionExecutionEvent("import"));
   }
 
   public void onEvent(Event event, Object source, Object data) {
