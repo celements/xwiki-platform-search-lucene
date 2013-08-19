@@ -57,8 +57,12 @@ public class SearcherProviderManager implements ISearcherProviderRole, EventList
     Vector<SearcherProvider> searcherProviderToRemove = new Vector<SearcherProvider>();
     for (SearcherProvider searcherProvider : getAllSearcherProvider()) {
       try {
+        LOGGER.trace("before cleanup for searchProvider [" + System.identityHashCode(
+            searcherProvider) + "], isIdle [" + searcherProvider.isIdle() + "].");
         searcherProvider.disconnect();
         searcherProvider.cleanUpAllSearchResultsForThread();
+        LOGGER.trace("after cleanup for searchProvider [" + System.identityHashCode(
+            searcherProvider) + "], isIdle [" + searcherProvider.isIdle() + "].");
       } catch (IOException exp) {
         LOGGER.error("Failed to disconnect searcherProvider from thread.", exp);
       }
