@@ -24,6 +24,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Vector;
 
+import javax.inject.Singleton;
+
 import org.apache.lucene.search.Searcher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,6 +36,7 @@ import org.xwiki.observation.event.Event;
 
 
 @Component
+@Singleton
 public class SearcherProviderManager implements ISearcherProviderRole, EventListener {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(
@@ -52,9 +55,10 @@ public class SearcherProviderManager implements ISearcherProviderRole, EventList
   }
 
   public void onEvent(Event event, Object source, Object data) {
-    LOGGER.debug("onEvent called for event [" + event + "], source [" + source
+    LOGGER.trace("onEvent called for event [" + event + "], source [" + source
         + "], data [" + data + "].");
-    LOGGER.trace("onEvent start: remaining [" + getAllSearcherProvider().size()
+    LOGGER.debug("onEvent start in manager [" + System.identityHashCode(this)
+        + "]: remaining [" + getAllSearcherProvider().size()
         + "] searchProviders.");
     Vector<SearcherProvider> searcherProviderToRemove = new Vector<SearcherProvider>();
     for (SearcherProvider searcherProvider : getAllSearcherProvider()) {
@@ -75,7 +79,8 @@ public class SearcherProviderManager implements ISearcherProviderRole, EventList
     for (SearcherProvider removeSP : searcherProviderToRemove) {
       getAllSearcherProvider().remove(removeSP);
     }
-    LOGGER.info("onEvent finish: remaining [" + getAllSearcherProvider().size()
+    LOGGER.info("onEvent finish in manager [" + System.identityHashCode(this)
+        + "]: remaining [" + getAllSearcherProvider().size()
         + "] searchProviders. removed [" + searcherProviderToRemove.size() + "].");
   }
 
@@ -89,7 +94,8 @@ public class SearcherProviderManager implements ISearcherProviderRole, EventList
   public SearcherProvider createSearchProvider(Searcher[] theSearchers) {
     SearcherProvider newSearcherProvider = new SearcherProvider(theSearchers);
     getAllSearcherProvider().add(newSearcherProvider);
-    LOGGER.debug("createSearchProvider: returning new SearchProvider and added to list ["
+    LOGGER.debug("createSearchProvider in manager [" + System.identityHashCode(this)
+        + "]: returning new SearchProvider and added to list ["
         + getAllSearcherProvider().size() + "].");
     return newSearcherProvider;
   }
