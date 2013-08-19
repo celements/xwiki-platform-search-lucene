@@ -27,4 +27,6 @@ public interface ISearcherProviderRole {
 
   public SearcherProvider createSearchProvider(Searcher[] createSearchers);
 
+  public void closeAllForCurrentThread();
+
 }

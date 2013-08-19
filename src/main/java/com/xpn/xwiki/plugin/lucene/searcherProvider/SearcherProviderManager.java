@@ -20,8 +20,6 @@
 package com.xpn.xwiki.plugin.lucene.searcherProvider;
 
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.List;
 import java.util.Vector;
 
 import javax.inject.Singleton;
@@ -30,33 +28,18 @@ import org.apache.lucene.search.Searcher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.xwiki.component.annotation.Component;
-import org.xwiki.observation.EventListener;
-import org.xwiki.observation.event.ActionExecutionEvent;
-import org.xwiki.observation.event.Event;
 
 
 @Component
 @Singleton
-public class SearcherProviderManager implements ISearcherProviderRole, EventListener {
+public class SearcherProviderManager implements ISearcherProviderRole {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(
       SearcherProviderManager.class);
 
   private Vector<SearcherProvider> allSearcherProvider;
 
-  public String getName() {
-    return "SearcherProviderService";
-  }
-
-  public List<Event> getEvents() {
-    return Arrays.asList((Event)new ActionExecutionEvent("view"),
-        (Event)new ActionExecutionEvent("edit"), (Event)new ActionExecutionEvent("admin"),
-        (Event)new ActionExecutionEvent("import"));
-  }
-
-  public void onEvent(Event event, Object source, Object data) {
-    LOGGER.trace("onEvent called for event [" + event + "], source [" + source
-        + "], data [" + data + "].");
+  public void closeAllForCurrentThread() {
     LOGGER.debug("onEvent start in manager [" + System.identityHashCode(this)
         + "]: remaining [" + getAllSearcherProvider().size()
         + "] searchProviders.");

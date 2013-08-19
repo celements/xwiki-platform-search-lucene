@@ -1,19 +1,13 @@
 package com.xpn.xwiki.plugin.lucene.searcherProvider;
 
+import static junit.framework.Assert.*;
 import static org.easymock.EasyMock.*;
 
-import static junit.framework.Assert.*;
-
-import java.io.IOException;
-import java.util.Arrays;
-import java.util.List;
 import java.util.Vector;
 
 import org.apache.lucene.search.Searcher;
 import org.junit.Before;
 import org.junit.Test;
-import org.xwiki.observation.event.ActionExecutionEvent;
-import org.xwiki.observation.event.Event;
 
 import com.celements.common.test.AbstractBridgedComponentTestCase;
 import com.xpn.xwiki.XWikiContext;
@@ -33,13 +27,8 @@ public class SearcherProviderManagerTest extends AbstractBridgedComponentTestCas
   }
 
   @Test
-  public void testGetEvents() {
-    List<Event> expectedEventsList = Arrays.asList((Event)new ActionExecutionEvent("view"
-        ), (Event)new ActionExecutionEvent("edit"), (Event)new ActionExecutionEvent(
-            "admin"), (Event)new ActionExecutionEvent("import"));
-    replayDefault();
-    assertEquals(expectedEventsList, theSearchProvManager.getEvents());
-    verifyDefault();
+  public void testSingletonComponent() {
+    assertSame(theSearchProvManager, Utils.getComponent(ISearcherProviderRole.class));
   }
 
   @Test
@@ -68,7 +57,7 @@ public class SearcherProviderManagerTest extends AbstractBridgedComponentTestCas
   public void testOnEvent_empty() {
     replayDefault();
     assertTrue(theSearchProvManager.getAllSearcherProvider().isEmpty());
-    theSearchProvManager.onEvent(new ActionExecutionEvent("view"), null, context);
+    theSearchProvManager.closeAllForCurrentThread();
     verifyDefault();
   }
 
@@ -83,7 +72,7 @@ public class SearcherProviderManagerTest extends AbstractBridgedComponentTestCas
     searcherProv.connect();
     searcherProv.connectSearchResults(mockSearchResults);
     assertTrue(searcherProv.hasSearchResultsForCurrentThread());
-    theSearchProvManager.onEvent(new ActionExecutionEvent("view"), null, context);
+    theSearchProvManager.closeAllForCurrentThread();
     assertEquals(1, theSearchProvManager.getAllSearcherProvider().size());
     assertFalse(searcherProv.hasSearchResultsForCurrentThread());
     assertTrue(searcherProv.isIdle());
@@ -103,7 +92,7 @@ public class SearcherProviderManagerTest extends AbstractBridgedComponentTestCas
     searcherProv.connect();
     searcherProv.markToClose();
     searcherProv.connectSearchResults(mockSearchResults);
-    theSearchProvManager.onEvent(new ActionExecutionEvent("view"), null, context);
+    theSearchProvManager.closeAllForCurrentThread();
     assertTrue(theSearchProvManager.getAllSearcherProvider().isEmpty());
     assertFalse(searcherProv.hasSearchResultsForCurrentThread());
     verifyDefault();
@@ -123,7 +112,7 @@ public class SearcherProviderManagerTest extends AbstractBridgedComponentTestCas
     searcherProv.markToClose();
     searcherProv.connectSearchResults(mockSearchResults);
     searcherProv.disconnect();
-    theSearchProvManager.onEvent(new ActionExecutionEvent("view"), null, context);
+    theSearchProvManager.closeAllForCurrentThread();
     assertTrue(theSearchProvManager.getAllSearcherProvider().isEmpty());
     assertFalse(searcherProv.hasSearchResultsForCurrentThread());
     verifyDefault();
