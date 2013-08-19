@@ -112,14 +112,17 @@ public class SearcherProvider {
   }
 
   private void closeIfIdle() throws IOException {
-    if (isIdle()) {
+    if (canBeClosed()) {
       closeSearchers();
     }
   }
 
-  boolean isIdle() {
-    return this.markToClose && connectedThreads.isEmpty()
-        && connectedSearchResultsMap.isEmpty();
+  boolean canBeClosed() {
+    return this.markToClose && isIdle();
+  }
+
+  public boolean isIdle() {
+    return connectedThreads.isEmpty() && connectedSearchResultsMap.isEmpty();
   }
 
   /**

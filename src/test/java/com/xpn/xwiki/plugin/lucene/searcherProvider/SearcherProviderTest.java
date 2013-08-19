@@ -163,7 +163,7 @@ public class SearcherProviderTest extends AbstractBridgedComponentTestCase {
     assertTrue(searcherProvider.isMarkedToClose());
     assertFalse(searcherProvider.internal_getConnectedThreads().isEmpty());
     assertTrue(searcherProvider.internal_getConnectedSearchResults().isEmpty());
-    assertFalse(searcherProvider.isIdle());
+    assertFalse(searcherProvider.canBeClosed());
     verifyDefault();
   }
 
@@ -173,7 +173,7 @@ public class SearcherProviderTest extends AbstractBridgedComponentTestCase {
     assertTrue(searcherProvider.internal_getConnectedThreads().isEmpty());
     assertTrue(searcherProvider.internal_getConnectedSearchResults().isEmpty());
     assertFalse(searcherProvider.isMarkedToClose());
-    assertFalse(searcherProvider.isIdle());
+    assertFalse(searcherProvider.canBeClosed());
     verifyDefault();
   }
 
@@ -188,7 +188,7 @@ public class SearcherProviderTest extends AbstractBridgedComponentTestCase {
     assertTrue(searcherProvider.internal_getConnectedThreads().isEmpty());
     assertTrue(searcherProvider.isMarkedToClose());
     assertFalse(searcherProvider.internal_getConnectedSearchResults().isEmpty());
-    assertFalse(searcherProvider.isIdle());
+    assertFalse(searcherProvider.canBeClosed());
     verifyDefault();
   }
 
@@ -201,7 +201,7 @@ public class SearcherProviderTest extends AbstractBridgedComponentTestCase {
     assertTrue(searcherProvider.internal_getConnectedThreads().isEmpty());
     assertTrue(searcherProvider.isMarkedToClose());
     assertTrue(searcherProvider.internal_getConnectedSearchResults().isEmpty());
-    assertTrue(searcherProvider.isIdle());
+    assertTrue(searcherProvider.canBeClosed());
     verifyDefault();
   }
 

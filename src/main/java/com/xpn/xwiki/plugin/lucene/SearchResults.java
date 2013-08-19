@@ -276,7 +276,13 @@ public class SearchResults extends Api {
 
   @Override
   protected void finalize() throws Throwable {
+    LOGGER.debug("finalize SearchResults for [" + System.identityHashCode(this)
+        + "], isMarkedClose [" + searcherProvider.isMarkedToClose() + "], "
+        + searcherProvider.isClosed() + "], isIdle [" + searcherProvider.isIdle() + "].");
     searcherProvider.cleanUpSearchResults(this);
+    LOGGER.debug("finalize SearchResults for [" + System.identityHashCode(this)
+        + "], isMarkedClose [" + searcherProvider.isMarkedToClose() + "], "
+        + searcherProvider.isClosed() + "], isIdle [" + searcherProvider.isIdle() + "].");
   }
 
 }
