@@ -79,7 +79,10 @@ import com.xpn.xwiki.web.Utils;
  * @version $Id: 9aef164ef88b71e1e854f4180a35cfdd838c2d5c $
  */
 public class LucenePlugin extends XWikiDefaultPlugin {
+  
   private static final Logger LOGGER = LoggerFactory.getLogger(LucenePlugin.class);
+  
+  public static final String SORT_FIELD_SCORE = "score";
 
   public static final String DOCTYPE_WIKIPAGE = "wikipage";
 
@@ -484,7 +487,7 @@ public class LucenePlugin extends XWikiDefaultPlugin {
   /**
    * Create a {@link SortField} corresponding to the field name. If the field
    * name starts with '-', then the field (excluding the leading -) will be used
-   * for reverse sorting.
+   * for reverse sorting. Field name "score" will create a score {@link SortField}.
    * 
    * @param sortField
    *          The name of the field to sort by. If <tt>null</tt>, return a
@@ -495,13 +498,19 @@ public class LucenePlugin extends XWikiDefaultPlugin {
   private SortField getSortField(String sortField) {
     SortField sort = null;
     if (!StringUtils.isEmpty(sortField)) {
-      // For the moment assuming everything is a String is enough, since we
-      // don't usually want to sort documents
-      // on numerical object properties.
-      sort = new SortField(StringUtils.removeStart(sortField, "-"), SortField.STRING,
-          sortField.startsWith("-"));
+      if (sortField.equals(SORT_FIELD_SCORE)) {
+        LOGGER.debug("getSortField: is field score");
+        sort = SortField.FIELD_SCORE;
+      } else {
+        // For the moment assuming everything is a String is enough, since we
+        // don't usually want to sort documents
+        // on numerical object properties.
+        sort = new SortField(StringUtils.removeStart(sortField, "-"), SortField.STRING,
+            sortField.startsWith("-"));
+      }
     }
 
+    LOGGER.debug("getSortField: returned '" + sort + "' for field '" + sortField + "'");
     return sort;
   }
 
