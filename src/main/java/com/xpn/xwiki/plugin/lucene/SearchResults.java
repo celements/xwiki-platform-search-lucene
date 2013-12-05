@@ -106,7 +106,8 @@ public class SearchResults extends Api {
                     + "] for result [" + result.getDocumentReference() + "].");
               }
             } else {
-              LOGGER.debug("getRelevantResults: skipping because no.");
+              LOGGER.debug("getRelevantResults: skipping because no wiki content"
+                  + " (wiki-Document or wiki-Doc-Attachment).");
             }
           } catch (Exception e) {
             LOGGER.error("getRelevantResults: Error getting search result", e);
