@@ -30,9 +30,11 @@ import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.search.TopDocsCollector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.xwiki.model.reference.EntityReferenceSerializer;
+import org.xwiki.model.reference.DocumentReference;
 
+import com.celements.web.service.IWebUtilsService;
 import com.xpn.xwiki.XWikiContext;
+import com.xpn.xwiki.XWikiException;
 import com.xpn.xwiki.api.Api;
 import com.xpn.xwiki.api.XWiki;
 import com.xpn.xwiki.plugin.lucene.searcherProvider.SearcherProvider;
@@ -56,26 +58,34 @@ public class SearchResults extends Api {
   private final SearcherProvider searcherProvider;
 
   private final TopDocsCollector<? extends ScoreDoc> results;
+  
+  private final boolean skipChecks;
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SearchResults.class);
 
   private List<SearchResult> relevantResults;
+  
+  private IWebUtilsService webUtilsService;
 
   /**
    * @param results
    *          Lucene search results
    * @param searcher 
+   * @param skipChecks
+   *          skips exists and access checks on documents
    * @param xwiki
    *          xwiki instance for access rights checking
    */
   SearchResults(TopDocsCollector<? extends ScoreDoc> results, Searcher searcher,
-      SearcherProvider theSearcherProvider, XWiki xwiki, XWikiContext context) {
+      SearcherProvider theSearcherProvider, boolean skipChecks, XWiki xwiki, 
+      XWikiContext context) {
     super(context);
 
     this.results = results;
     this.searcher = searcher;
     this.searcherProvider = theSearcherProvider;
     this.searcherProvider.connectSearchResults(this);
+    this.skipChecks = skipChecks;
     this.xwiki = xwiki;
   }
 
@@ -94,16 +104,11 @@ public class SearchResults extends Api {
                 docs.scoreDocs[i].score, this.xwiki);
   
             if (result.isWikiContent()) {
-              String prefixedFullName = ((EntityReferenceSerializer<String>
-                  ) Utils.getComponent(EntityReferenceSerializer.class)).serialize(
-                      result.getDocumentReference());
-              if (this.xwiki.exists(result.getDocumentReference())
-                  && this.xwiki.hasAccessLevel("view", this.context.getUser(),
-                      prefixedFullName)) {
+              if (skipChecks || check(result.getDocumentReference())) {
                 this.relevantResults.add(result);
               } else {
-                LOGGER.debug("getRelevantResults: skipping wrong type [" + result.getType()
-                    + "] for result [" + result.getDocumentReference() + "].");
+                LOGGER.debug("getRelevantResults: skipping because checks failed for "
+                    + "result [" + result.getDocumentReference() + "].");
               }
             } else {
               LOGGER.debug("getRelevantResults: skipping because no wiki content"
@@ -126,6 +131,11 @@ public class SearchResults extends Api {
     }
 
     return this.relevantResults;
+  }
+
+  private boolean check(DocumentReference docRef) throws XWikiException {
+    return xwiki.exists(docRef) && xwiki.hasAccessLevel("view", this.context.getUser(), 
+        getWebUtilsService().getRefDefaultSerializer().serialize(docRef));
   }
 
   /**
@@ -284,6 +294,13 @@ public class SearchResults extends Api {
     LOGGER.debug("finalize SearchResults for [" + System.identityHashCode(this)
         + "], isMarkedClose [" + searcherProvider.isMarkedToClose() + "], "
         + searcherProvider.isClosed() + "], isIdle [" + searcherProvider.isIdle() + "].");
+  }
+
+  private IWebUtilsService getWebUtilsService() {
+    if (webUtilsService == null) {
+      webUtilsService = Utils.getComponent(IWebUtilsService.class);
+    }
+    return webUtilsService;
   }
 
 }
