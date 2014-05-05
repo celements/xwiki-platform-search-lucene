@@ -52,6 +52,7 @@ import org.apache.lucene.search.TopFieldCollector;
 import org.apache.lucene.search.TopScoreDocCollector;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
+import org.apache.lucene.store.LockObtainFailedException;
 import org.apache.lucene.util.Version;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -200,11 +201,11 @@ public class LucenePlugin extends XWikiDefaultPlugin {
    * @param context
    *          The context of the request.
    * @return The list of search results.
-   * @throws Exception
+   * @throws IOException, ParseException
    *           If the index directories cannot be read, or the query is invalid.
    */
   public SearchResults getSearchResultsFromIndexes(String query, String myIndexDirs,
-      String languages, XWikiContext context) throws Exception {
+      String languages, XWikiContext context) throws IOException, ParseException {
     SearcherProvider mySearchers = getSearcherProviderManager().createSearchProvider(
         createSearchers(myIndexDirs));
     try {
@@ -237,11 +238,12 @@ public class LucenePlugin extends XWikiDefaultPlugin {
    * @param context
    *          The context of the request.
    * @return The list of search results.
-   * @throws Exception
+   * @throws IOException, ParseException
    *           If the index directories cannot be read, or the query is invalid.
    */
   public SearchResults getSearchResultsFromIndexes(String query, String[] sortFields,
-      String myIndexDirs, String languages, XWikiContext context) throws Exception {
+      String myIndexDirs, String languages, XWikiContext context
+      ) throws IOException, ParseException {
     SearcherProvider mySearchers = getSearcherProviderManager().createSearchProvider(
         createSearchers(myIndexDirs));
     try {
@@ -275,11 +277,12 @@ public class LucenePlugin extends XWikiDefaultPlugin {
    * @param context
    *          The context of the request.
    * @return The list of search results.
-   * @throws Exception
+   * @throws IOException, ParseException
    *           If the index directories cannot be read, or the query is invalid.
    */
   public SearchResults getSearchResultsFromIndexes(String query, String sortField,
-      String myIndexDirs, String languages, XWikiContext context) throws Exception {
+      String myIndexDirs, String languages, XWikiContext context
+      ) throws IOException, ParseException {
     SearcherProvider mySearchers = getSearcherProviderManager().createSearchProvider(
         createSearchers(myIndexDirs));
     try {
@@ -311,11 +314,12 @@ public class LucenePlugin extends XWikiDefaultPlugin {
    * @return The list of search results.
    * @param context
    *          The context of the request.
-   * @throws Exception
+   * @throws IOException, ParseException
    *           If the index directories cannot be read, or the query is invalid.
    */
   public SearchResults getSearchResults(String query, String sortField,
-      String virtualWikiNames, String languages, XWikiContext context) throws Exception {
+      String virtualWikiNames, String languages, XWikiContext context
+      ) throws IOException, ParseException {
     return search(query, sortField, virtualWikiNames, languages, this.searcherProvider,
         false, context);
   }
@@ -339,11 +343,12 @@ public class LucenePlugin extends XWikiDefaultPlugin {
    * @return The list of search results.
    * @param context
    *          The context of the request.
-   * @throws Exception
+   * @throws IOException, ParseException
    *           If the index directories cannot be read, or the query is invalid.
    */
   public SearchResults getSearchResults(String query, String[] sortField,
-      String virtualWikiNames, String languages, XWikiContext context) throws Exception {
+      String virtualWikiNames, String languages, XWikiContext context
+      ) throws IOException, ParseException {
     return search(query, sortField, virtualWikiNames, languages, this.searcherProvider, 
         false, context);
   }
@@ -371,11 +376,12 @@ public class LucenePlugin extends XWikiDefaultPlugin {
    * @return The list of search results.
    * @param context
    *          The context of the request.
-   * @throws Exception
+   * @throws IOException, ParseException
    *           If the index directories cannot be read, or the query is invalid.
    */
   public SearchResults getSearchResultsWithoutChecks(String query, String[] sortField,
-      String virtualWikiNames, String languages, XWikiContext context) throws Exception {
+      String virtualWikiNames, String languages, XWikiContext context
+      ) throws IOException, ParseException {
     return search(query, sortField, virtualWikiNames, languages, this.searcherProvider, 
         true, context);
   }
@@ -825,9 +831,10 @@ public class LucenePlugin extends XWikiDefaultPlugin {
    *          Comma separated list of Lucene index directories to create
    *          searchers for.
    * @return Array of searchers
+   * @throws IOException 
+   * @throws LockObtainFailedException 
    */
-  public Searcher[] createSearchers(String indexDirs)
-      throws Exception {
+  public Searcher[] createSearchers(String indexDirs) throws IOException {
     String[] dirs = StringUtils.split(indexDirs, ",");
     List<IndexSearcher> searchersList = new ArrayList<IndexSearcher>();
     IndexWriterConfig cfg = new IndexWriterConfig(Version.LUCENE_34, this.analyzer);
