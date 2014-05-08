@@ -650,7 +650,7 @@ public class LucenePlugin extends XWikiDefaultPlugin {
     return new TermQuery(new Term(fieldname, valueArray[0]));
   }
 
-  private int getResultLimit(boolean skipChecks, XWikiContext context) {
+  public int getResultLimit(boolean skipChecks, XWikiContext context) {
     String key = PROP_RESULT_LIMIT;
     String defaultValue = DEFAULT_RESULT_LIMIT;
     if (skipChecks) {
