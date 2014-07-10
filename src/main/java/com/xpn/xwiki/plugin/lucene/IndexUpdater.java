@@ -247,7 +247,7 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
                 }
             }
 
-            this.plugin.openSearchers(context);
+            this.plugin.openSearchers();
         }
     }
 

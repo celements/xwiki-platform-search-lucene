@@ -320,7 +320,7 @@ public class LucenePlugin extends XWikiDefaultPlugin {
   public SearchResults getSearchResults(String query, String sortField,
       String virtualWikiNames, String languages, XWikiContext context
       ) throws IOException, ParseException {
-    return search(query, sortField, virtualWikiNames, languages, this.searcherProvider,
+    return search(query, sortField, virtualWikiNames, languages, getSearcherProvider(),
         false, context);
   }
 
@@ -349,7 +349,7 @@ public class LucenePlugin extends XWikiDefaultPlugin {
   public SearchResults getSearchResults(String query, String[] sortField,
       String virtualWikiNames, String languages, XWikiContext context
       ) throws IOException, ParseException {
-    return search(query, sortField, virtualWikiNames, languages, this.searcherProvider, 
+    return search(query, sortField, virtualWikiNames, languages, getSearcherProvider(), 
         false, context);
   }
 
@@ -382,7 +382,7 @@ public class LucenePlugin extends XWikiDefaultPlugin {
   public SearchResults getSearchResultsWithoutChecks(String query, String[] sortField,
       String virtualWikiNames, String languages, XWikiContext context
       ) throws IOException, ParseException {
-    return search(query, sortField, virtualWikiNames, languages, this.searcherProvider, 
+    return search(query, sortField, virtualWikiNames, languages, getSearcherProvider(), 
         true, context);
   }
 
@@ -812,12 +812,7 @@ public class LucenePlugin extends XWikiDefaultPlugin {
 
     this.indexRebuilder = null;
 
-    try {
-      this.searcherProvider.markToClose();
-      this.searcherProvider = null;
-    } catch (IOException e) {
-      LOGGER.warn("Cannot close searchers: {}", e.getMessage());
-    }
+    openSearchers(context);
 
     this.analyzer = null;
 
@@ -864,20 +859,33 @@ public class LucenePlugin extends XWikiDefaultPlugin {
    * Opens the searchers for the configured index Dirs after closing any already
    * existing ones.
    */
-  protected synchronized void openSearchers(XWikiContext context) {
-    try {
-      if (this.searcherProvider != null) {
-        this.searcherProvider.markToClose();
-        this.searcherProvider = null;
+  protected void openSearchers(XWikiContext context) {
+    getSearcherProvider(true, context);
+  }
+
+  private SearcherProvider getSearcherProvider() {
+    return getSearcherProvider(false, getContext());
+  }
+
+  private synchronized SearcherProvider getSearcherProvider(boolean createNew,
+      XWikiContext context) {
+    if (createNew || (this.searcherProvider == null)) {
+      try {
+        if (this.searcherProvider != null) {
+          this.searcherProvider.markToClose();
+          this.searcherProvider = null;
+        }
+        this.searcherProvider = getSearcherProviderManager().createSearchProvider(
+            createSearchers(this.indexDirs));
+      } catch (Exception exp) {
+        LOGGER.error("Error opening searchers for index dirs [{}]", context.getWiki(
+            ).Param(PROP_INDEX_DIR), exp);
+        throw new RuntimeException("Error opening searchers for index dirs "
+            + context.getWiki().Param(PROP_INDEX_DIR), exp);
       }
-      this.searcherProvider = getSearcherProviderManager().createSearchProvider(
-          createSearchers(this.indexDirs));
-    } catch (Exception e) {
-      LOGGER.error("Error opening searchers for index dirs [{}]", context.getWiki()
-          .Param(PROP_INDEX_DIR), e);
-      throw new RuntimeException("Error opening searchers for index dirs "
-          + context.getWiki().Param(PROP_INDEX_DIR), e);
+      
     }
+    return this.searcherProvider;
   }
 
   public String getIndexDirs() {
