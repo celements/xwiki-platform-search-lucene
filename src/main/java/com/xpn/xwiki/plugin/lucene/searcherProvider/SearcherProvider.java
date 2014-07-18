@@ -63,14 +63,19 @@ public class SearcherProvider {
     return connectedThreads;
   }
 
+  /**
+   * connect and markToClose need to be externally synchronized
+   */
   public void connect() {
-    if (this.markToClose) {
-      throw new IllegalStateException("you may not connect to a SearchProvider"
-          + " marked to close.");
+    if (!checkConnected()) {
+      if (this.markToClose) {
+        throw new IllegalStateException("you may not connect to a SearchProvider"
+            + " marked to close.");
+      }
+      LOGGER.debug("connect searcherProvider [" + System.identityHashCode(this) + "] to ["
+          + Thread.currentThread() + "].");
+      connectedThreads.add(Thread.currentThread());
     }
-    LOGGER.debug("connect searcherProvider [" + System.identityHashCode(this) + "] to ["
-        + Thread.currentThread() + "].");
-    connectedThreads.add(Thread.currentThread());
   }
 
   public boolean isClosed() {
@@ -102,6 +107,9 @@ public class SearcherProvider {
     return this.markToClose;
   }
 
+  /**
+   * connect and markToClose need to be externally synchronized
+   */
   public void markToClose() throws IOException {
     if (!this.markToClose) {
       LOGGER.debug("markToClose searcherProvider [" + System.identityHashCode(this)

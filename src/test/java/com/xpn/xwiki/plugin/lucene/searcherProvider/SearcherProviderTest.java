@@ -46,6 +46,21 @@ public class SearcherProviderTest extends AbstractBridgedComponentTestCase {
   }
 
   @Test
+  public void testConnect_connectAconnectedThreadAfterMarkToClose() throws Exception {
+    assertTrue(searcherProvider.internal_getConnectedThreads().isEmpty());
+    searcherProvider.connect();
+    searcherProvider.markToClose();
+    replayDefault();
+    try {
+      searcherProvider.connect();
+    } catch(IllegalStateException exp) {
+      fail("connect may not throw an IllegalStateException on if the thread is already"
+          + " connected");
+    }
+    verifyDefault();
+  }
+
+  @Test
   public void testConnect() {
     replayDefault();
     assertTrue(searcherProvider.internal_getConnectedThreads().isEmpty());
