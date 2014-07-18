@@ -320,7 +320,7 @@ public class LucenePlugin extends XWikiDefaultPlugin {
   public SearchResults getSearchResults(String query, String sortField,
       String virtualWikiNames, String languages, XWikiContext context
       ) throws IOException, ParseException {
-    return search(query, sortField, virtualWikiNames, languages, getSearcherProvider(),
+    return search(query, sortField, virtualWikiNames, languages, null,
         false, context);
   }
 
@@ -349,7 +349,7 @@ public class LucenePlugin extends XWikiDefaultPlugin {
   public SearchResults getSearchResults(String query, String[] sortField,
       String virtualWikiNames, String languages, XWikiContext context
       ) throws IOException, ParseException {
-    return search(query, sortField, virtualWikiNames, languages, getSearcherProvider(), 
+    return search(query, sortField, virtualWikiNames, languages, null, 
         false, context);
   }
 
@@ -382,7 +382,7 @@ public class LucenePlugin extends XWikiDefaultPlugin {
   public SearchResults getSearchResultsWithoutChecks(String query, String[] sortField,
       String virtualWikiNames, String languages, XWikiContext context
       ) throws IOException, ParseException {
-    return search(query, sortField, virtualWikiNames, languages, getSearcherProvider(), 
+    return search(query, sortField, virtualWikiNames, languages, null, 
         true, context);
   }
 
@@ -527,7 +527,11 @@ public class LucenePlugin extends XWikiDefaultPlugin {
       String languages, SearcherProvider theSearcherProvider, boolean skipChecks, 
       XWikiContext context) throws IOException, ParseException {
     try {
-      theSearcherProvider.connect();
+      if (theSearcherProvider == null) {
+        theSearcherProvider = getConnectedSearcherProvider();
+      } else {
+        theSearcherProvider.connect();
+      }
       MultiSearcher searcher = new MultiSearcher(theSearcherProvider.getSearchers());
   
       // Enhance the base query with wiki names and languages.
@@ -860,18 +864,19 @@ public class LucenePlugin extends XWikiDefaultPlugin {
    * existing ones.
    */
   protected void openSearchers(XWikiContext context) {
-    getSearcherProvider(true, context);
+    getConnectedSearcherProvider(true, context);
   }
 
-  private SearcherProvider getSearcherProvider() {
-    return getSearcherProvider(false, getContext());
+  private SearcherProvider getConnectedSearcherProvider() {
+    return getConnectedSearcherProvider(false, getContext());
   }
 
-  private synchronized SearcherProvider getSearcherProvider(boolean createNew,
+  private synchronized SearcherProvider getConnectedSearcherProvider(boolean createNew,
       XWikiContext context) {
     if (createNew || (this.searcherProvider == null)) {
       try {
         if (this.searcherProvider != null) {
+          this.searcherProvider.disconnect();
           this.searcherProvider.markToClose();
           this.searcherProvider = null;
         }
@@ -883,8 +888,8 @@ public class LucenePlugin extends XWikiDefaultPlugin {
         throw new RuntimeException("Error opening searchers for index dirs "
             + context.getWiki().Param(PROP_INDEX_DIR), exp);
       }
-      
     }
+    this.searcherProvider.connect();
     return this.searcherProvider;
   }
 
