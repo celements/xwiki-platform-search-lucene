@@ -64,13 +64,15 @@ public class SearcherProvider {
   }
 
   public void connect() {
-    if (this.markToClose) {
-      throw new IllegalStateException("you may not connect to a SearchProvider"
-          + " marked to close.");
+    if (!connectedThreads.contains(Thread.currentThread())) {
+      if (this.markToClose) {
+        throw new IllegalStateException("you may not connect to a SearchProvider"
+            + " marked to close.");
+      }
+      LOGGER.debug("connect searcherProvider [" + System.identityHashCode(this) + "] to ["
+          + Thread.currentThread() + "].");
+      connectedThreads.add(Thread.currentThread());
     }
-    LOGGER.debug("connect searcherProvider [" + System.identityHashCode(this) + "] to ["
-        + Thread.currentThread() + "].");
-    connectedThreads.add(Thread.currentThread());
   }
 
   public boolean isClosed() {
