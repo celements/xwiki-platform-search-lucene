@@ -98,24 +98,27 @@ public class SearchResults extends Api {
             + docs.scoreDocs.length + "] for results [" + results.getTotalHits()
             + "] with class [" + results.getClass() + "] and id-Hash ["
             + System.identityHashCode(results) + "].");
-        for (int i = 0; i < docs.scoreDocs.length; i++) {
+        for (ScoreDoc scoreDoc : docs.scoreDocs) {
           try {
-            SearchResult result = new SearchResult(this.searcher.doc(docs.scoreDocs[i].doc),
-                docs.scoreDocs[i].score, this.xwiki);
-  
+            SearchResult result = new SearchResult(searcher.doc(scoreDoc.doc), 
+                scoreDoc.score, this.xwiki); 
             if (result.isWikiContent()) {
-              if (skipChecks || check(result.getDocumentReference())) {
-                this.relevantResults.add(result);
-              } else {
-                LOGGER.debug("getRelevantResults: skipping because checks failed for "
-                    + "result [" + result.getDocumentReference() + "].");
+              try {
+                if (skipChecks || check(result.getDocumentReference())) {
+                  this.relevantResults.add(result);
+                } else {
+                  LOGGER.debug("getRelevantResults: skipping because checks failed for "
+                      + "result [" + result.getDocumentReference() + "].");
+                }
+              } catch (XWikiException xwe) {
+                LOGGER.error("Error checking result: " + result.getFullName(), xwe);
               }
             } else {
               LOGGER.debug("getRelevantResults: skipping because no wiki content"
                   + " (wiki-Document or wiki-Doc-Attachment).");
             }
-          } catch (Exception e) {
-            LOGGER.error("getRelevantResults: Error getting search result", e);
+          } catch (IOException ioe) {
+            LOGGER.error("Error getting result doc '" + scoreDoc + "' from searcher", ioe);
           }
         }
       } finally {
