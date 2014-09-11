@@ -98,24 +98,27 @@ public class SearchResults extends Api {
             + docs.scoreDocs.length + "] for results [" + results.getTotalHits()
             + "] with class [" + results.getClass() + "] and id-Hash ["
             + System.identityHashCode(results) + "].");
-        for (int i = 0; i < docs.scoreDocs.length; i++) {
+        for (ScoreDoc scoreDoc : docs.scoreDocs) {
           try {
-            SearchResult result = new SearchResult(this.searcher.doc(docs.scoreDocs[i].doc),
-                docs.scoreDocs[i].score, this.xwiki);
-  
+            SearchResult result = new SearchResult(searcher.doc(scoreDoc.doc), 
+                scoreDoc.score, this.xwiki); 
             if (result.isWikiContent()) {
-              if (skipChecks || check(result.getDocumentReference())) {
-                this.relevantResults.add(result);
-              } else {
-                LOGGER.debug("getRelevantResults: skipping because checks failed for "
-                    + "result [" + result.getDocumentReference() + "].");
+              try {
+                if (skipChecks || check(result.getDocumentReference())) {
+                  this.relevantResults.add(result);
+                } else {
+                  LOGGER.debug("getRelevantResults: skipping because checks failed for "
+                      + "result [" + result.getDocumentReference() + "].");
+                }
+              } catch (XWikiException xwe) {
+                LOGGER.error("Error checking result: " + result.getFullName(), xwe);
               }
             } else {
               LOGGER.debug("getRelevantResults: skipping because no wiki content"
                   + " (wiki-Document or wiki-Doc-Attachment).");
             }
-          } catch (Exception e) {
-            LOGGER.error("getRelevantResults: Error getting search result", e);
+          } catch (IOException ioe) {
+            LOGGER.error("Error getting result doc '" + scoreDoc + "' from searcher", ioe);
           }
         }
       } finally {
@@ -212,55 +215,14 @@ public class SearchResults extends Api {
    *         and containing up to <code>items</code> elements.
    */
   public List<SearchResult> getResults(int beginIndex, int items) {
-    final int listStartIndex = beginIndex - 1;
-    final int listEndIndex = listStartIndex + items;
-    int resultcount = 0;
-    List<SearchResult> relResults = this.relevantResults;
-    if (relResults == null) {
-      relResults = new ArrayList<SearchResult>();
-      TopDocs docs = this.results.topDocs();
-      String database = this.context.getDatabase();
-      try {
-        for (int i = 0; i < docs.scoreDocs.length; i++) {
-          SearchResult result = null;
-          try {
-            result = new SearchResult(this.searcher.doc(docs.scoreDocs[i].doc),
-                docs.scoreDocs[i].score, this.xwiki);
-
-            this.context.setDatabase(result.getWiki());
-
-            String pageName = null;
-            if (result.isWikiContent()) {
-              pageName = result.getWiki() + ":" + result.getSpace() + "."
-                  + result.getName();
-            }
-            if (result.isWikiContent() && this.xwiki.exists(pageName)
-                && this.xwiki.checkAccess(pageName, "view")) {
-              if (resultcount >= listStartIndex) {
-                relResults.add(result);
-              }
-              resultcount++;
-              if (resultcount == listEndIndex) {
-                return relResults;
-              }
-            }
-          } catch (Exception e) {
-            LOGGER.error("error getting search result", e);
-          }
-        }
-      } finally {
-        this.context.setDatabase(database);
-      }
-
-      return relResults;
+    int listStartIndex = beginIndex - 1;
+    int listEndIndex = listStartIndex + items;
+    int resultcount = getRelevantResults().size();
+    listEndIndex = listEndIndex < resultcount ? listEndIndex : resultcount;
+    if (listStartIndex <= listEndIndex) {
+      return getRelevantResults().subList(listStartIndex, listEndIndex);
     } else {
-      resultcount = getRelevantResults().size();
-      int theListEndIndex = listEndIndex < resultcount ? listEndIndex : resultcount;
-      if (listStartIndex <= theListEndIndex) {
-        return getRelevantResults().subList(listStartIndex, theListEndIndex);
-      } else {
-        return Collections.emptyList();
-      }
+      return Collections.emptyList();
     }
   }
 
