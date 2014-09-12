@@ -102,9 +102,9 @@ public class LucenePlugin extends XWikiDefaultPlugin {
   
   public static final String PROP_RESULT_LIMIT_WITHOUT_CHECKS = "xwiki.plugins.lucene.resultLimitWithoutChecks";
   
-  public static final String DEFAULT_RESULT_LIMIT = "1000";
+  public static final int DEFAULT_RESULT_LIMIT = 1000;
   
-  public static final String DEFAULT_RESULT_LIMIT_WITHOUT_CHECKS = "150000";
+  public static final int DEFAULT_RESULT_LIMIT_WITHOUT_CHECKS = 150000;
 
   private static final String DEFAULT_ANALYZER = "org.apache.lucene.analysis.standard.StandardAnalyzer";
 
@@ -656,13 +656,19 @@ public class LucenePlugin extends XWikiDefaultPlugin {
 
   public int getResultLimit(boolean skipChecks, XWikiContext context) {
     String key = PROP_RESULT_LIMIT;
-    String defaultValue = DEFAULT_RESULT_LIMIT;
+    int defaultVal = DEFAULT_RESULT_LIMIT;
     if (skipChecks) {
       key = PROP_RESULT_LIMIT_WITHOUT_CHECKS;
-      defaultValue = DEFAULT_RESULT_LIMIT_WITHOUT_CHECKS;
+      defaultVal = DEFAULT_RESULT_LIMIT_WITHOUT_CHECKS;
     }
-    String limitParam = context.getWiki().Param(key, defaultValue);
-    return Integer.parseInt(limitParam);
+    String limitParam = context.getWiki().Param(key, Integer.toString(defaultVal));
+    int limit;
+    try {
+      limit = Integer.parseInt(limitParam);
+    } catch (NumberFormatException exc) {
+      limit = defaultVal;
+    }
+    return limit;
   }
 
   @Override
