@@ -215,7 +215,7 @@ public class SearchResults extends Api {
    *         and containing up to <code>items</code> elements.
    */
   public List<SearchResult> getResults(int beginIndex, int items) {
-    int listStartIndex = beginIndex - 1;
+    int listStartIndex = Math.max(beginIndex - 1, 0);
     int listEndIndex = listStartIndex + items;
     int resultcount = getRelevantResults().size();
     listEndIndex = listEndIndex < resultcount ? listEndIndex : resultcount;
