@@ -22,15 +22,21 @@ package com.xpn.xwiki.plugin.lucene;
 import static org.easymock.EasyMock.*;
 import static org.junit.Assert.*;
 
+import java.io.File;
 import java.io.IOException;
+
+import javax.servlet.ServletContext;
 
 import org.junit.Before;
 import org.junit.Test;
 import org.xwiki.model.reference.DocumentReference;
 
 import com.celements.common.test.AbstractBridgedComponentTestCase;
+import com.xpn.xwiki.XWikiException;
 import com.xpn.xwiki.doc.XWikiAttachment;
 import com.xpn.xwiki.doc.XWikiDocument;
+import com.xpn.xwiki.render.XWikiRenderingEngine;
+import com.xpn.xwiki.web.XWikiServletContext;
 
 /**
  * Unit tests for {@link AttachmentData}.
@@ -38,101 +44,106 @@ import com.xpn.xwiki.doc.XWikiDocument;
  * @version $Id: 6235ccd3b45c79ed04c8c9ef57f99a45e11fbc01 $
  */
 public class AttachmentDataTest extends AbstractBridgedComponentTestCase {
+
   private XWikiDocument document;
 
   private XWikiAttachment attachment;
 
   private AttachmentData attachmentData;
 
-//  private ServletContext servletContext;
+  private ServletContext servletContext;
 
   @Before
   public void setUp_AttachmentDataTest() throws Exception {
-    this.document = new XWikiDocument(new DocumentReference("wiki", "space", "page"));
+    DocumentReference docRef = new DocumentReference("wiki", "space", "page");
+    this.document = new XWikiDocument(docRef);
+    this.document.setTitle(docRef.getName());
     this.attachment = new XWikiAttachment(this.document, "filename");
     this.document.getAttachmentList().add(this.attachment);
 
-    this.attachmentData = new AttachmentData(this.attachment, getContext(), false);
-//    ServletEnvironment env = (ServletEnvironment)getComponentManager().getInstance(
-//        Environment.class);
-//    servletContext = createMock(ServletContext.class);
-//    env.setServletContext(servletContext);
-//    expect(servletContext.getAttribute(eq("javax.servlet.context.tempdir"))).andReturn(
-//        new File("./", "")).anyTimes();
-  }
+    XWikiRenderingEngine renderEngineMock = createMockAndAddToDefault(
+        XWikiRenderingEngine.class);
+    expect(getWikiMock().getRenderingEngine()).andReturn(renderEngineMock).once();
+    expect(
+        renderEngineMock.interpretText(eq(docRef.getName()), same(document),
+            same(getContext()))).andReturn(docRef.getName()).once();
 
-  private void assertGetFullText(String expect, String filename) throws IOException {
-    this.attachment.setFilename(filename);
-    this.attachment.setContent(getClass().getResourceAsStream("/" + filename));
-
-    this.attachmentData.setFilename(filename);
-
-    String fullText = this.attachmentData.getFullText(this.document, getContext());
-
-    assertEquals("Wrong attachment content indexed", expect, fullText);
+    servletContext = createMockAndAddToDefault(ServletContext.class);
+    getContext().setEngineContext(new XWikiServletContext(servletContext));
+    expect(servletContext.getAttribute(eq("javax.servlet.context.tempdir"))).andReturn(
+        new File("./", "")).anyTimes();
   }
 
   @Test
-  public void testFiller() {
-    //TODO remove me as soon as ASM problem is fixed
+  public void getFullTextFromTxt() throws IOException, XWikiException {
+    String filename = "txt.txt";
+    String mimetype = "text/plain";
+    String content = "text content\n";
+    assertFullTextAndMimeType(filename, mimetype, content);
   }
 
-/**
- * ASM ticka-parsers removed
- *FIXME see http://jira.xwiki.org/browse/XWIKI-8657
- * @param mocks
- */
-//  @Test
-//  public void testGetFullTextFromTxt() throws IOException {
-//    replayAll();
-//    assertGetFullText("text content\n", "txt.txt");
-//    verifyAll();
-//  }
-//
-//  @Test
-//  public void testGetFullTextFromMSOffice97() throws IOException {
-//    replayAll();
-//    assertGetFullText("ms office 97 content\n\n", "msoffice97.doc");
-//    verifyAll();
-//  }
-//
-//  @Test
-//  public void testGetFullTextFromOpenXML() throws IOException {
-//    replayAll();
-//    assertGetFullText("openxml content\n", "openxml.docx");
-//    verifyAll();
-//  }
-//
-//  @Test
-//  public void testGetFullTextFromOpenDocument() throws IOException {
-//    replayAll();
-//    assertGetFullText("opendocument content\n", "opendocument.odt");
-//    verifyAll();
-//  }
-//
-//  @Test
-//  public void testGetFullTextFromPDF() throws IOException {
-//    replayAll();
-//    assertGetFullText("\npdf content\n\n\n", "pdf.pdf");
-//    verifyAll();
-//  }
-//
-//  @Test
-//  public void testGetFullTextFromZIP() throws IOException {
-//    replayAll();
-//    assertGetFullText("zip.txt\nzip content\n\n\n\n", "zip.zip");
-//    verifyAll();
-//  }
+  @Test
+  public void getFullTextFromMSOffice97() throws IOException, XWikiException {
+    String filename = "msoffice97.doc";
+    String mimetype = "application/msword";
+    String content = "ms office 97 content\n\n";
+    assertFullTextAndMimeType(filename, mimetype, content);
 
-
-  private void replayAll(Object ... mocks) {
-    replay(mocks);
-//    replay(servletContext);
   }
 
-  private void verifyAll(Object ... mocks) {
-    verify(mocks);
-//    verify(servletContext);
+  @Test
+  public void getFullTextFromOpenXML() throws IOException, XWikiException {
+    String filename = "openxml.docx";
+    String mimetype = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    String content = "openxml content\n";
+    assertFullTextAndMimeType(filename, mimetype, content);
+
+  }
+
+  @Test
+  public void getFullTextFromOpenDocument() throws IOException, XWikiException {
+    String filename = "opendocument.odt";
+    String mimetype = "application/vnd.oasis.opendocument.text";
+    String content = "opendocument content\n";
+    assertFullTextAndMimeType(filename, mimetype, content);
+  }
+
+  @Test
+  public void getFullTextFromPDF() throws IOException, XWikiException {
+    String filename = "pdf.pdf";
+    String mimetype = "application/pdf";
+    String content = "\npdf content\n\n\n";
+    assertFullTextAndMimeType(filename, mimetype, content);
+  }
+
+  @Test
+  public void getFullTextFromZIP() throws IOException, XWikiException {
+    String filename = "zip.zip";
+    String mimetype = "application/zip";
+    String content = "\nzip.txt\nzip content\n\n\n\n";
+    assertFullTextAndMimeType(filename, mimetype, content);
+  }
+
+  @Test
+  public void getFullTextFromHTML() throws IOException, XWikiException {
+    String filename = "html.html";
+    String mimetype = "text/html";
+    String content = "something\n";
+    assertFullTextAndMimeType(filename, mimetype, content);
+  }
+
+  private void assertFullTextAndMimeType(String filename, String mimetype, String content)
+      throws IOException {
+    attachment.setFilename(filename);
+    attachment.setContent(getClass().getResourceAsStream("/" + filename));
+    expect(servletContext.getMimeType(eq(filename))).andReturn(mimetype).once();
+    replayDefault();
+    this.attachmentData = new AttachmentData(this.attachment, getContext(), false);
+    this.attachmentData.setFilename(filename);
+    assertEquals("Wrong attachment content indexed", content, attachmentData.getFullText(
+        document, getContext()));
+    assertEquals("Wrong mimetype content indexed", mimetype, attachmentData.getMimeType());
+    verifyDefault();
   }
 
 }
