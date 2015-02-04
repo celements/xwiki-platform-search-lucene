@@ -23,7 +23,9 @@ import java.util.Date;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.xwiki.model.reference.AttachmentReference;
 import org.xwiki.model.reference.DocumentReference;
+import org.xwiki.model.reference.EntityReference;
 
 import com.xpn.xwiki.XWikiException;
 import com.xpn.xwiki.api.Document;
@@ -69,7 +71,7 @@ public class SearchResult
 
     private boolean hidden;
 
-    private DocumentReference documentReference;
+    private EntityReference reference;
 
     private static final Logger LOGGER = LoggerFactory.getLogger(SearchResult.class);
 
@@ -95,9 +97,11 @@ public class SearchResult
         this.date = IndexFields.stringToDate(doc.get(IndexFields.DOCUMENT_DATE));
         this.creationDate = IndexFields.stringToDate(doc.get(IndexFields.DOCUMENT_CREATIONDATE));
         this.hidden = IndexFields.stringToBoolean(doc.get(IndexFields.DOCUMENT_HIDDEN));
-        this.documentReference = new DocumentReference(wiki, space, name);
-        if (LucenePlugin.DOCTYPE_ATTACHMENT.equals(this.type)) {
+        this.reference = new DocumentReference(wiki, space, name);
+        if (this.isAttachment()) {
             this.filename = doc.get(IndexFields.FILENAME);
+            this.reference = new AttachmentReference(this.filename, 
+                (DocumentReference) this.reference);
             Document document;
             final String fullDocName =
                 new StringBuffer(this.wiki).append(":").append(this.space).append(".").append(this.name).toString();
@@ -252,11 +256,27 @@ public class SearchResult
     }
 
     /**
-     * @return true when this result points to wiki content (attachment, wiki page or object)
+     * @return true when this result points to a wiki page
+     */
+    public boolean isWikiPage()
+    {
+        return LucenePlugin.DOCTYPE_WIKIPAGE.equals(this.type);
+    }
+
+    /**
+     * @return true when this result points to an attachment
+     */
+    public boolean isAttachment()
+    {
+        return LucenePlugin.DOCTYPE_ATTACHMENT.equals(this.type);
+    }
+
+    /**
+     * @return true when this result points to wiki content (attachment or wiki page)
      */
     public boolean isWikiContent()
     {
-        return (LucenePlugin.DOCTYPE_WIKIPAGE.equals(this.type) || LucenePlugin.DOCTYPE_ATTACHMENT.equals(this.type));
+        return (this.isWikiPage() || this.isAttachment());
     }
 
     /**
@@ -272,6 +292,20 @@ public class SearchResult
      */
     public DocumentReference getDocumentReference()
     {
-        return this.documentReference;
+        DocumentReference docRef = null;
+        if (getReference() instanceof DocumentReference) {
+          docRef = (DocumentReference) getReference();
+        } else if (getReference() instanceof AttachmentReference) {
+          docRef = ((AttachmentReference) getReference()).getDocumentReference();
+        }
+        return docRef;
+    }
+
+    /**
+     * @return the reference of the entity (document or attachment).
+     */
+    public EntityReference getReference()
+    {
+        return this.reference;
     }
 }
