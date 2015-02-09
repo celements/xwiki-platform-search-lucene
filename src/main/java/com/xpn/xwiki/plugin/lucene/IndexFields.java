@@ -90,6 +90,8 @@ public abstract class IndexFields
      */
     public static final String FILENAME = "filename";
 
+    public static final String MIMETYPE = "mimetype";
+
     /**
      * XWiki object type, only used for objects
      */
