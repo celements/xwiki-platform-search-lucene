@@ -214,8 +214,8 @@ public class AttachmentData extends AbstractDocumentData
 
             contentText = StringUtils.lowerCase(tika.parseToString(att.getContentInputStream(context), metadata));
         } catch (Throwable ex) {
-            LOGGER.warn("error getting content of attachment [{}] for document [{}]",
-                new Object[] {this.filename, doc.getDocumentReference(), ex});
+            LOGGER.error("error getting content of attachment [{}] for document [{}]", 
+                this.filename, doc.getDocumentReference(), ex);
         }
 
         return contentText;
