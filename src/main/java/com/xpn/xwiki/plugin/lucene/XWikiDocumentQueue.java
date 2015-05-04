@@ -25,6 +25,8 @@ import java.util.Map;
 import org.apache.commons.collections.Buffer;
 import org.apache.commons.collections.BufferUnderflowException;
 import org.apache.commons.collections.buffer.UnboundedFifoBuffer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This class represents a Queue (FirstInFirstOut) for XWikiDocument objects. It is used during indexing of the wiki.
@@ -35,6 +37,10 @@ import org.apache.commons.collections.buffer.UnboundedFifoBuffer;
  */
 public class XWikiDocumentQueue
 {
+
+    /** Logging helper object. */
+    private static final Logger LOGGER = LoggerFactory.getLogger(XWikiDocumentQueue.class);
+    
     /**
      * Maps names of documents to the document instances.
      */
@@ -54,6 +60,7 @@ public class XWikiDocumentQueue
      */
     public synchronized AbstractIndexData remove() throws BufferUnderflowException
     {
+        LOGGER.debug("removing element from queue.");
         return this.documentsByName.remove(this.namesQueue.remove());
     }
 
@@ -69,7 +76,8 @@ public class XWikiDocumentQueue
     public synchronized void add(AbstractIndexData data)
     {
         String key = data.getId();
-
+        
+        LOGGER.debug("adding element to queue. Key: " + key);
         if (!this.documentsByName.containsKey(key)) {
             // Document with this name not yet in the Queue, so add it
             this.namesQueue.add(key);
