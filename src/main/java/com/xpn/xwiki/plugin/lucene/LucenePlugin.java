@@ -797,6 +797,7 @@ public class LucenePlugin extends XWikiDefaultPlugin {
 
   @Override
   public void flushCache(XWikiContext context) {
+    LOGGER.info("Lucene plugin flushCache called!");
     // take care of crappy code calling #flushCache with no context...
     if (context == null) {
       context = getContext();
@@ -814,6 +815,14 @@ public class LucenePlugin extends XWikiDefaultPlugin {
         this.indexUpdaterThread.join();
       } catch (InterruptedException ex) {
         LOGGER.warn("Error while waiting for indexUpdaterThread to die.", ex);
+      }
+
+      if (this.indexUpdater.getQueueSize() > 0) {
+        LOGGER.warn("Lucene plugin dropping index updater with NON-EMPTY queue ["
+            + this.indexUpdater.getQueueSize() + "].");
+      } else {
+        LOGGER.debug("Lucene plugin dropping index updater with empty queue ["
+            + this.indexUpdater.getQueueSize() + "].");
       }
 
       this.indexUpdater = null;
