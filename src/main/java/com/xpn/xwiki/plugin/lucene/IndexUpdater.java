@@ -321,7 +321,11 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
 
     public void queueDocument(XWikiDocument document, XWikiContext context, boolean deleted)
     {
+        LOGGER.debug("IndexUpdater: adding [{}] to queue ", document.getDocumentReference(
+            ).getLastSpaceReference().getName() + "." + document.getDocumentReference(
+            ).getName());
         this.queue.add(new DocumentData(document, context, deleted));
+        LOGGER.debug("IndexUpdater: queue has now size " + getQueueSize());
     }
 
     public void queueAttachment(XWikiAttachment attachment, XWikiContext context, boolean deleted)
