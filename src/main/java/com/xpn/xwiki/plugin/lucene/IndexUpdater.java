@@ -54,6 +54,7 @@ import com.xpn.xwiki.internal.event.AbstractAttachmentEvent;
 import com.xpn.xwiki.internal.event.AttachmentAddedEvent;
 import com.xpn.xwiki.internal.event.AttachmentDeletedEvent;
 import com.xpn.xwiki.internal.event.AttachmentUpdatedEvent;
+import com.xpn.xwiki.plugin.lucene.indexExtension.ILuceneIndexExtensionServiceRole;
 import com.xpn.xwiki.util.AbstractXWikiRunnable;
 import com.xpn.xwiki.web.Utils;
 
@@ -281,6 +282,7 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
 
         Document luceneDoc = new Document();
         data.addDataToLuceneDocument(luceneDoc, context);
+        getLuceneExtensionService().extend(data, luceneDoc);
 
         // collecting all the fields for using up in search
         for (Fieldable field : luceneDoc.getFields()) {
@@ -444,4 +446,9 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
     {
         return this.maxQueueSize;
     }
+
+    public ILuceneIndexExtensionServiceRole getLuceneExtensionService() {
+      return Utils.getComponent(ILuceneIndexExtensionServiceRole.class);
+    }
+
 }
