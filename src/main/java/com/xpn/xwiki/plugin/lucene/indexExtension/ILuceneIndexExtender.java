@@ -11,6 +11,11 @@ import com.xpn.xwiki.plugin.lucene.AbstractIndexData;
 public interface ILuceneIndexExtender {
 
   /**
+   * @return the name of this extender
+   */
+  public String getName();
+
+  /**
    * @param data
    *          about to be indexed
    * @return true if the provided data is eligible and should be extended by this extender
