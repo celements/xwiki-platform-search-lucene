@@ -27,13 +27,13 @@ public class LuceneIndexExtensionService implements ILuceneIndexExtensionService
         for (Fieldable field : ext.getExtensionFields(data)) {
           if (field != null) {
             luceneDoc.add(field);
-            LOGGER.debug("extend: extender '{}' added for data '{}' field '{}'",
-                ext.getName(), data, field);
+            LOGGER.debug("extend: added field '{}' by extender '{}' for data '{}' ",
+                field, ext.getName(), data);
           }
         }
       } else {
-        LOGGER.debug("extend: data '{}' not eligible for extender '{}'", data,
-            ext.getName());
+        LOGGER.debug("extend: not eligible extender '{}' for data '{}' ", ext.getName(), 
+            data);
       }
     }
   }
