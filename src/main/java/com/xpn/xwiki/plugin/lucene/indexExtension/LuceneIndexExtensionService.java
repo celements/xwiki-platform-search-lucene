@@ -3,7 +3,6 @@ package com.xpn.xwiki.plugin.lucene.indexExtension;
 import java.util.List;
 
 import org.apache.lucene.document.Document;
-import org.apache.lucene.document.Fieldable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.xwiki.component.annotation.Component;
@@ -24,11 +23,14 @@ public class LuceneIndexExtensionService implements ILuceneIndexExtensionService
   public void extend(AbstractIndexData data, Document luceneDoc) {
     for (ILuceneIndexExtender ext : extenders) {
       if (ext.isEligibleIndexData(data)) {
-        for (Fieldable field : ext.getExtensionFields(data)) {
-          if (field != null) {
-            luceneDoc.add(field);
+        for (IndexExtensionField extField : ext.getExtensionFields(data)) {
+          if (extField != null) {
+            if (extField.isReplace()) {
+              luceneDoc.removeFields(extField.getName());
+            }
+            luceneDoc.add(extField.getLuceneField());
             LOGGER.debug("extend: added field '{}' by extender '{}' for data '{}' ",
-                field, ext.getName(), data);
+                extField, ext.getName(), data);
           }
         }
       } else {
