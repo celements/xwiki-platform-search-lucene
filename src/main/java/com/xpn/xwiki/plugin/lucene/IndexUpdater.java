@@ -42,8 +42,10 @@ import org.xwiki.bridge.event.DocumentDeletedEvent;
 import org.xwiki.bridge.event.DocumentUpdatedEvent;
 import org.xwiki.bridge.event.WikiDeletedEvent;
 import org.xwiki.context.Execution;
+import org.xwiki.model.reference.EntityReference;
 import org.xwiki.model.reference.WikiReference;
 import org.xwiki.observation.EventListener;
+import org.xwiki.observation.ObservationManager;
 import org.xwiki.observation.event.Event;
 
 import com.xpn.xwiki.XWikiContext;
@@ -55,6 +57,10 @@ import com.xpn.xwiki.internal.event.AttachmentAddedEvent;
 import com.xpn.xwiki.internal.event.AttachmentDeletedEvent;
 import com.xpn.xwiki.internal.event.AttachmentUpdatedEvent;
 import com.xpn.xwiki.plugin.lucene.indexExtension.ILuceneIndexExtensionServiceRole;
+import com.xpn.xwiki.plugin.lucene.observation.event.LuceneDocumentDeletedEvent;
+import com.xpn.xwiki.plugin.lucene.observation.event.LuceneDocumentDeletingEvent;
+import com.xpn.xwiki.plugin.lucene.observation.event.LuceneDocumentIndexedEvent;
+import com.xpn.xwiki.plugin.lucene.observation.event.LuceneDocumentIndexingEvent;
 import com.xpn.xwiki.util.AbstractXWikiRunnable;
 import com.xpn.xwiki.web.Utils;
 
@@ -275,31 +281,39 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
         }
     }
 
-    private void addToIndex(IndexWriter writer, AbstractIndexData data, XWikiContext context) throws IOException,
-        XWikiException
-    {
-        LOGGER.debug("addToIndex: [{}]", data);
-
-        Document luceneDoc = new Document();
-        data.addDataToLuceneDocument(luceneDoc, context);
-        getLuceneExtensionService().extend(data, luceneDoc);
-
-        // collecting all the fields for using up in search
-        for (Fieldable field : luceneDoc.getFields()) {
-            if (!fields.contains(field.name())) {
-                fields.add(field.name());
-            }
-        }
-
-        writer.updateDocument(data.getTerm(), luceneDoc);
+    private void addToIndex(IndexWriter writer, AbstractIndexData data,
+        XWikiContext context) throws IOException, XWikiException {
+      LOGGER.debug("addToIndex: [{}]", data);
+      EntityReference ref = data.getEntityReference();      
+      getObservationManager().notify(new LuceneDocumentIndexingEvent(ref), ref,
+          getContext());
+      Document luceneDoc = new Document();
+      data.addDataToLuceneDocument(luceneDoc, context);
+      getLuceneExtensionService().extend(data, luceneDoc);
+      collectFields(luceneDoc);
+      writer.updateDocument(data.getTerm(), luceneDoc);
+      getObservationManager().notify(new LuceneDocumentIndexedEvent(ref), ref,
+          getContext());
     }
 
-    private void removeFromIndex(IndexWriter writer, AbstractIndexData data, XWikiContext context)
-        throws CorruptIndexException, IOException
-    {
-        LOGGER.debug("removeFromIndex: [{}]", data);
+    // collecting all the fields for using up in search
+    private void collectFields(Document luceneDoc) {
+      for (Fieldable field : luceneDoc.getFields()) {
+          if (!fields.contains(field.name())) {
+              fields.add(field.name());
+          }
+      }
+    }
 
-        writer.deleteDocuments(data.getTerm());
+    private void removeFromIndex(IndexWriter writer, AbstractIndexData data,
+        XWikiContext context) throws CorruptIndexException, IOException {
+      LOGGER.debug("removeFromIndex: [{}]", data);
+      EntityReference ref = data.getEntityReference();
+      getObservationManager().notify(new LuceneDocumentDeletingEvent(ref), ref,
+          getContext());
+      writer.deleteDocuments(data.getTerm());
+      getObservationManager().notify(new LuceneDocumentDeletedEvent(ref), ref,
+          getContext());
     }
 
     /**
@@ -445,6 +459,10 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
     public int getMaxQueueSize()
     {
         return this.maxQueueSize;
+    }
+
+    public ObservationManager getObservationManager() {
+      return Utils.getComponent(ObservationManager.class);
     }
 
     public ILuceneIndexExtensionServiceRole getLuceneExtensionService() {
