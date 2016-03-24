@@ -32,6 +32,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.xwiki.model.reference.DocumentReference;
 
+import com.celements.rights.access.EAccessLevel;
+import com.celements.rights.access.IRightsAccessFacadeRole;
 import com.celements.web.service.IWebUtilsService;
 import com.xpn.xwiki.XWikiContext;
 import com.xpn.xwiki.XWikiException;
@@ -65,7 +67,7 @@ public class SearchResults extends Api {
 
   private List<SearchResult> relevantResults;
   
-  private IWebUtilsService webUtilsService;
+  private IRightsAccessFacadeRole rightsAccess;
 
   /**
    * @param results
@@ -137,8 +139,8 @@ public class SearchResults extends Api {
   }
 
   private boolean check(DocumentReference docRef) throws XWikiException {
-    return xwiki.exists(docRef) && xwiki.hasAccessLevel("view", this.context.getUser(), 
-        getWebUtilsService().getRefDefaultSerializer().serialize(docRef));
+    return xwiki.exists(docRef) && getRightsAccess().hasAccessLevel(docRef,
+        EAccessLevel.VIEW);
   }
 
   /**
@@ -258,11 +260,11 @@ public class SearchResults extends Api {
         + searcherProvider.isClosed() + "], isIdle [" + searcherProvider.isIdle() + "].");
   }
 
-  private IWebUtilsService getWebUtilsService() {
-    if (webUtilsService == null) {
-      webUtilsService = Utils.getComponent(IWebUtilsService.class);
+  private IRightsAccessFacadeRole getRightsAccess() {
+    if (rightsAccess == null) {
+      rightsAccess = Utils.getComponent(IRightsAccessFacadeRole.class);
     }
-    return webUtilsService;
+    return rightsAccess;
   }
 
 }
