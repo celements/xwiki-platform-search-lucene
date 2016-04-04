@@ -48,6 +48,8 @@ import org.xwiki.observation.EventListener;
 import org.xwiki.observation.ObservationManager;
 import org.xwiki.observation.event.Event;
 
+import com.celements.common.observation.event.AbstractEntityEvent;
+import com.celements.web.service.IWebUtilsService;
 import com.xpn.xwiki.XWikiContext;
 import com.xpn.xwiki.XWikiException;
 import com.xpn.xwiki.doc.XWikiAttachment;
@@ -134,10 +136,9 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
         this.maxQueueSize = maxQueueSize;
     }
 
-    private XWikiContext getContext()
-    {
-        return (XWikiContext) Utils.getComponent(Execution.class).getContext()
-            .getProperty(XWikiContext.EXECUTIONCONTEXT_KEY);
+    private XWikiContext getContext() {
+      return (XWikiContext) Utils.getComponent(Execution.class).getContext().getProperty(
+          XWikiContext.EXECUTIONCONTEXT_KEY);
     }
 
     public void doExit()
@@ -285,15 +286,13 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
         XWikiContext context) throws IOException, XWikiException {
       LOGGER.debug("addToIndex: [{}]", data);
       EntityReference ref = data.getEntityReference();      
-      getObservationManager().notify(new LuceneDocumentIndexingEvent(ref), ref,
-          getContext());
+      notify(new LuceneDocumentIndexingEvent(ref));
       Document luceneDoc = new Document();
       data.addDataToLuceneDocument(luceneDoc, context);
       getLuceneExtensionService().extend(data, luceneDoc);
       collectFields(luceneDoc);
       writer.updateDocument(data.getTerm(), luceneDoc);
-      getObservationManager().notify(new LuceneDocumentIndexedEvent(ref), ref,
-          getContext());
+      notify(new LuceneDocumentIndexedEvent(ref));
     }
 
     // collecting all the fields for using up in search
@@ -309,11 +308,9 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
         XWikiContext context) throws CorruptIndexException, IOException {
       LOGGER.debug("removeFromIndex: [{}]", data);
       EntityReference ref = data.getEntityReference();
-      getObservationManager().notify(new LuceneDocumentDeletingEvent(ref), ref,
-          getContext());
+      notify(new LuceneDocumentDeletingEvent(ref));
       writer.deleteDocuments(data.getTerm());
-      getObservationManager().notify(new LuceneDocumentDeletedEvent(ref), ref,
-          getContext());
+      notify(new LuceneDocumentDeletedEvent(ref));
     }
 
     /**
@@ -460,13 +457,25 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
     {
         return this.maxQueueSize;
     }
-
-    public ObservationManager getObservationManager() {
-      return Utils.getComponent(ObservationManager.class);
+    
+    private void notify(AbstractEntityEvent event) {
+      String curDB = getContext().getDatabase();
+      try {
+        String eventDB = getWebUtils().getWikiRef(event.getReference()).getName();
+        getContext().setDatabase(eventDB);
+        Utils.getComponent(ObservationManager.class).notify(event, event.getReference(),
+            getContext());
+      } finally {
+        getContext().setDatabase(curDB);
+      }
     }
 
     public ILuceneIndexExtensionServiceRole getLuceneExtensionService() {
       return Utils.getComponent(ILuceneIndexExtensionServiceRole.class);
+    }
+
+    public IWebUtilsService getWebUtils() {
+      return Utils.getComponent(IWebUtilsService.class);
     }
 
 }
