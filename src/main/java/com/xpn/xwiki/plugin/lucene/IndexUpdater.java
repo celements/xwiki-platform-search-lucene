@@ -201,10 +201,7 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
             LOGGER.debug("IndexUpdater: queue empty, nothing to do");
         } else {
             LOGGER.debug("IndexUpdater: documents in queue, start indexing");
-
-            XWikiContext context = getContext();
-            context.getWiki().getStore().cleanUp(context);
-
+            getContext().getWiki().getStore().cleanUp(getContext());
             IndexWriter writer;
             RETRY: while (true) {
                 // We will retry after repairing if the index was
@@ -223,39 +220,39 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
                 }
             }
 
+            String curDB = getContext().getDatabase();
             try {
-                int nb = 0;
-                while (!this.queue.isEmpty()) {
-                    AbstractIndexData data = this.queue.remove();
-
-                    try {
-                        if (data.isDeleted()) {
-                            removeFromIndex(writer, data, context);
-                        } else {
-                            addToIndex(writer, data, context);
-                        }
-
-                        ++nb;
-                    } catch (Throwable e) {
-                        LOGGER.error("error indexing document [{}]", data, e);
+              int nb = 0;
+              while (!this.queue.isEmpty()) {
+                  AbstractIndexData data = this.queue.remove();
+                  getContext().setDatabase(getWebUtils().getWikiRef(
+                      data.getEntityReference()).getName());
+                  try {
+                    if (data.isDeleted()) {
+                        removeFromIndex(writer, data);
+                    } else {
+                        addToIndex(writer, data);
                     }
-                }
-
-                LOGGER.info("indexed [{}] docs to lucene index", nb);
+                    ++nb;
+                  } catch (Throwable e) {
+                      LOGGER.error("error indexing document [{}]", data, e);
+                  }
+              }
+              LOGGER.info("indexed [{}] docs to lucene index", nb);
             } catch (Exception e) {
                 LOGGER.error("error indexing documents", e);
             } finally {
-                context.getWiki().getStore().cleanUp(context);
-
-                try {
-                    writer.optimize();
-                    writer.close();
-                } catch (IOException e) {
-                    LOGGER.warn("Failed to close writer.", e);
-                }
+              getContext().setDatabase(curDB);
+              getContext().getWiki().getStore().cleanUp(getContext());
+              try {
+                writer.optimize();
+                writer.close();
+              } catch (IOException e) {
+                  LOGGER.warn("Failed to close writer.", e);
+              }
             }
 
-            this.plugin.openSearchers(context);
+            this.plugin.openSearchers(getContext());
         }
     }
 
@@ -282,13 +279,13 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
         }
     }
 
-    private void addToIndex(IndexWriter writer, AbstractIndexData data,
-        XWikiContext context) throws IOException, XWikiException {
+    private void addToIndex(IndexWriter writer, AbstractIndexData data
+        ) throws IOException, XWikiException {
       LOGGER.debug("addToIndex: [{}]", data);
-      EntityReference ref = data.getEntityReference();      
+      EntityReference ref = data.getEntityReference();
       notify(new LuceneDocumentIndexingEvent(ref));
       Document luceneDoc = new Document();
-      data.addDataToLuceneDocument(luceneDoc, context);
+      data.addDataToLuceneDocument(luceneDoc, getContext());
       getLuceneExtensionService().extend(data, luceneDoc);
       collectFields(luceneDoc);
       writer.updateDocument(data.getTerm(), luceneDoc);
@@ -304,8 +301,8 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
       }
     }
 
-    private void removeFromIndex(IndexWriter writer, AbstractIndexData data,
-        XWikiContext context) throws CorruptIndexException, IOException {
+    private void removeFromIndex(IndexWriter writer, AbstractIndexData data
+        ) throws CorruptIndexException, IOException {
       LOGGER.debug("removeFromIndex: [{}]", data);
       EntityReference ref = data.getEntityReference();
       notify(new LuceneDocumentDeletingEvent(ref));
@@ -459,15 +456,8 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
     }
     
     private void notify(AbstractEntityEvent event) {
-      String curDB = getContext().getDatabase();
-      try {
-        String eventDB = getWebUtils().getWikiRef(event.getReference()).getName();
-        getContext().setDatabase(eventDB);
-        Utils.getComponent(ObservationManager.class).notify(event, event.getReference(),
-            getContext());
-      } finally {
-        getContext().setDatabase(curDB);
-      }
+      Utils.getComponent(ObservationManager.class).notify(event, event.getReference(),
+          getContext());
     }
 
     public ILuceneIndexExtensionServiceRole getLuceneExtensionService() {
