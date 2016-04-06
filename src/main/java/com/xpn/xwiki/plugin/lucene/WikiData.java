@@ -26,34 +26,31 @@ import com.xpn.xwiki.XWikiContext;
 import com.xpn.xwiki.doc.XWikiDocument;
 
 /**
- * Holds all data but the content of a wiki page to be indexed. The content is retrieved at indexing time, which should
- * save us some memory especially when rebuilding an index for a big wiki.
- * 
+ * Holds all data but the content of a wiki page to be indexed. The content is retrieved
+ * at indexing time, which should save us some memory especially when rebuilding an index
+ * for a big wiki.
+ *
  * @version $Id: 9b8dc406f6212de2110fb11415ee7dd66c0bbdb0 $
  */
-public class WikiData extends AbstractIndexData
-{
-    public WikiData(WikiReference wikiReference, boolean deleted)
-    {
-        super(null, wikiReference, deleted);
-    }
+public class WikiData extends AbstractIndexData {
 
-    @Override
-    public Term getTerm()
-    {
-        return new Term(IndexFields.DOCUMENT_WIKI, getWiki());
-    }
+  public WikiData(WikiReference wikiReference, boolean deleted) {
+    super(null, wikiReference, deleted);
+  }
 
-    @Override
-    protected void getFullText(StringBuilder sb, XWikiDocument doc, XWikiContext context)
-    {
-        // nothing to do
-    }
+  @Override
+  public Term getTerm() {
+    return new Term(IndexFields.DOCUMENT_WIKI, getWiki());
+  }
 
-    @Override
-    public String getId()
-    {
-        // TODO Auto-generated method stub
-        return null;
-    }
+  @Override
+  protected void getFullText(StringBuilder sb, XWikiDocument doc, XWikiContext context) {
+    // nothing to do
+  }
+
+  @Override
+  public String getId() {
+    // TODO Auto-generated method stub
+    return null;
+  }
 }

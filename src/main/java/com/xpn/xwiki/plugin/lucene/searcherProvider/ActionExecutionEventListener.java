@@ -32,7 +32,6 @@ import org.xwiki.observation.EventListener;
 import org.xwiki.observation.event.ActionExecutionEvent;
 import org.xwiki.observation.event.Event;
 
-
 @Component("SearcherProviderManager")
 @Singleton
 public class ActionExecutionEventListener implements EventListener {
@@ -40,19 +39,23 @@ public class ActionExecutionEventListener implements EventListener {
   @Requirement
   ISearcherProviderRole searchProviderManager;
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(
-      ActionExecutionEventListener.class);
+  private static final Logger LOGGER = LoggerFactory
+      .getLogger(ActionExecutionEventListener.class);
 
+  @Override
   public String getName() {
     return "SearcherProviderManager";
   }
 
+  @Override
   public List<Event> getEvents() {
-    return Arrays.asList((Event)new ActionExecutionEvent("view"),
-        (Event)new ActionExecutionEvent("edit"), (Event)new ActionExecutionEvent("admin"),
-        (Event)new ActionExecutionEvent("import"));
+    return Arrays.asList((Event) new ActionExecutionEvent("view"),
+        (Event) new ActionExecutionEvent("edit"),
+        (Event) new ActionExecutionEvent("admin"),
+        (Event) new ActionExecutionEvent("import"));
   }
 
+  @Override
   public void onEvent(Event event, Object source, Object data) {
     LOGGER.trace("onEvent called for event [" + event + "], source [" + source
         + "], data [" + data + "].");

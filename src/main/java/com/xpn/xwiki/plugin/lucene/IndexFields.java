@@ -25,143 +25,141 @@ import java.util.Date;
 import org.apache.commons.lang3.time.FastDateFormat;
 
 /**
- * Contains constants naming the Lucene index fields used by this Plugin and some helper methods for proper handling of
- * special field values like dates.
- * 
+ * Contains constants naming the Lucene index fields used by this Plugin and some helper
+ * methods for proper handling of special field values like dates.
+ *
  * @version $Id: c5240610a807da9be47eebfeb002872449773cb6 $
  */
-public abstract class IndexFields
-{
-    /**
-     * Keyword field, holds a string uniquely identifying a document across the index. this is used for finding old
-     * versions of a document to be indexed.
-     */
-    public static final String DOCUMENT_ID = "_docid";
+public abstract class IndexFields {
 
-    /**
-     * Keyword field, holds the name of the virtual wiki a document belongs to
-     */
-    public static final String DOCUMENT_WIKI = "wiki";
+  /**
+   * Keyword field, holds a string uniquely identifying a document across the index. this
+   * is used for finding old versions of a document to be indexed.
+   */
+  public static final String DOCUMENT_ID = "_docid";
 
-    /**
-     * Title of the document
-     */
-    public static final String DOCUMENT_TITLE = "title";
+  /**
+   * Keyword field, holds the name of the virtual wiki a document belongs to
+   */
+  public static final String DOCUMENT_WIKI = "wiki";
 
-    /**
-     * Name of the document
-     */
-    public static final String DOCUMENT_NAME = "name";
+  /**
+   * Title of the document
+   */
+  public static final String DOCUMENT_TITLE = "title";
 
-    /**
-     * Name of the web the document belongs to
-     */
-    @Deprecated
-    public static final String DOCUMENT_WEB = "web";
+  /**
+   * Name of the document
+   */
+  public static final String DOCUMENT_NAME = "name";
 
-    /**
-     * Name of the space the document belongs to
-     */
-    public static final String DOCUMENT_SPACE = "space";
+  /**
+   * Name of the web the document belongs to
+   */
+  @Deprecated
+  public static final String DOCUMENT_WEB = "web";
 
-    /**
-     * FullName of the document (example : Main.WebHome)
-     */
-    public static final String DOCUMENT_FULLNAME = "fullname";
+  /**
+   * Name of the space the document belongs to
+   */
+  public static final String DOCUMENT_SPACE = "space";
 
-    /**
-     * Version of the document
-     */
-    public static final String DOCUMENT_VERSION = "version";
-    
-    /**
-     * Language of the document
-     */
-    public static final String DOCUMENT_LANGUAGE = "lang";
+  /**
+   * FullName of the document (example : Main.WebHome)
+   */
+  public static final String DOCUMENT_FULLNAME = "fullname";
 
-    /**
-     * Type of a document, "attachment", "wikipage" or "objects", used to control presentation of searchresults. See
-     * {@link SearchResult}and xdocs/searchResult.vm.
-     */
-    public static final String DOCUMENT_TYPE = "type";
+  /**
+   * Version of the document
+   */
+  public static final String DOCUMENT_VERSION = "version";
 
-    /**
-     * Filename, only used for attachments
-     */
-    public static final String FILENAME = "filename";
+  /**
+   * Language of the document
+   */
+  public static final String DOCUMENT_LANGUAGE = "lang";
 
-    public static final String MIMETYPE = "mimetype";
+  /**
+   * Type of a document, "attachment", "wikipage" or "objects", used to control
+   * presentation of searchresults. See {@link SearchResult}and xdocs/searchResult.vm.
+   */
+  public static final String DOCUMENT_TYPE = "type";
 
-    /**
-     * XWiki object type, only used for objects
-     */
-    public static final String OBJECT = "object";
+  /**
+   * Filename, only used for attachments
+   */
+  public static final String FILENAME = "filename";
 
-    /**
-     * Last modifier
-     */
-    public static final String DOCUMENT_AUTHOR = "author";
+  public static final String MIMETYPE = "mimetype";
 
-    /**
-     * Creator of the document
-     */
-    public static final String DOCUMENT_CREATOR = "creator";
+  /**
+   * XWiki object type, only used for objects
+   */
+  public static final String OBJECT = "object";
 
-    /**
-     * Date of last modification
-     */
-    public static final String DOCUMENT_DATE = "date";
+  /**
+   * Last modifier
+   */
+  public static final String DOCUMENT_AUTHOR = "author";
 
-    /**
-     * Date of creation
-     */
-    public static final String DOCUMENT_CREATIONDATE = "creationdate";
+  /**
+   * Creator of the document
+   */
+  public static final String DOCUMENT_CREATOR = "creator";
 
-    /**
-     * Document hidden flag.
-     */
-    public static final String DOCUMENT_HIDDEN = "hidden";
+  /**
+   * Date of last modification
+   */
+  public static final String DOCUMENT_DATE = "date";
 
-    /**
-     * Fulltext content, not stored (and can therefore not be restored from the index).
-     */
-    public static final String FULLTEXT = "ft";
+  /**
+   * Date of creation
+   */
+  public static final String DOCUMENT_CREATIONDATE = "creationdate";
 
-    /**
-     * not in use
-     */
-    public static final String KEYWORDS = "kw";
+  /**
+   * Document hidden flag.
+   */
+  public static final String DOCUMENT_HIDDEN = "hidden";
 
-    /**
-     * Format for date storage in the index, and therefore the format which has to be used for date-queries.
-     */
-    public static final String DATE_FORMAT = "yyyyMMddHHmm";
+  /**
+   * Fulltext content, not stored (and can therefore not be restored from the index).
+   */
+  public static final String FULLTEXT = "ft";
 
-    private static final FastDateFormat DF = FastDateFormat.getInstance(IndexFields.DATE_FORMAT);
+  /**
+   * not in use
+   */
+  public static final String KEYWORDS = "kw";
 
-    public static final String dateToString(Date date)
-    {
-        return DF.format(date);
+  /**
+   * Format for date storage in the index, and therefore the format which has to be used
+   * for date-queries.
+   */
+  public static final String DATE_FORMAT = "yyyyMMddHHmm";
+
+  private static final FastDateFormat DF = FastDateFormat
+      .getInstance(IndexFields.DATE_FORMAT);
+
+  public static final String dateToString(Date date) {
+    return DF.format(date);
+  }
+
+  public static final Date stringToDate(String dateValue) {
+    SimpleDateFormat sdf = new SimpleDateFormat(DATE_FORMAT);
+    try {
+      return sdf.parse(dateValue);
+    } catch (Exception e) {
+      // silently ignore
     }
 
-    public static final Date stringToDate(String dateValue)
-    {
-        SimpleDateFormat sdf = new SimpleDateFormat(DATE_FORMAT);
-        try {
-            return sdf.parse(dateValue);
-        } catch (Exception e) {
-            // silently ignore
-        }
+    return null;
+  }
 
-        return null;
-    }
+  public static final boolean stringToBoolean(String booleanValue) {
+    return Boolean.parseBoolean(booleanValue);
+  }
 
-    public static final boolean stringToBoolean(String booleanValue)
-    {
-        return Boolean.parseBoolean(booleanValue);
-    }
-
-    private IndexFields()
-    {
-    }
+  private IndexFields() {
+  }
 }

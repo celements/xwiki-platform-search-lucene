@@ -13,8 +13,8 @@ import com.xpn.xwiki.plugin.lucene.AbstractIndexData;
 @Component
 public class LuceneIndexExtensionService implements ILuceneIndexExtensionServiceRole {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(
-      LuceneIndexExtensionService.class);
+  private static final Logger LOGGER = LoggerFactory
+      .getLogger(LuceneIndexExtensionService.class);
 
   @Requirement
   private List<ILuceneIndexExtender> extenders;
@@ -34,7 +34,7 @@ public class LuceneIndexExtensionService implements ILuceneIndexExtensionService
           }
         }
       } else {
-        LOGGER.debug("extend: not eligible extender '{}' for data '{}' ", ext.getName(), 
+        LOGGER.debug("extend: not eligible extender '{}' for data '{}' ", ext.getName(),
             data);
       }
     }

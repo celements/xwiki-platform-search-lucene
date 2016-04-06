@@ -29,23 +29,20 @@ import com.xpn.xwiki.doc.XWikiDocument;
 /**
  * @version $Id: 3ad189dae804eab651627fa472fb56a11b072ff5 $
  */
-public class TestXWikiDocument extends XWikiDocument
-{
-    public TestXWikiDocument(DocumentReference documentReference)
-    {
-        super(documentReference);
-    }
+public class TestXWikiDocument extends XWikiDocument {
 
-    @Override
-    public XWikiDocument getTranslatedDocument(String language, XWikiContext context
-        ) throws XWikiException
-    {
-        return this;
-    }
+  public TestXWikiDocument(DocumentReference documentReference) {
+    super(documentReference);
+  }
 
-    @Override
-    public String getRenderedTitle(Syntax outputSyntax, XWikiContext context)
-    {
-        return getTitle();
-    }
+  @Override
+  public XWikiDocument getTranslatedDocument(String language, XWikiContext context)
+      throws XWikiException {
+    return this;
+  }
+
+  @Override
+  public String getRenderedTitle(Syntax outputSyntax, XWikiContext context) {
+    return getTitle();
+  }
 }

@@ -34,7 +34,6 @@ import org.xwiki.model.reference.DocumentReference;
 
 import com.celements.rights.access.EAccessLevel;
 import com.celements.rights.access.IRightsAccessFacadeRole;
-import com.celements.web.service.IWebUtilsService;
 import com.xpn.xwiki.XWikiContext;
 import com.xpn.xwiki.XWikiException;
 import com.xpn.xwiki.api.Api;
@@ -45,14 +44,15 @@ import com.xpn.xwiki.web.Utils;
 /**
  * Container for the results of a search.
  * <p>
- * This class handles paging through search results and enforces the xwiki
- * rights management by only returning search results the user executing the
- * search is allowed to view.
+ * This class handles paging through search results and enforces the xwiki rights
+ * management by only returning search results the user executing the search is allowed to
+ * view.
  * </p>
- * 
+ *
  * @version $Id: 111c8d01d68749e3b4214a49238963ab10b70445 $
  */
 public class SearchResults extends Api {
+
   private final XWiki xwiki;
 
   private final Searcher searcher;
@@ -60,26 +60,26 @@ public class SearchResults extends Api {
   private final SearcherProvider searcherProvider;
 
   private final TopDocsCollector<? extends ScoreDoc> results;
-  
+
   private final boolean skipChecks;
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SearchResults.class);
 
   private List<SearchResult> relevantResults;
-  
+
   private IRightsAccessFacadeRole rightsAccess;
 
   /**
    * @param results
    *          Lucene search results
-   * @param searcher 
+   * @param searcher
    * @param skipChecks
    *          skips exists and access checks on documents
    * @param xwiki
    *          xwiki instance for access rights checking
    */
   SearchResults(TopDocsCollector<? extends ScoreDoc> results, Searcher searcher,
-      SearcherProvider theSearcherProvider, boolean skipChecks, XWiki xwiki, 
+      SearcherProvider theSearcherProvider, boolean skipChecks, XWiki xwiki,
       XWikiContext context) {
     super(context);
 
@@ -102,8 +102,8 @@ public class SearchResults extends Api {
             + System.identityHashCode(results) + "].");
         for (ScoreDoc scoreDoc : docs.scoreDocs) {
           try {
-            SearchResult result = new SearchResult(searcher.doc(scoreDoc.doc), 
-                scoreDoc.score, this.xwiki); 
+            SearchResult result = new SearchResult(searcher.doc(scoreDoc.doc),
+                scoreDoc.score, this.xwiki);
             if (result.isWikiContent()) {
               try {
                 if (skipChecks || check(result.getDocumentReference())) {
@@ -120,7 +120,8 @@ public class SearchResults extends Api {
                   + " (wiki-Document or wiki-Doc-Attachment).");
             }
           } catch (IOException ioe) {
-            LOGGER.error("Error getting result doc '" + scoreDoc + "' from searcher", ioe);
+            LOGGER.error("Error getting result doc '" + scoreDoc + "' from searcher",
+                ioe);
           }
         }
       } finally {
@@ -139,8 +140,8 @@ public class SearchResults extends Api {
   }
 
   private boolean check(DocumentReference docRef) throws XWikiException {
-    return xwiki.exists(docRef) && getRightsAccess().hasAccessLevel(docRef,
-        EAccessLevel.VIEW);
+    return xwiki.exists(docRef)
+        && getRightsAccess().hasAccessLevel(docRef, EAccessLevel.VIEW);
   }
 
   /**
@@ -150,32 +151,32 @@ public class SearchResults extends Api {
     final int itemCount = Integer.parseInt(items);
     final int begin = Integer.parseInt(beginIndex);
 
-    return begin + itemCount - 1 < getRelevantResults().size();
+    return ((begin + itemCount) - 1) < getRelevantResults().size();
   }
 
   /**
-   * @return true when there is a page before the one currently displayed, that
-   *         is, when <code>beginIndex > 1</code>
+   * @return true when there is a page before the one currently displayed, that is, when
+   *         <code>beginIndex > 1</code>
    */
   public boolean hasPrevious(String beginIndex) {
     return Integer.parseInt(beginIndex) > 1;
   }
 
   /**
-   * @return the value to be used for the firstIndex URL parameter to build a
-   *         link pointing to the next page of results
+   * @return the value to be used for the firstIndex URL parameter to build a link
+   *         pointing to the next page of results
    */
   public int getNextIndex(String beginIndex, String items) {
     final int itemCount = Integer.parseInt(items);
     final int resultcount = getRelevantResults().size();
     int retval = Integer.parseInt(beginIndex) + itemCount;
 
-    return retval > resultcount ? (resultcount - itemCount + 1) : retval;
+    return retval > resultcount ? ((resultcount - itemCount) + 1) : retval;
   }
 
   /**
-   * @return the value to be used for the firstIndex URL parameter to build a
-   *         link pointing to the previous page of results
+   * @return the value to be used for the firstIndex URL parameter to build a link
+   *         pointing to the previous page of results
    */
   public int getPreviousIndex(String beginIndex, String items) {
     int retval = Integer.parseInt(beginIndex) - Integer.parseInt(items);
@@ -187,7 +188,7 @@ public class SearchResults extends Api {
    * @return the index of the last displayed search result
    */
   public int getEndIndex(String beginIndex, String items) {
-    int retval = Integer.parseInt(beginIndex) + Integer.parseInt(items) - 1;
+    int retval = (Integer.parseInt(beginIndex) + Integer.parseInt(items)) - 1;
     final int resultcount = getRelevantResults().size();
     if (retval > resultcount) {
       return resultcount;
@@ -197,24 +198,24 @@ public class SearchResults extends Api {
   }
 
   /**
-   * Helper method for use in velocity templates, takes string values instead of
-   * ints. See {@link #getResults(int,int)}.
+   * Helper method for use in velocity templates, takes string values instead of ints. See
+   * {@link #getResults(int,int)}.
    */
   public List<SearchResult> getResults(String beginIndex, String items) {
     return getResults(Integer.parseInt(beginIndex), Integer.parseInt(items));
   }
 
   /**
-   * Returns a list of search results. According to beginIndex and endIndex,
-   * only a subset of the results is returned. To get the first ten results, one
-   * would use beginIndex=1 and items=10.
-   * 
+   * Returns a list of search results. According to beginIndex and endIndex, only a subset
+   * of the results is returned. To get the first ten results, one would use beginIndex=1
+   * and items=10.
+   *
    * @param beginIndex
    *          1-based index of first result to return.
    * @param items
    *          number of items to return
-   * @return List of SearchResult instances starting at <code>beginIndex</code>
-   *         and containing up to <code>items</code> elements.
+   * @return List of SearchResult instances starting at <code>beginIndex</code> and
+   *         containing up to <code>items</code> elements.
    */
   public List<SearchResult> getResults(int beginIndex, int items) {
     int listStartIndex = Math.max(beginIndex - 1, 0);
