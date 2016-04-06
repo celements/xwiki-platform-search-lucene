@@ -43,8 +43,8 @@ import com.xpn.xwiki.web.Utils;
  */
 public abstract class AbstractDocumentData extends AbstractIndexData {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(
-      AbstractDocumentData.class);
+  private static final Logger LOGGER = LoggerFactory
+      .getLogger(AbstractDocumentData.class);
 
   /** The importance of the document ID. **/
   protected static final float ID_BOOST = 0.1f;
@@ -117,30 +117,27 @@ public abstract class AbstractDocumentData extends AbstractIndexData {
    * <strong>Short introduction to Lucene field types </strong>
    * </p>
    * <p>
-   * Which type of Lucene field is used determines what Lucene does with data
-   * and how we can use it for searching and showing search results:
+   * Which type of Lucene field is used determines what Lucene does with data and how we
+   * can use it for searching and showing search results:
    * </p>
    * <ul>
-   * <li>Keyword fields don't get tokenized, but are searchable and stored in
-   * the index. This is perfect for fields you want to search in
-   * programmatically (like ids and such), and date fields. Since all
-   * user-entered queries are tokenized, letting the user search these fields
-   * makes almost no sense, except of queries for date fields, where
-   * tokenization is useless.</li>
-   * <li>the stored text fields are used for short texts which should be
-   * searchable by the user, and stored in the index for reconstruction. Perfect
-   * for document names, titles, abstracts.</li>
-   * <li>the unstored field takes the biggest part of the content - the full
-   * text. It is tokenized and indexed, but not stored in the index. This makes
-   * sense, since when the user wants to see the full content, he clicks the
-   * link to vie the full version of a document, which is then delivered by
-   * xwiki.</li>
+   * <li>Keyword fields don't get tokenized, but are searchable and stored in the index.
+   * This is perfect for fields you want to search in programmatically (like ids and
+   * such), and date fields. Since all user-entered queries are tokenized, letting the
+   * user search these fields makes almost no sense, except of queries for date fields,
+   * where tokenization is useless.</li>
+   * <li>the stored text fields are used for short texts which should be searchable by the
+   * user, and stored in the index for reconstruction. Perfect for document names, titles,
+   * abstracts.</li>
+   * <li>the unstored field takes the biggest part of the content - the full text. It is
+   * tokenized and indexed, but not stored in the index. This makes sense, since when the
+   * user wants to see the full content, he clicks the link to vie the full version of a
+   * document, which is then delivered by xwiki.</li>
    * </ul>
-   * 
+   *
    * @param luceneDoc
-   *          if not null, this controls which translated version of the content
-   *          will be indexed. If null, the content in the default language will
-   *          be used.
+   *          if not null, this controls which translated version of the content will be
+   *          indexed. If null, the content in the default language will be used.
    */
   @Override
   public void addDataToLuceneDocument(Document luceneDoc, XWikiContext context)
@@ -148,7 +145,7 @@ public abstract class AbstractDocumentData extends AbstractIndexData {
     // FIXME Is it not possible to obtain the right translation directly?
     XWikiDocument doc = context.getWiki().getDocument(getDocumentReference(), context);
 
-    if (getLanguage() != null && !getLanguage().equals("")) {
+    if ((getLanguage() != null) && !getLanguage().equals("")) {
       doc = doc.getTranslatedDocument(getLanguage(), context);
     }
 
@@ -227,8 +224,8 @@ public abstract class AbstractDocumentData extends AbstractIndexData {
     try {
       final String ft = getFullText(doc, context);
       if (ft != null) {
-        addFieldToDocument(IndexFields.FULLTEXT, ft, Field.Store.NO,
-            Field.Index.ANALYZED, CONTENT_BOOST, luceneDoc);
+        addFieldToDocument(IndexFields.FULLTEXT, ft, Field.Store.NO, Field.Index.ANALYZED,
+            CONTENT_BOOST, luceneDoc);
       }
     } catch (Exception e) {
       LOGGER.error("Error extracting fulltext for document [{}]", this.toString(), e);
@@ -236,8 +233,7 @@ public abstract class AbstractDocumentData extends AbstractIndexData {
   }
 
   /**
-   * @return string unique to this document across all languages and virtual
-   *         wikis
+   * @return string unique to this document across all languages and virtual wikis
    */
   @Override
   public String getId() {
@@ -354,8 +350,8 @@ public abstract class AbstractDocumentData extends AbstractIndexData {
 
   @Override
   public String getFullName() {
-    return (String) Utils.getComponent(EntityReferenceSerializer.class).serialize(
-        getEntityReference());
+    return (String) Utils.getComponent(EntityReferenceSerializer.class)
+        .serialize(getEntityReference());
   }
 
   public String getLanguage() {
@@ -378,9 +374,8 @@ public abstract class AbstractDocumentData extends AbstractIndexData {
   }
 
   /**
-   * Indexes data into a Lucene field and adds it to the specified Lucene
-   * document.
-   * 
+   * Indexes data into a Lucene field and adds it to the specified Lucene document.
+   *
    * @param fieldName
    *          the target field name under which to index this data
    * @param value

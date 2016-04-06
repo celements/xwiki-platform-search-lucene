@@ -34,145 +34,136 @@ import com.xpn.xwiki.web.Utils;
  * @version $Id: 7078d17d13ffdd29d41a0b5367bbaf3ce545ba36 $
  * @since 1.23
  */
-public abstract class AbstractIndexData
-{
-    private String type;
+public abstract class AbstractIndexData {
 
-    private boolean deleted;
+  private String type;
 
-    private EntityReference entityReference;
+  private boolean deleted;
 
-    public AbstractIndexData(String type, EntityReference entityReference, boolean deleted)
-    {
-        this.type = type;
+  private EntityReference entityReference;
 
-        setEntityReference(entityReference);
-        setDeleted(deleted);
-    }
+  public AbstractIndexData(String type, EntityReference entityReference,
+      boolean deleted) {
+    this.type = type;
 
-    /**
-     * Adds this documents data to a lucene Document instance for indexing.
-     * <p>
-     * <strong>Short introduction to Lucene field types </strong>
-     * </p>
-     * <p>
-     * Which type of Lucene field is used determines what Lucene does with data and how we can use it for searching and
-     * showing search results:
-     * </p>
-     * <ul>
-     * <li>Keyword fields don't get tokenized, but are searchable and stored in the index. This is perfect for fields
-     * you want to search in programmatically (like ids and such), and date fields. Since all user-entered queries are
-     * tokenized, letting the user search these fields makes almost no sense, except of queries for date fields, where
-     * tokenization is useless.</li>
-     * <li>the stored text fields are used for short texts which should be searchable by the user, and stored in the
-     * index for reconstruction. Perfect for document names, titles, abstracts.</li>
-     * <li>the unstored field takes the biggest part of the content - the full text. It is tokenized and indexed, but
-     * not stored in the index. This makes sense, since when the user wants to see the full content, he clicks the link
-     * to vie the full version of a document, which is then delivered by xwiki.</li>
-     * </ul>
-     * 
-     * @param luceneDoc if not null, this controls which translated version of the content will be indexed. If null, the
-     *            content in the default language will be used.
-     */
-    public void addDataToLuceneDocument(Document luceneDoc, XWikiContext context) throws XWikiException
-    {
+    setEntityReference(entityReference);
+    setDeleted(deleted);
+  }
 
-    }
+  /**
+   * Adds this documents data to a lucene Document instance for indexing.
+   * <p>
+   * <strong>Short introduction to Lucene field types </strong>
+   * </p>
+   * <p>
+   * Which type of Lucene field is used determines what Lucene does with data and how we
+   * can use it for searching and showing search results:
+   * </p>
+   * <ul>
+   * <li>Keyword fields don't get tokenized, but are searchable and stored in the index.
+   * This is perfect for fields you want to search in programmatically (like ids and
+   * such), and date fields. Since all user-entered queries are tokenized, letting the
+   * user search these fields makes almost no sense, except of queries for date fields,
+   * where tokenization is useless.</li>
+   * <li>the stored text fields are used for short texts which should be searchable by the
+   * user, and stored in the index for reconstruction. Perfect for document names, titles,
+   * abstracts.</li>
+   * <li>the unstored field takes the biggest part of the content - the full text. It is
+   * tokenized and indexed, but not stored in the index. This makes sense, since when the
+   * user wants to see the full content, he clicks the link to vie the full version of a
+   * document, which is then delivered by xwiki.</li>
+   * </ul>
+   *
+   * @param luceneDoc
+   *          if not null, this controls which translated version of the content will be
+   *          indexed. If null, the content in the default language will be used.
+   */
+  public void addDataToLuceneDocument(Document luceneDoc, XWikiContext context)
+      throws XWikiException {
 
-    /**
-     * @return string unique to this document across all languages and virtual wikis
-     */
-    public abstract String getId();
+  }
 
-    public Term getTerm()
-    {
-        return new Term(IndexFields.DOCUMENT_ID, getId());
-    }
+  /**
+   * @return string unique to this document across all languages and virtual wikis
+   */
+  public abstract String getId();
 
-    /**
-     * @return String of documentName, documentWeb, author and creator
-     */
-    public String getFullText(XWikiDocument doc, XWikiContext context)
-    {
-        StringBuilder sb = new StringBuilder();
+  public Term getTerm() {
+    return new Term(IndexFields.DOCUMENT_ID, getId());
+  }
 
-        getFullText(sb, doc, context);
+  /**
+   * @return String of documentName, documentWeb, author and creator
+   */
+  public String getFullText(XWikiDocument doc, XWikiContext context) {
+    StringBuilder sb = new StringBuilder();
 
-        return sb.toString();
-    }
+    getFullText(sb, doc, context);
 
-    protected abstract void getFullText(StringBuilder sb, XWikiDocument doc, XWikiContext context);
+    return sb.toString();
+  }
 
-    public String getType()
-    {
-        return this.type;
-    }
+  protected abstract void getFullText(StringBuilder sb, XWikiDocument doc,
+      XWikiContext context);
 
-    /**
-     * @see #isDeleted()
-     */
-    public void setDeleted(boolean deleted)
-    {
-        this.deleted = deleted;
-    }
+  public String getType() {
+    return this.type;
+  }
 
-    /**
-     * @return indicate of the element should be deleted from he index
-     */
-    public boolean isDeleted()
-    {
-        return this.deleted;
-    }
+  /**
+   * @see #isDeleted()
+   */
+  public void setDeleted(boolean deleted) {
+    this.deleted = deleted;
+  }
 
-    public EntityReference getEntityReference()
-    {
-        return this.entityReference;
-    }
+  /**
+   * @return indicate of the element should be deleted from he index
+   */
+  public boolean isDeleted() {
+    return this.deleted;
+  }
 
-    public void setEntityReference(EntityReference entityReference)
-    {
-        this.entityReference = entityReference;
-    }
+  public EntityReference getEntityReference() {
+    return this.entityReference;
+  }
 
-    protected String getEntityName(EntityType type)
-    {
-        EntityReference extract = getEntityReference().extractReference(type);
+  public void setEntityReference(EntityReference entityReference) {
+    this.entityReference = entityReference;
+  }
 
-        return extract != null ? extract.getName() : null;
-    }
+  protected String getEntityName(EntityType type) {
+    EntityReference extract = getEntityReference().extractReference(type);
 
-    public String getDocumentName()
-    {
-        return getEntityName(EntityType.DOCUMENT);
-    }
+    return extract != null ? extract.getName() : null;
+  }
 
-    public String getDocumentSpace()
-    {
-        return getEntityName(EntityType.SPACE);
-    }
+  public String getDocumentName() {
+    return getEntityName(EntityType.DOCUMENT);
+  }
 
-    public String getWiki()
-    {
-        return getEntityName(EntityType.WIKI);
-    }
+  public String getDocumentSpace() {
+    return getEntityName(EntityType.SPACE);
+  }
 
-    public String getDocumentFullName()
-    {
-        return (String)Utils.getComponent(EntityReferenceSerializer.class, "local")
-            .serialize(getEntityReference());
-    }
+  public String getWiki() {
+    return getEntityName(EntityType.WIKI);
+  }
 
-    public String getFullName()
-    {
-        return (String)Utils.getComponent(EntityReferenceSerializer.class).serialize(
-            getEntityReference());
-    }
+  public String getDocumentFullName() {
+    return (String) Utils.getComponent(EntityReferenceSerializer.class, "local")
+        .serialize(getEntityReference());
+  }
 
-    // Object
+  public String getFullName() {
+    return (String) Utils.getComponent(EntityReferenceSerializer.class)
+        .serialize(getEntityReference());
+  }
 
-    @Override
-    public String toString()
-    {
-        return getId();
-    }
+  // Object
+
+  @Override
+  public String toString() {
+    return getId();
+  }
 }

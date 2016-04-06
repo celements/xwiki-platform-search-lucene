@@ -70,400 +70,398 @@ import com.xpn.xwiki.web.Utils;
 /**
  * @version $Id: ced4ee86b2d2cf5830598a4a3aefcea8394d60e6 $
  */
-public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
-{
-    /**
-     * Logging helper.
-     */
-    private static final Logger LOGGER = LoggerFactory.getLogger(IndexUpdater.class);
+public class IndexUpdater extends AbstractXWikiRunnable implements EventListener {
 
-    private static final String NAME = "lucene";
+  /**
+   * Logging helper.
+   */
+  private static final Logger LOGGER = LoggerFactory.getLogger(IndexUpdater.class);
 
-    /**
-     * The maximum number of milliseconds we have to wait before this thread is safely closed.
-     */
-    private static final int EXIT_INTERVAL = 3000;
+  private static final String NAME = "lucene";
 
-    private static final List<Event> EVENTS = Arrays.<Event> asList(new DocumentUpdatedEvent(),
-        new DocumentCreatedEvent(), new DocumentDeletedEvent(), new AttachmentAddedEvent(),
-        new AttachmentDeletedEvent(), new AttachmentUpdatedEvent());
+  /**
+   * The maximum number of milliseconds we have to wait before this thread is safely
+   * closed.
+   */
+  private static final int EXIT_INTERVAL = 3000;
 
-    /**
-     * Collecting all the fields for using up in search
-     */
-    static final List<String> fields = new ArrayList<String>();
+  private static final List<Event> EVENTS = Arrays.<Event>asList(
+      new DocumentUpdatedEvent(), new DocumentCreatedEvent(), new DocumentDeletedEvent(),
+      new AttachmentAddedEvent(), new AttachmentDeletedEvent(),
+      new AttachmentUpdatedEvent());
 
-    private final LucenePlugin plugin;
+  /**
+   * Collecting all the fields for using up in search
+   */
+  static final List<String> fields = new ArrayList<String>();
 
-    /**
-     * Milliseconds of sleep between checks for changed documents.
-     */
-    private final int indexingInterval;
+  private final LucenePlugin plugin;
 
-    private final Directory directory;
+  /**
+   * Milliseconds of sleep between checks for changed documents.
+   */
+  private final int indexingInterval;
 
-    private final XWikiDocumentQueue queue = new XWikiDocumentQueue();
+  private final Directory directory;
 
-    /**
-     * Milliseconds left till the next check for changed documents.
-     */
-    private int indexingTimer = 0;
+  private final XWikiDocumentQueue queue = new XWikiDocumentQueue();
 
-    /**
-     * Soft threshold after which no more documents will be added to the indexing queue. When the queue size gets larger
-     * than this value, the index rebuilding thread will sleep chunks of {@code IndexRebuilder#retryInterval}
-     * milliseconds until the queue size will get back bellow this threshold. This does not affect normal indexing
-     * through wiki updates.
-     */
-    private final int maxQueueSize;
+  /**
+   * Milliseconds left till the next check for changed documents.
+   */
+  private int indexingTimer = 0;
 
-    /**
-     * volatile forces the VM to check for changes every time the variable is accessed since it is not otherwise changed
-     * in the main loop the VM could "optimize" the check out and possibly never exit
-     */
-    private volatile boolean exit = false;
+  /**
+   * Soft threshold after which no more documents will be added to the indexing queue.
+   * When the queue size gets larger than this value, the index rebuilding thread will
+   * sleep chunks of {@code IndexRebuilder#retryInterval} milliseconds until the queue
+   * size will get back bellow this threshold. This does not affect normal indexing
+   * through wiki updates.
+   */
+  private final int maxQueueSize;
 
-    private Analyzer analyzer;
+  /**
+   * volatile forces the VM to check for changes every time the variable is accessed since
+   * it is not otherwise changed in the main loop the VM could "optimize" the check out
+   * and possibly never exit
+   */
+  private volatile boolean exit = false;
 
-    IndexUpdater(Directory directory, int indexingInterval, int maxQueueSize, LucenePlugin plugin, XWikiContext context)
-    {
-        super(XWikiContext.EXECUTIONCONTEXT_KEY, context.clone());
+  private Analyzer analyzer;
 
-        this.plugin = plugin;
+  IndexUpdater(Directory directory, int indexingInterval, int maxQueueSize,
+      LucenePlugin plugin, XWikiContext context) {
+    super(XWikiContext.EXECUTIONCONTEXT_KEY, context.clone());
 
-        this.directory = directory;
+    this.plugin = plugin;
 
-        this.indexingInterval = indexingInterval;
-        this.maxQueueSize = maxQueueSize;
+    this.directory = directory;
+
+    this.indexingInterval = indexingInterval;
+    this.maxQueueSize = maxQueueSize;
+  }
+
+  private XWikiContext getContext() {
+    return (XWikiContext) Utils.getComponent(Execution.class).getContext()
+        .getProperty(XWikiContext.EXECUTIONCONTEXT_KEY);
+  }
+
+  public void doExit() {
+    this.exit = true;
+  }
+
+  /**
+   * Return a reference to the directory that this updater is currently working with.
+   */
+  public Directory getDirectory() {
+    return this.directory;
+  }
+
+  /**
+   * Main loop. Polls the queue for documents to be indexed.
+   *
+   * @see java.lang.Runnable#run()
+   */
+  @Override
+  protected void runInternal() {
+    getContext().setDatabase(getContext().getMainXWiki());
+    runMainLoop();
+  }
+
+  /**
+   * Main loop. Polls the queue for documents to be indexed.
+   */
+  private void runMainLoop() {
+    while (!this.exit) {
+      // Check if the indexing interval elapsed.
+      if (this.indexingTimer == 0) {
+        // Reset the indexing timer.
+        this.indexingTimer = this.indexingInterval;
+
+        // Poll the queue for documents to be indexed.
+        updateIndex();
+      }
+
+      // Remove the exit interval from the indexing timer.
+      int sleepInterval = Math.min(EXIT_INTERVAL, this.indexingTimer);
+      this.indexingTimer -= sleepInterval;
+      try {
+        Thread.sleep(sleepInterval);
+      } catch (InterruptedException e) {
+        LOGGER.warn("Error while sleeping", e);
+      }
     }
+  }
 
-    private XWikiContext getContext() {
-      return (XWikiContext) Utils.getComponent(Execution.class).getContext().getProperty(
-          XWikiContext.EXECUTIONCONTEXT_KEY);
-    }
-
-    public void doExit()
-    {
-        this.exit = true;
-    }
-
-    /**
-     * Return a reference to the directory that this updater is currently working with.
-     */
-    public Directory getDirectory()
-    {
-        return this.directory;
-    }
-
-    /**
-     * Main loop. Polls the queue for documents to be indexed.
-     * 
-     * @see java.lang.Runnable#run()
-     */
-    @Override
-    protected void runInternal()
-    {
-        getContext().setDatabase(getContext().getMainXWiki());
-        runMainLoop();
-    }
-
-    /**
-     * Main loop. Polls the queue for documents to be indexed.
-     */
-    private void runMainLoop()
-    {
-        while (!this.exit) {
-            // Check if the indexing interval elapsed.
-            if (this.indexingTimer == 0) {
-                // Reset the indexing timer.
-                this.indexingTimer = this.indexingInterval;
-
-                // Poll the queue for documents to be indexed.
-                updateIndex();
-            }
-
-            // Remove the exit interval from the indexing timer.
-            int sleepInterval = Math.min(EXIT_INTERVAL, this.indexingTimer);
-            this.indexingTimer -= sleepInterval;
-            try {
-                Thread.sleep(sleepInterval);
-            } catch (InterruptedException e) {
-                LOGGER.warn("Error while sleeping", e);
-            }
-        }
-    }
-
-    /**
-     * Polls the queue for documents to be indexed.
-     */
-    private void updateIndex()
-    {
-        if (this.queue.isEmpty()) {
-            LOGGER.debug("IndexUpdater: queue empty, nothing to do");
-        } else {
-            LOGGER.debug("IndexUpdater: documents in queue, start indexing");
-            getContext().getWiki().getStore().cleanUp(getContext());
-            IndexWriter writer;
-            RETRY: while (true) {
-                // We will retry after repairing if the index was
-                // corrupt
-                try {
-                    try {
-                        writer = openWriter(false);
-                        break RETRY;
-                    } catch (CorruptIndexException e) {
-                        this.plugin.handleCorruptIndex();
-                    }
-                } catch (IOException e) {
-                    LOGGER.error("Failed to open index", e);
-                    throw new RuntimeException(e);
-                }
-            }
-
-            String curDB = getContext().getDatabase();
-            try {
-              int nb = 0;
-              while (!this.queue.isEmpty()) {
-                  AbstractIndexData data = this.queue.remove();
-                  getContext().setDatabase(getWebUtils().getWikiRef(
-                      data.getEntityReference()).getName());
-                  try {
-                    if (data.isDeleted()) {
-                        removeFromIndex(writer, data);
-                    } else {
-                        addToIndex(writer, data);
-                    }
-                    ++nb;
-                  } catch (Throwable e) {
-                      LOGGER.error("error indexing document [{}]", data, e);
-                  }
-              }
-              LOGGER.info("indexed [{}] docs to lucene index", nb);
-            } catch (Exception e) {
-                LOGGER.error("error indexing documents", e);
-            } finally {
-              getContext().setDatabase(curDB);
-              getContext().getWiki().getStore().cleanUp(getContext());
-              try {
-                writer.optimize();
-                IOUtils.closeQuietly(writer);
-              } catch (IOException e) {
-                  LOGGER.warn("Failed to close writer.", e);
-              }
-            }
-
-            this.plugin.openSearchers(getContext());
-        }
-    }
-
-    protected IndexWriter openWriter(boolean create) throws IOException
-    {
-        while (true) {
-            try {
-                IndexWriterConfig cfg = new IndexWriterConfig(Version.LUCENE_34, this.analyzer);
-                if (create) {
-                    cfg.setOpenMode(OpenMode.CREATE);
-                }
-                IndexWriter w = new IndexWriter(this.directory, cfg);
-                return w;
-            } catch (LockObtainFailedException e) {
-                try {
-                    int s = new Random().nextInt(1000);
-
-                    LOGGER.debug("failed to acquire lock, retrying in {}ms ...", s);
-
-                    Thread.sleep(s);
-                } catch (InterruptedException e0) {
-                }
-            }
-        }
-    }
-
-    private void addToIndex(IndexWriter writer, AbstractIndexData data
-        ) throws IOException, XWikiException {
-      LOGGER.debug("addToIndex: [{}]", data);
-      EntityReference ref = data.getEntityReference();
-      notify(new LuceneDocumentIndexingEvent(ref));
-      Document luceneDoc = new Document();
-      data.addDataToLuceneDocument(luceneDoc, getContext());
-      getLuceneExtensionService().extend(data, luceneDoc);
-      collectFields(luceneDoc);
-      writer.updateDocument(data.getTerm(), luceneDoc);
-      notify(new LuceneDocumentIndexedEvent(ref));
-    }
-
-    // collecting all the fields for using up in search
-    private void collectFields(Document luceneDoc) {
-      for (Fieldable field : luceneDoc.getFields()) {
-          if (!fields.contains(field.name())) {
-              fields.add(field.name());
+  /**
+   * Polls the queue for documents to be indexed.
+   */
+  private void updateIndex() {
+    if (this.queue.isEmpty()) {
+      LOGGER.debug("IndexUpdater: queue empty, nothing to do");
+    } else {
+      LOGGER.debug("IndexUpdater: documents in queue, start indexing");
+      getContext().getWiki().getStore().cleanUp(getContext());
+      IndexWriter writer;
+      RETRY: while (true) {
+        // We will retry after repairing if the index was
+        // corrupt
+        try {
+          try {
+            writer = openWriter(false);
+            break RETRY;
+          } catch (CorruptIndexException e) {
+            this.plugin.handleCorruptIndex();
           }
+        } catch (IOException e) {
+          LOGGER.error("Failed to open index", e);
+          throw new RuntimeException(e);
+        }
+      }
+
+      String curDB = getContext().getDatabase();
+      try {
+        int nb = 0;
+        while (!this.queue.isEmpty()) {
+          AbstractIndexData data = this.queue.remove();
+          getContext()
+              .setDatabase(getWebUtils().getWikiRef(data.getEntityReference()).getName());
+          try {
+            if (data.isDeleted()) {
+              removeFromIndex(writer, data);
+            } else {
+              addToIndex(writer, data);
+            }
+            ++nb;
+          } catch (Throwable e) {
+            LOGGER.error("error indexing document [{}]", data, e);
+          }
+        }
+        LOGGER.info("indexed [{}] docs to lucene index", nb);
+      } catch (Exception e) {
+        LOGGER.error("error indexing documents", e);
+      } finally {
+        getContext().setDatabase(curDB);
+        getContext().getWiki().getStore().cleanUp(getContext());
+        try {
+          writer.optimize();
+          IOUtils.closeQuietly(writer);
+        } catch (IOException e) {
+          LOGGER.warn("Failed to close writer.", e);
+        }
+      }
+
+      this.plugin.openSearchers(getContext());
+    }
+  }
+
+  protected IndexWriter openWriter(boolean create) throws IOException {
+    while (true) {
+      try {
+        IndexWriterConfig cfg = new IndexWriterConfig(Version.LUCENE_34, this.analyzer);
+        if (create) {
+          cfg.setOpenMode(OpenMode.CREATE);
+        }
+        IndexWriter w = new IndexWriter(this.directory, cfg);
+        return w;
+      } catch (LockObtainFailedException e) {
+        try {
+          int s = new Random().nextInt(1000);
+
+          LOGGER.debug("failed to acquire lock, retrying in {}ms ...", s);
+
+          Thread.sleep(s);
+        } catch (InterruptedException e0) {
+        }
+      }
+    }
+  }
+
+  private void addToIndex(IndexWriter writer, AbstractIndexData data)
+      throws IOException, XWikiException {
+    LOGGER.debug("addToIndex: [{}]", data);
+    EntityReference ref = data.getEntityReference();
+    notify(new LuceneDocumentIndexingEvent(ref));
+    Document luceneDoc = new Document();
+    data.addDataToLuceneDocument(luceneDoc, getContext());
+    getLuceneExtensionService().extend(data, luceneDoc);
+    collectFields(luceneDoc);
+    writer.updateDocument(data.getTerm(), luceneDoc);
+    notify(new LuceneDocumentIndexedEvent(ref));
+  }
+
+  // collecting all the fields for using up in search
+  private void collectFields(Document luceneDoc) {
+    for (Fieldable field : luceneDoc.getFields()) {
+      if (!fields.contains(field.name())) {
+        fields.add(field.name());
+      }
+    }
+  }
+
+  private void removeFromIndex(IndexWriter writer, AbstractIndexData data)
+      throws CorruptIndexException, IOException {
+    LOGGER.debug("removeFromIndex: [{}]", data);
+    EntityReference ref = data.getEntityReference();
+    notify(new LuceneDocumentDeletingEvent(ref));
+    writer.deleteDocuments(data.getTerm());
+    notify(new LuceneDocumentDeletedEvent(ref));
+  }
+
+  /**
+   * @param analyzer
+   *          The analyzer to set.
+   */
+  public void setAnalyzer(Analyzer analyzer) {
+    this.analyzer = analyzer;
+  }
+
+  public void cleanIndex() {
+    LOGGER.info("trying to clear index for rebuilding");
+    try {
+      IOUtils.closeQuietly(openWriter(true));
+    } catch (IOException e) {
+      LOGGER.error("Failed to clean index", e);
+    }
+  }
+
+  public void queueDocument(XWikiDocument document, XWikiContext context,
+      boolean deleted) {
+    LOGGER.debug("IndexUpdater: adding [{}] to queue ",
+        document.getDocumentReference().getLastSpaceReference().getName() + "."
+            + document.getDocumentReference().getName());
+    this.queue.add(new DocumentData(document, context, deleted));
+    LOGGER.debug("IndexUpdater: queue has now size " + getQueueSize() + ", is empty: "
+        + queue.isEmpty());
+  }
+
+  public void queueAttachment(XWikiAttachment attachment, XWikiContext context,
+      boolean deleted) {
+    if ((attachment != null) && (context != null)) {
+      this.queue.add(new AttachmentData(attachment, context, deleted));
+    } else {
+      LOGGER.error("Invalid parameters given to {} attachment [{}] of document [{}]",
+          new Object[] { deleted ? "deleted" : "added",
+              attachment == null ? null : attachment.getFilename(),
+              (attachment == null) || (attachment.getDoc() == null) ? null
+                  : attachment.getDoc().getDocumentReference() });
+    }
+  }
+
+  public void addAttachment(XWikiDocument document, String attachmentName,
+      XWikiContext context, boolean deleted) {
+    if ((document != null) && (attachmentName != null) && (context != null)) {
+      this.queue.add(new AttachmentData(document, attachmentName, context, deleted));
+    } else {
+      LOGGER.error("Invalid parameters given to {} attachment [{}] of document [{}]",
+          new Object[] { (deleted ? "deleted" : "added"), attachmentName, document });
+    }
+  }
+
+  public void addWiki(String wikiId, boolean deleted) {
+    if (wikiId != null) {
+      this.queue.add(new WikiData(new WikiReference(wikiId), deleted));
+    } else {
+      LOGGER.error("Invalid parameters given to {} wiki [{}]",
+          (deleted ? "deleted" : "added"), wikiId);
+    }
+  }
+
+  public int queueAttachments(XWikiDocument document, XWikiContext context) {
+    int retval = 0;
+
+    final List<XWikiAttachment> attachmentList = document.getAttachmentList();
+    retval += attachmentList.size();
+    for (XWikiAttachment attachment : attachmentList) {
+      try {
+        queueAttachment(attachment, context, false);
+      } catch (Exception e) {
+        LOGGER.error("Failed to retrieve attachment [{}] of document [{}]",
+            new Object[] { attachment.getFilename(), document, e });
       }
     }
 
-    private void removeFromIndex(IndexWriter writer, AbstractIndexData data
-        ) throws CorruptIndexException, IOException {
-      LOGGER.debug("removeFromIndex: [{}]", data);
-      EntityReference ref = data.getEntityReference();
-      notify(new LuceneDocumentDeletingEvent(ref));
-      writer.deleteDocuments(data.getTerm());
-      notify(new LuceneDocumentDeletedEvent(ref));
-    }
+    return retval;
+  }
 
-    /**
-     * @param analyzer The analyzer to set.
-     */
-    public void setAnalyzer(Analyzer analyzer)
-    {
-        this.analyzer = analyzer;
-    }
+  // @Override
+  @Override
+  public String getName() {
+    return NAME;
+  }
 
-    public void cleanIndex()
-    {
-        LOGGER.info("trying to clear index for rebuilding");
-        try {
-          IOUtils.closeQuietly(openWriter(true));
-        } catch (IOException e) {
-            LOGGER.error("Failed to clean index", e);
-        }
-    }
+  // @Override
+  @Override
+  public List<Event> getEvents() {
+    return EVENTS;
+  }
 
-    public void queueDocument(XWikiDocument document, XWikiContext context, boolean deleted)
-    {
-        LOGGER.debug("IndexUpdater: adding [{}] to queue ", document.getDocumentReference(
-            ).getLastSpaceReference().getName() + "." + document.getDocumentReference(
-            ).getName());
-        this.queue.add(new DocumentData(document, context, deleted));
-        LOGGER.debug("IndexUpdater: queue has now size " + getQueueSize() + ", is empty: " 
-            + queue.isEmpty());
+  // @Override
+  @Override
+  public void onEvent(Event event, Object source, Object data) {
+    XWikiContext context = (XWikiContext) data;
+    LOGGER.debug("IndexUpdater: onEvent for [" + event.getClass() + "] on ["
+        + source.toString() + "].");
+    try {
+      if ((event instanceof DocumentUpdatedEvent)
+          || (event instanceof DocumentCreatedEvent)) {
+        queueDocument((XWikiDocument) source, context, false);
+      } else if (event instanceof DocumentDeletedEvent) {
+        queueDocument((XWikiDocument) source, context, true);
+      } else if ((event instanceof AttachmentUpdatedEvent)
+          || (event instanceof AttachmentAddedEvent)) {
+        queueAttachment(((XWikiDocument) source)
+            .getAttachment(((AbstractAttachmentEvent) event).getName()), context, false);
+      } else if (event instanceof AttachmentDeletedEvent) {
+        addAttachment((XWikiDocument) source, ((AbstractAttachmentEvent) event).getName(),
+            context, true);
+      } else if (event instanceof WikiDeletedEvent) {
+        addWiki((String) source, true);
+      }
+    } catch (Exception e) {
+      LOGGER.error("error in notify", e);
     }
+  }
 
-    public void queueAttachment(XWikiAttachment attachment, XWikiContext context, boolean deleted)
-    {
-        if (attachment != null && context != null) {
-            this.queue.add(new AttachmentData(attachment, context, deleted));
-        } else {
-            LOGGER.error("Invalid parameters given to {} attachment [{}] of document [{}]", new Object[] {
-                deleted ? "deleted" : "added",
-                attachment == null ? null : attachment.getFilename(),
-                attachment == null || attachment.getDoc() == null ? null : attachment.getDoc().getDocumentReference()});
-        }
+  /**
+   * @return the number of documents in the queue.
+   */
+  public long getQueueSize() {
+    return this.queue.getSize();
+  }
+
+  /**
+   * @return the number of documents in Lucene index writer.
+   */
+  public long getLuceneDocCount() {
+    int n = -1;
+    IndexWriter writer = null;
+    try {
+      writer = openWriter(false);
+      n = writer.numDocs();
+    } catch (IOException e) {
+      LOGGER.error("Failed to get the number of documents in Lucene index writer", e);
+    } finally {
+      IOUtils.closeQuietly(writer);
     }
+    return n;
+  }
 
-    public void addAttachment(XWikiDocument document, String attachmentName, XWikiContext context, boolean deleted)
-    {
-        if (document != null && attachmentName != null && context != null) {
-            this.queue.add(new AttachmentData(document, attachmentName, context, deleted));
-        } else {
-            LOGGER.error("Invalid parameters given to {} attachment [{}] of document [{}]",
-                new Object[] {(deleted ? "deleted" : "added"), attachmentName, document});
-        }
-    }
+  public int getMaxQueueSize() {
+    return this.maxQueueSize;
+  }
 
-    public void addWiki(String wikiId, boolean deleted)
-    {
-        if (wikiId != null) {
-            this.queue.add(new WikiData(new WikiReference(wikiId), deleted));
-        } else {
-            LOGGER.error("Invalid parameters given to {} wiki [{}]", (deleted ? "deleted" : "added"), wikiId);
-        }
-    }
+  private void notify(AbstractEntityEvent event) {
+    Utils.getComponent(ObservationManager.class).notify(event, event.getReference(),
+        getContext());
+  }
 
-    public int queueAttachments(XWikiDocument document, XWikiContext context)
-    {
-        int retval = 0;
+  public ILuceneIndexExtensionServiceRole getLuceneExtensionService() {
+    return Utils.getComponent(ILuceneIndexExtensionServiceRole.class);
+  }
 
-        final List<XWikiAttachment> attachmentList = document.getAttachmentList();
-        retval += attachmentList.size();
-        for (XWikiAttachment attachment : attachmentList) {
-            try {
-                queueAttachment(attachment, context, false);
-            } catch (Exception e) {
-                LOGGER.error("Failed to retrieve attachment [{}] of document [{}]",
-                    new Object[] {attachment.getFilename(), document, e});
-            }
-        }
-
-        return retval;
-    }
-
-//    @Override
-    public String getName()
-    {
-        return NAME;
-    }
-
-//    @Override
-    public List<Event> getEvents()
-    {
-        return EVENTS;
-    }
-
-//    @Override
-    public void onEvent(Event event, Object source, Object data)
-    {
-        XWikiContext context = (XWikiContext) data;
-        LOGGER.debug("IndexUpdater: onEvent for [" + event.getClass() + "] on ["
-            + source.toString() + "].");
-        try {
-            if (event instanceof DocumentUpdatedEvent || event instanceof DocumentCreatedEvent) {
-                queueDocument((XWikiDocument) source, context, false);
-            } else if (event instanceof DocumentDeletedEvent) {
-                queueDocument((XWikiDocument) source, context, true);
-            } else if (event instanceof AttachmentUpdatedEvent || event instanceof AttachmentAddedEvent) {
-                queueAttachment(((XWikiDocument) source).getAttachment(((AbstractAttachmentEvent) event).getName()),
-                    context, false);
-            } else if (event instanceof AttachmentDeletedEvent) {
-                addAttachment((XWikiDocument) source, ((AbstractAttachmentEvent) event).getName(), context, true);
-            } else if (event instanceof WikiDeletedEvent) {
-                addWiki((String) source, true);
-            }
-        } catch (Exception e) {
-            LOGGER.error("error in notify", e);
-        }
-    }
-
-    /**
-     * @return the number of documents in the queue.
-     */
-    public long getQueueSize()
-    {
-        return this.queue.getSize();
-    }
-
-    /**
-     * @return the number of documents in Lucene index writer.
-     */
-    public long getLuceneDocCount() {
-        int n = -1;
-        IndexWriter writer = null;
-        try {
-          writer = openWriter(false);
-          n = writer.numDocs();
-        } catch (IOException e) {
-          LOGGER.error("Failed to get the number of documents in Lucene index writer", e);
-        } finally {
-          IOUtils.closeQuietly(writer);
-        }
-        return n;
-    }
-
-    public int getMaxQueueSize()
-    {
-        return this.maxQueueSize;
-    }
-    
-    private void notify(AbstractEntityEvent event) {
-      Utils.getComponent(ObservationManager.class).notify(event, event.getReference(),
-          getContext());
-    }
-
-    public ILuceneIndexExtensionServiceRole getLuceneExtensionService() {
-      return Utils.getComponent(ILuceneIndexExtensionServiceRole.class);
-    }
-
-    public IWebUtilsService getWebUtils() {
-      return Utils.getComponent(IWebUtilsService.class);
-    }
+  public IWebUtilsService getWebUtils() {
+    return Utils.getComponent(IWebUtilsService.class);
+  }
 
 }

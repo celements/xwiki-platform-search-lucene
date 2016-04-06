@@ -35,9 +35,8 @@ public class SearcherProvider {
   private static final Logger LOGGER = LoggerFactory.getLogger(SearcherProvider.class);
 
   /**
-   * List of Lucene indexes used for searching. By default there is only one
-   * such index for all the wiki. One searches is created for each entry in
-   * {@link #indexDirs}.
+   * List of Lucene indexes used for searching. By default there is only one such index
+   * for all the wiki. One searches is created for each entry in {@link #indexDirs}.
    */
   private Searcher[] searchers;
 
@@ -69,8 +68,8 @@ public class SearcherProvider {
   public void connect() {
     if (!checkConnected()) {
       if (this.markToClose) {
-        throw new IllegalStateException("you may not connect to a SearchProvider"
-            + " marked to close.");
+        throw new IllegalStateException(
+            "you may not connect to a SearchProvider" + " marked to close.");
       }
       LOGGER.debug("connect searcherProvider [" + System.identityHashCode(this) + "] to ["
           + Thread.currentThread() + "].");
@@ -96,9 +95,9 @@ public class SearcherProvider {
 
   public void disconnect() throws IOException {
     if (connectedThreads.remove(Thread.currentThread())) {
-      LOGGER.debug("disconnect searcherProvider [" + System.identityHashCode(this)
-          + "] to [" + Thread.currentThread() + "], markedToClose [" + isMarkedToClose()
-          + "].");
+      LOGGER.debug(
+          "disconnect searcherProvider [" + System.identityHashCode(this) + "] to ["
+              + Thread.currentThread() + "], markedToClose [" + isMarkedToClose() + "].");
       closeIfIdle();
     }
   }
@@ -112,8 +111,8 @@ public class SearcherProvider {
    */
   public void markToClose() throws IOException {
     if (!this.markToClose) {
-      LOGGER.debug("markToClose searcherProvider [" + System.identityHashCode(this)
-          + "].");
+      LOGGER
+          .debug("markToClose searcherProvider [" + System.identityHashCode(this) + "].");
       this.markToClose = true;
       closeIfIdle();
     }
@@ -158,8 +157,8 @@ public class SearcherProvider {
 
   public void connectSearchResults(SearchResults searchResults) {
     if (!this.checkConnected()) {
-      throw new IllegalStateException("you may not connect a searchResult to a" +
-      		" SearchProvider from a not connected thread.");
+      throw new IllegalStateException("you may not connect a searchResult to a"
+          + " SearchProvider from a not connected thread.");
     }
     getConnectedSearchResultsForCurrentThread().add(searchResults);
   }
@@ -184,8 +183,8 @@ public class SearcherProvider {
 
   public void cleanUpSearchResults(SearchResults searchResults) throws IOException {
     if (hasSearchResultsForCurrentThread()) {
-      Set<SearchResults> currentThreadSet = connectedSearchResultsMap.get(
-          Thread.currentThread());
+      Set<SearchResults> currentThreadSet = connectedSearchResultsMap
+          .get(Thread.currentThread());
       if (currentThreadSet.remove(searchResults)) {
         if (currentThreadSet.isEmpty()) {
           connectedSearchResultsMap.remove(Thread.currentThread());

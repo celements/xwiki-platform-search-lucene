@@ -31,281 +31,262 @@ import com.xpn.xwiki.XWikiException;
 import com.xpn.xwiki.api.Document;
 
 /**
- * Result of a search. The Plugin will return a collection of these for display on the search page.
- * 
+ * Result of a search. The Plugin will return a collection of these for display on the
+ * search page.
+ *
  * @version $Id: 412230dc664221304dd7aa81ce2d99857af3a35e $
  */
-public class SearchResult
-{
-    private String id;
+public class SearchResult {
 
-    private float score;
+  private String id;
 
-    private String title;
+  private float score;
 
-    private String name;
+  private String title;
 
-    private String wiki;
+  private String name;
 
-    private String space;
+  private String wiki;
 
-    private String fullName;
+  private String space;
 
-    private String url;
+  private String fullName;
 
-    private String filename;
+  private String url;
 
-    private String[] objects;
+  private String filename;
 
-    private String type;
+  private String[] objects;
 
-    private String author;
+  private String type;
 
-    private String language;
+  private String author;
 
-    private Date date;
+  private String language;
 
-    private Date creationDate;
+  private Date date;
 
-    private String creator;
+  private Date creationDate;
 
-    private boolean hidden;
+  private String creator;
 
-    private EntityReference reference;
+  private boolean hidden;
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(SearchResult.class);
+  private EntityReference reference;
 
-    /**
-     * @todo add fallback for unknown index field names (read values into a map accessible from search results page)
-     *       This would be useful for integration of external indexes where the field names dont match ours.
-     * @todo TODO: to be more flexible make a factory to construct different kinds of searchresults, esp. for external
-     *       indexes and custom implementations of searchresults
-     */
-    public SearchResult(org.apache.lucene.document.Document doc, float score, com.xpn.xwiki.api.XWiki xwiki)
-    {
-        this.score = score;
-        this.id = doc.get(IndexFields.DOCUMENT_ID);
-        this.title = doc.get(IndexFields.DOCUMENT_TITLE);
-        this.name = doc.get(IndexFields.DOCUMENT_NAME);
-        this.space = doc.get(IndexFields.DOCUMENT_SPACE);
-        this.wiki = doc.get(IndexFields.DOCUMENT_WIKI);
-        this.fullName = doc.get(IndexFields.DOCUMENT_FULLNAME);
-        this.type = doc.get(IndexFields.DOCUMENT_TYPE);
-        this.author = doc.get(IndexFields.DOCUMENT_AUTHOR);
-        this.creator = doc.get(IndexFields.DOCUMENT_CREATOR);
-        this.language = doc.get(IndexFields.DOCUMENT_LANGUAGE);
-        this.date = IndexFields.stringToDate(doc.get(IndexFields.DOCUMENT_DATE));
-        this.creationDate = IndexFields.stringToDate(doc.get(IndexFields.DOCUMENT_CREATIONDATE));
-        this.hidden = IndexFields.stringToBoolean(doc.get(IndexFields.DOCUMENT_HIDDEN));
-        this.reference = new DocumentReference(wiki, space, name);
-        if (this.isAttachment()) {
-            this.filename = doc.get(IndexFields.FILENAME);
-            this.reference = new AttachmentReference(this.filename, 
-                (DocumentReference) this.reference);
-            Document document;
-            final String fullDocName =
-                new StringBuffer(this.wiki).append(":").append(this.space).append(".").append(this.name).toString();
-            try {
-                document = xwiki.getDocument(fullDocName);
-                if (document != null) {
-                    this.url = document.getAttachmentURL(this.filename, "download");
-                }
-            } catch (XWikiException e) {
-                LOGGER.error("error retrieving url for attachment [{}] of document [{}]",
-                    new Object[] {this.filename, fullDocName, e});
-            }
-        } else {
-            this.objects = doc.getValues("object");
+  private static final Logger LOGGER = LoggerFactory.getLogger(SearchResult.class);
+
+  /**
+   * @todo add fallback for unknown index field names (read values into a map accessible
+   *       from search results page) This would be useful for integration of external
+   *       indexes where the field names dont match ours.
+   * @todo TODO: to be more flexible make a factory to construct different kinds of
+   *       searchresults, esp. for external indexes and custom implementations of
+   *       searchresults
+   */
+  public SearchResult(org.apache.lucene.document.Document doc, float score,
+      com.xpn.xwiki.api.XWiki xwiki) {
+    this.score = score;
+    this.id = doc.get(IndexFields.DOCUMENT_ID);
+    this.title = doc.get(IndexFields.DOCUMENT_TITLE);
+    this.name = doc.get(IndexFields.DOCUMENT_NAME);
+    this.space = doc.get(IndexFields.DOCUMENT_SPACE);
+    this.wiki = doc.get(IndexFields.DOCUMENT_WIKI);
+    this.fullName = doc.get(IndexFields.DOCUMENT_FULLNAME);
+    this.type = doc.get(IndexFields.DOCUMENT_TYPE);
+    this.author = doc.get(IndexFields.DOCUMENT_AUTHOR);
+    this.creator = doc.get(IndexFields.DOCUMENT_CREATOR);
+    this.language = doc.get(IndexFields.DOCUMENT_LANGUAGE);
+    this.date = IndexFields.stringToDate(doc.get(IndexFields.DOCUMENT_DATE));
+    this.creationDate = IndexFields
+        .stringToDate(doc.get(IndexFields.DOCUMENT_CREATIONDATE));
+    this.hidden = IndexFields.stringToBoolean(doc.get(IndexFields.DOCUMENT_HIDDEN));
+    this.reference = new DocumentReference(wiki, space, name);
+    if (this.isAttachment()) {
+      this.filename = doc.get(IndexFields.FILENAME);
+      this.reference = new AttachmentReference(this.filename,
+          (DocumentReference) this.reference);
+      Document document;
+      final String fullDocName = new StringBuffer(this.wiki).append(":")
+          .append(this.space).append(".").append(this.name).toString();
+      try {
+        document = xwiki.getDocument(fullDocName);
+        if (document != null) {
+          this.url = document.getAttachmentURL(this.filename, "download");
         }
+      } catch (XWikiException e) {
+        LOGGER.error("error retrieving url for attachment [{}] of document [{}]",
+            new Object[] { this.filename, fullDocName, e });
+      }
+    } else {
+      this.objects = doc.getValues("object");
     }
+  }
 
-    /**
-     * @return the document id as indexed
-     */
-    public String getId()
-    {
-        return this.id;
-    }
+  /**
+   * @return the document id as indexed
+   */
+  public String getId() {
+    return this.id;
+  }
 
-    /**
-     * @return Returns the name of the user who last modified the document.
-     */
-    public String getAuthor()
-    {
-        return this.author;
-    }
+  /**
+   * @return Returns the name of the user who last modified the document.
+   */
+  public String getAuthor() {
+    return this.author;
+  }
 
-    /**
-     * @return Returns the date of last modification.
-     */
-    public Date getDate()
-    {
-        return this.date;
-    }
+  /**
+   * @return Returns the date of last modification.
+   */
+  public Date getDate() {
+    return this.date;
+  }
 
-    /**
-     * @return Returns the filename, only used for Attachments (see {@link #getType()})
-     */
-    public String getFilename()
-    {
-        return this.filename;
-    }
+  /**
+   * @return Returns the filename, only used for Attachments (see {@link #getType()})
+   */
+  public String getFilename() {
+    return this.filename;
+  }
 
-    /**
-     * @return the title of the document.
-     */
-    public String getTitle()
-    {
-        return this.title;
-    }
+  /**
+   * @return the title of the document.
+   */
+  public String getTitle() {
+    return this.title;
+  }
 
-    /**
-     * @return Returns the name of the document.
-     */
-    public String getName()
-    {
-        return this.name;
-    }
+  /**
+   * @return Returns the name of the document.
+   */
+  public String getName() {
+    return this.name;
+  }
 
-    /**
-     * @return Returns the score of this search result as computed by lucene. Is a float between zero and 1.
-     */
-    public float getScore()
-    {
-        return this.score;
-    }
+  /**
+   * @return Returns the score of this search result as computed by lucene. Is a float
+   *         between zero and 1.
+   */
+  public float getScore() {
+    return this.score;
+  }
 
-    /**
-     * @return Returns the type of the document, atm this can be either <code>wikipage</code> or <code>attachment</code>
-     *         .
-     */
-    public String getType()
-    {
-        return this.type;
-    }
+  /**
+   * @return Returns the type of the document, atm this can be either
+   *         <code>wikipage</code> or <code>attachment</code> .
+   */
+  public String getType() {
+    return this.type;
+  }
 
-    /**
-     * @return Returns the url to access the document.
-     */
-    public String getUrl()
-    {
-        return this.url;
-    }
+  /**
+   * @return Returns the url to access the document.
+   */
+  public String getUrl() {
+    return this.url;
+  }
 
-    /**
-     * @return Returns the space the document belongs to.
-     * @deprecated Use {@link #getSpace} instead.
-     */
-    @Deprecated
-    public String getWeb()
-    {
-        return this.space;
-    }
+  /**
+   * @return Returns the space the document belongs to.
+   * @deprecated Use {@link #getSpace} instead.
+   */
+  @Deprecated
+  public String getWeb() {
+    return this.space;
+  }
 
-    /**
-     * @return Returns the space the document belongs to.
-     */
-    public String getSpace()
-    {
-        return this.space;
-    }
+  /**
+   * @return Returns the space the document belongs to.
+   */
+  public String getSpace() {
+    return this.space;
+  }
 
-    /**
-     * @return the language of the Document, i.e. <code>de</code> or <code>en</code>,<code>default</code> if no language
-     *         was set at indexing time.
-     */
-    public String getLanguage()
-    {
-        return this.language;
-    }
+  /**
+   * @return the language of the Document, i.e. <code>de</code> or <code>en</code>,
+   *         <code>default</code> if no language was set at indexing time.
+   */
+  public String getLanguage() {
+    return this.language;
+  }
 
-    /**
-     * @return creationDate of this document
-     */
-    public Date getCreationDate()
-    {
-        return this.creationDate;
-    }
+  /**
+   * @return creationDate of this document
+   */
+  public Date getCreationDate() {
+    return this.creationDate;
+  }
 
-    /**
-     * @return Username of the creator of the document
-     */
-    public String getCreator()
-    {
-        return this.creator;
-    }
+  /**
+   * @return Username of the creator of the document
+   */
+  public String getCreator() {
+    return this.creator;
+  }
 
-    public void setUrl(String url)
-    {
-        this.url = url;
-    }
+  public void setUrl(String url) {
+    this.url = url;
+  }
 
-    public String getWiki()
-    {
-        return this.wiki;
-    }
+  public String getWiki() {
+    return this.wiki;
+  }
 
-    public String getFullName()
-    {
-        return this.fullName;
-    }
+  public String getFullName() {
+    return this.fullName;
+  }
 
-    public String[] getObjects()
-    {
-        return this.objects;
-    }
+  public String[] getObjects() {
+    return this.objects;
+  }
 
-    /**
-     * @return true when this result points to a wiki page
-     */
-    public boolean isWikiPage()
-    {
-        return LucenePlugin.DOCTYPE_WIKIPAGE.equals(this.type);
-    }
+  /**
+   * @return true when this result points to a wiki page
+   */
+  public boolean isWikiPage() {
+    return LucenePlugin.DOCTYPE_WIKIPAGE.equals(this.type);
+  }
 
-    /**
-     * @return true when this result points to an attachment
-     */
-    public boolean isAttachment()
-    {
-        return LucenePlugin.DOCTYPE_ATTACHMENT.equals(this.type);
-    }
+  /**
+   * @return true when this result points to an attachment
+   */
+  public boolean isAttachment() {
+    return LucenePlugin.DOCTYPE_ATTACHMENT.equals(this.type);
+  }
 
-    /**
-     * @return true when this result points to wiki content (attachment or wiki page)
-     */
-    public boolean isWikiContent()
-    {
-        return (this.isWikiPage() || this.isAttachment());
-    }
+  /**
+   * @return true when this result points to wiki content (attachment or wiki page)
+   */
+  public boolean isWikiContent() {
+    return (this.isWikiPage() || this.isAttachment());
+  }
 
-    /**
-     * @return true if the result is marked as "hidden", false otherwise.
-     */
-    public boolean isHidden()
-    {
-        return this.hidden;
-    }
+  /**
+   * @return true if the result is marked as "hidden", false otherwise.
+   */
+  public boolean isHidden() {
+    return this.hidden;
+  }
 
-    /**
-     * @return the reference of the document.
-     */
-    public DocumentReference getDocumentReference()
-    {
-        DocumentReference docRef = null;
-        if (getReference() instanceof DocumentReference) {
-          docRef = (DocumentReference) getReference();
-        } else if (getReference() instanceof AttachmentReference) {
-          docRef = ((AttachmentReference) getReference()).getDocumentReference();
-        }
-        return docRef;
+  /**
+   * @return the reference of the document.
+   */
+  public DocumentReference getDocumentReference() {
+    DocumentReference docRef = null;
+    if (getReference() instanceof DocumentReference) {
+      docRef = (DocumentReference) getReference();
+    } else if (getReference() instanceof AttachmentReference) {
+      docRef = ((AttachmentReference) getReference()).getDocumentReference();
     }
+    return docRef;
+  }
 
-    /**
-     * @return the reference of the entity (document or attachment).
-     */
-    public EntityReference getReference()
-    {
-        return this.reference;
-    }
+  /**
+   * @return the reference of the entity (document or attachment).
+   */
+  public EntityReference getReference() {
+    return this.reference;
+  }
 }

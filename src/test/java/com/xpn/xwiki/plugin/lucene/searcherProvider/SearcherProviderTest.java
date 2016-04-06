@@ -53,7 +53,7 @@ public class SearcherProviderTest extends AbstractBridgedComponentTestCase {
     replayDefault();
     try {
       searcherProvider.connect();
-    } catch(IllegalStateException exp) {
+    } catch (IllegalStateException exp) {
       fail("connect may not throw an IllegalStateException on if the thread is already"
           + " connected");
     }
@@ -66,8 +66,8 @@ public class SearcherProviderTest extends AbstractBridgedComponentTestCase {
     assertTrue(searcherProvider.internal_getConnectedThreads().isEmpty());
     searcherProvider.connect();
     assertFalse(searcherProvider.internal_getConnectedThreads().isEmpty());
-    assertTrue(searcherProvider.internal_getConnectedThreads().contains(
-        Thread.currentThread()));
+    assertTrue(
+        searcherProvider.internal_getConnectedThreads().contains(Thread.currentThread()));
     verifyDefault();
   }
 
@@ -81,8 +81,8 @@ public class SearcherProviderTest extends AbstractBridgedComponentTestCase {
       searcherProvider.connect();
       fail("expecting illegal state exception if not connected before calling"
           + " getSearchers");
-    } catch(IllegalStateException exp) {
-      //expected
+    } catch (IllegalStateException exp) {
+      // expected
     }
     verifyDefault();
   }
@@ -95,8 +95,8 @@ public class SearcherProviderTest extends AbstractBridgedComponentTestCase {
       assertSame(theMockSearcher, searcherProvider.getSearchers()[0]);
       fail("expecting illegal state exception if not connected before calling"
           + " getSearchers");
-    } catch(IllegalStateException exp) {
-      //expected
+    } catch (IllegalStateException exp) {
+      // expected
     }
     verifyDefault();
   }
@@ -281,7 +281,6 @@ public class SearcherProviderTest extends AbstractBridgedComponentTestCase {
     verifyDefault();
   }
 
-
   @Test
   public void testConnectSearchResult_illegalState() throws Exception {
     SearchResults searchResults = createMockAndAddToDefault(SearchResults.class);
@@ -290,8 +289,8 @@ public class SearcherProviderTest extends AbstractBridgedComponentTestCase {
       searcherProvider.connectSearchResults(searchResults);
       fail("expecting illegal state exception if thread is not connected before calling"
           + " connectSearchResults");
-    } catch(IllegalStateException exp) {
-      //expected
+    } catch (IllegalStateException exp) {
+      // expected
     }
     verifyDefault();
   }

@@ -19,7 +19,6 @@
  */
 package com.xpn.xwiki.plugin.lucene;
 
-import java.io.Closeable;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -84,7 +83,7 @@ import com.xpn.xwiki.web.Utils;
  * <li>making sure that only one rebuild is in progress (since 1.2)</li>
  * </ul>
  * </p>
- * 
+ *
  * @version $Id: 5bb91a92a5990405edd8203dff5b4e24103af5c3 $
  */
 public class IndexRebuilder extends AbstractXWikiRunnable {
@@ -250,7 +249,7 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
   /**
    * First empties the index, then fetches all Documents, their translations and their
    * attachments for re-addition to the index.
-   * 
+   *
    * @param context
    *          the XWiki context
    * @return the number of indexed elements
@@ -287,7 +286,7 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
 
   /**
    * Adds the content of a given wiki to the indexUpdater's queue.
-   * 
+   *
    * @param wikiName
    *          the name of the wiki to index
    * @param context
@@ -349,7 +348,7 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
     String hql = "select distinct doc.space, doc.name, doc.version, doc.language"
         + "from XWikiDocument as doc ";
     if (StringUtils.isNotBlank(this.hqlFilter)) {
-      if (this.hqlFilter.charAt(0) != ',' && !this.hqlFilter.contains("where")
+      if ((this.hqlFilter.charAt(0) != ',') && !this.hqlFilter.contains("where")
           && !this.hqlFilter.contains("WHERE")) {
         hql += "where ";
       }
