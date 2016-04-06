@@ -172,6 +172,7 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
   }
 
   private void clearIndex(Collection<String> wikis) {
+    LOGGER.info("clearIndex: for wikis '{}'", wikis);
     if (wikis == null) {
       this.indexUpdater.cleanIndex();
     } else {
@@ -296,8 +297,7 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
    */
   protected int indexWiki(String wikiName, XWikiContext context)
       throws InterruptedException {
-    LOGGER.info("Reading content of wiki [{}]", wikiName);
-    // Number of index entries processed
+    LOGGER.info("indexing wiki '{}'", wikiName);
     int retval = -1;
     String database = context.getDatabase();
     Searcher searcher = null;
@@ -320,20 +320,17 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
   private int indexDocuments(String wikiName, Searcher searcher, XWikiContext context)
       throws InterruptedException, IOException, XWikiException {
     int retval = 0;
+    List<Object[]> documentsToIndex = getAllDocs(wikiName, context);
+    LOGGER.info("adding {} docs to index", documentsToIndex.size());
     Set<String> remainingDocs = getAllIndexedDocs(wikiName, searcher);
-    for (Object[] document : getAllDocs(wikiName, context)) {
-      DocumentReference docRef = new DocumentReference(wikiName, (String) document[0],
-          (String) document[1]);
-      String version = (String) document[2];
-      String language = (String) document[3];
+    for (Object[] docData : documentsToIndex) {
+      DocumentReference docRef = new DocumentReference(wikiName, (String) docData[0],
+          (String) docData[1]);
+      String version = (String) docData[2];
+      String language = (String) docData[3];
       if (!this.onlyNew || !isIndexed(docRef, version, language, searcher)) {
-        try {
-          retval += addTranslationOfDocument(docRef, language, context);
-        } catch (XWikiException e) {
-          LOGGER.error("Error fetching document [{}] for language [{}]",
-              new Object[] { docRef, language, e });
-          return retval;
-        }
+        retval += addTranslationOfDocument(docRef, language, context);
+        LOGGER.trace("indexed {}", docRef);
       }
       remainingDocs.remove(getWebUtils().serializeRef(docRef) + "." + language);
     }
@@ -369,15 +366,18 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
     for (ScoreDoc scoreDoc : topDocs.scoreDocs) {
       ret.add(searcher.doc(scoreDoc.doc).get(IndexFields.DOCUMENT_ID));
     }
+    LOGGER.info("found {} docs in index", ret.size());
     return ret;
   }
 
   private void cleanIndex(Set<String> danglingDocs) throws IOException {
+    LOGGER.info("cleanIndex: for {} dangling docs", danglingDocs.size());
     IndexWriter writer = null;
     try {
       writer = this.indexUpdater.openWriter(false);
       for (String docId : danglingDocs) {
         writer.deleteDocuments(new Term(IndexFields.DOCUMENT_ID, docId));
+        LOGGER.trace("cleanIndex: deleted doc: {}", docId);
       }
     } finally {
       IOUtils.closeQuietly(writer);
