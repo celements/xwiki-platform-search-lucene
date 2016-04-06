@@ -25,6 +25,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 
+import org.apache.commons.io.IOUtils;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Fieldable;
@@ -215,7 +216,6 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
                     }
                 } catch (IOException e) {
                     LOGGER.error("Failed to open index", e);
-
                     throw new RuntimeException(e);
                 }
             }
@@ -246,7 +246,7 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
               getContext().getWiki().getStore().cleanUp(getContext());
               try {
                 writer.optimize();
-                writer.close();
+                IOUtils.closeQuietly(writer);
               } catch (IOException e) {
                   LOGGER.warn("Failed to close writer.", e);
               }
@@ -321,9 +321,8 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
     public void cleanIndex()
     {
         LOGGER.info("trying to clear index for rebuilding");
-
         try {
-            openWriter(true).close();
+          IOUtils.closeQuietly(openWriter(true));
         } catch (IOException e) {
             LOGGER.error("Failed to clean index", e);
         }
@@ -435,18 +434,17 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
     /**
      * @return the number of documents in Lucene index writer.
      */
-    public long getLuceneDocCount()
-    {
+    public long getLuceneDocCount() {
         int n = -1;
-
+        IndexWriter writer = null;
         try {
-            IndexWriter w = openWriter(false);
-            n = w.numDocs();
-            w.close();
+          writer = openWriter(false);
+          n = writer.numDocs();
         } catch (IOException e) {
-            LOGGER.error("Failed to get the number of documents in Lucene index writer", e);
+          LOGGER.error("Failed to get the number of documents in Lucene index writer", e);
+        } finally {
+          IOUtils.closeQuietly(writer);
         }
-
         return n;
     }
 
