@@ -22,20 +22,24 @@ public class LuceneIndexExtensionService implements ILuceneIndexExtensionService
   @Override
   public void extend(AbstractIndexData data, Document luceneDoc) {
     for (ILuceneIndexExtender ext : extenders) {
-      if (ext.isEligibleIndexData(data)) {
-        for (IndexExtensionField extField : ext.getExtensionFields(data)) {
-          if (extField != null) {
-            if (extField.isReplace()) {
-              luceneDoc.removeFields(extField.getName());
+      try {
+        if (ext.isEligibleIndexData(data)) {
+          for (IndexExtensionField extField : ext.getExtensionFields(data)) {
+            if (extField != null) {
+              if (extField.isReplace()) {
+                luceneDoc.removeFields(extField.getName());
+              }
+              luceneDoc.add(extField.getLuceneField());
+              LOGGER.debug("extend: added field '{}' by extender '{}' for data '{}' ",
+                  extField, ext.getName(), data);
             }
-            luceneDoc.add(extField.getLuceneField());
-            LOGGER.debug("extend: added field '{}' by extender '{}' for data '{}' ",
-                extField, ext.getName(), data);
           }
+        } else {
+          LOGGER.debug("extend: not eligible extender '{}' for data '{}' ", ext.getName(),
+              data);
         }
-      } else {
-        LOGGER.debug("extend: not eligible extender '{}' for data '{}' ", ext.getName(),
-            data);
+      } catch (Exception exc) {
+        LOGGER.error("Failed to extend lucene index for '{}'", ext.getName(), exc);
       }
     }
   }

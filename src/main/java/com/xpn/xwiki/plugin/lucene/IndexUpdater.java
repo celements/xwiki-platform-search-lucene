@@ -203,29 +203,19 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
       LOGGER.debug("IndexUpdater: documents in queue, start indexing");
       getContext().getWiki().getStore().cleanUp(getContext());
       IndexWriter writer;
-      RETRY: while (true) {
-        // We will retry after repairing if the index was
-        // corrupt
-        try {
-          try {
-            writer = openWriter(false);
-            break RETRY;
-          } catch (CorruptIndexException e) {
-            this.plugin.handleCorruptIndex();
-          }
-        } catch (IOException e) {
-          LOGGER.error("Failed to open index", e);
-          throw new RuntimeException(e);
-        }
-      }
-
-      String curDB = getContext().getDatabase();
       try {
-        int nb = 0;
+        writer = openWriter(false);
+      } catch (IOException exc) {
+        LOGGER.error("Failed to open index", exc);
+        throw new RuntimeException(exc);
+      }
+      String curDB = getContext().getDatabase();
+      int nb = 0;
+      try {
         while (!this.queue.isEmpty()) {
           AbstractIndexData data = this.queue.remove();
-          getContext()
-              .setDatabase(getWebUtils().getWikiRef(data.getEntityReference()).getName());
+          getContext().setDatabase(getWebUtils().getWikiRef(data.getEntityReference()
+              ).getName());
           try {
             if (data.isDeleted()) {
               removeFromIndex(writer, data);
@@ -233,24 +223,24 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
               addToIndex(writer, data);
             }
             ++nb;
-          } catch (Throwable e) {
-            LOGGER.error("error indexing document [{}]", data, e);
+          } catch (IOException | XWikiException exc) {
+            LOGGER.error("error indexing document '{}'", data, exc);
           }
         }
-        LOGGER.info("indexed [{}] docs to lucene index", nb);
-      } catch (Exception e) {
-        LOGGER.error("error indexing documents", e);
+        LOGGER.info("indexed '{}' docs", nb);
       } finally {
-        getContext().setDatabase(curDB);
-        getContext().getWiki().getStore().cleanUp(getContext());
         try {
-          writer.optimize();
+          getContext().setDatabase(curDB);
+          getContext().getWiki().getStore().cleanUp(getContext());
+          if (nb > 0) {
+            writer.optimize();
+          }
+        } catch (IOException exc) {
+          LOGGER.warn("Failed to optimize writer.", exc);
+        } finally {
           IOUtils.closeQuietly(writer);
-        } catch (IOException e) {
-          LOGGER.warn("Failed to close writer.", e);
         }
       }
-
       this.plugin.openSearchers(getContext());
     }
   }
@@ -262,14 +252,11 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
         if (create) {
           cfg.setOpenMode(OpenMode.CREATE);
         }
-        IndexWriter w = new IndexWriter(this.directory, cfg);
-        return w;
+        return new IndexWriter(this.directory, cfg);
       } catch (LockObtainFailedException e) {
         try {
           int s = new Random().nextInt(1000);
-
           LOGGER.debug("failed to acquire lock, retrying in {}ms ...", s);
-
           Thread.sleep(s);
         } catch (InterruptedException e0) {
         }
@@ -279,7 +266,7 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
 
   private void addToIndex(IndexWriter writer, AbstractIndexData data)
       throws IOException, XWikiException {
-    LOGGER.debug("addToIndex: [{}]", data);
+    LOGGER.debug("addToIndex: '{}'", data);
     EntityReference ref = data.getEntityReference();
     notify(new LuceneDocumentIndexingEvent(ref));
     Document luceneDoc = new Document();
@@ -301,7 +288,7 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
 
   private void removeFromIndex(IndexWriter writer, AbstractIndexData data)
       throws CorruptIndexException, IOException {
-    LOGGER.debug("removeFromIndex: [{}]", data);
+    LOGGER.debug("removeFromIndex: '{}'", data);
     EntityReference ref = data.getEntityReference();
     notify(new LuceneDocumentDeletingEvent(ref));
     writer.deleteDocuments(data.getTerm());
@@ -327,7 +314,7 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
 
   public void queueDocument(XWikiDocument document, XWikiContext context,
       boolean deleted) {
-    LOGGER.debug("IndexUpdater: adding [{}] to queue ",
+    LOGGER.debug("IndexUpdater: adding '{}' to queue ",
         document.getDocumentReference().getLastSpaceReference().getName() + "."
             + document.getDocumentReference().getName());
     this.queue.add(new DocumentData(document, context, deleted));
@@ -340,7 +327,7 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
     if ((attachment != null) && (context != null)) {
       this.queue.add(new AttachmentData(attachment, context, deleted));
     } else {
-      LOGGER.error("Invalid parameters given to {} attachment [{}] of document [{}]",
+      LOGGER.error("Invalid parameters given to {} attachment '{}' of document '{}'",
           new Object[] { deleted ? "deleted" : "added",
               attachment == null ? null : attachment.getFilename(),
               (attachment == null) || (attachment.getDoc() == null) ? null
@@ -353,7 +340,7 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
     if ((document != null) && (attachmentName != null) && (context != null)) {
       this.queue.add(new AttachmentData(document, attachmentName, context, deleted));
     } else {
-      LOGGER.error("Invalid parameters given to {} attachment [{}] of document [{}]",
+      LOGGER.error("Invalid parameters given to {} attachment '{}' of document '{}'",
           new Object[] { (deleted ? "deleted" : "added"), attachmentName, document });
     }
   }
@@ -362,7 +349,7 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
     if (wikiId != null) {
       this.queue.add(new WikiData(new WikiReference(wikiId), deleted));
     } else {
-      LOGGER.error("Invalid parameters given to {} wiki [{}]",
+      LOGGER.error("Invalid parameters given to {} wiki '{}'",
           (deleted ? "deleted" : "added"), wikiId);
     }
   }
@@ -376,7 +363,7 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
       try {
         queueAttachment(attachment, context, false);
       } catch (Exception e) {
-        LOGGER.error("Failed to retrieve attachment [{}] of document [{}]",
+        LOGGER.error("Failed to retrieve attachment '{}' of document '{}'",
             new Object[] { attachment.getFilename(), document, e });
       }
     }

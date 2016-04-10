@@ -183,7 +183,7 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
           writer.deleteDocuments(new Term(IndexFields.DOCUMENT_WIKI, wiki));
         }
       } catch (IOException ex) {
-        LOGGER.warn("Failed to clear wiki index: {}", ex.getMessage());
+        LOGGER.error("Failed to clear wiki index: {}", ex.getMessage());
       } finally {
         IOUtils.closeQuietly(writer);
       }
