@@ -342,7 +342,7 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
 
   private List<Object[]> getAllDocs(String wikiName, XWikiContext context)
       throws XWikiException {
-    String hql = "select distinct doc.space, doc.name, doc.version, doc.language"
+    String hql = "select distinct doc.space, doc.name, doc.version, doc.language "
         + "from XWikiDocument as doc ";
     if (StringUtils.isNotBlank(this.hqlFilter)) {
       if ((this.hqlFilter.charAt(0) != ',') && !this.hqlFilter.contains("where")
