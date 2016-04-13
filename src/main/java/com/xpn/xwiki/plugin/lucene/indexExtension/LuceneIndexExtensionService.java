@@ -15,6 +15,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.xwiki.component.annotation.Component;
 
+import com.celements.web.plugin.cmd.PlainTextCommand;
 import com.google.common.base.Strings;
 import com.xpn.xwiki.plugin.lucene.AbstractIndexData;
 import com.xpn.xwiki.plugin.lucene.IndexFields;
@@ -29,6 +30,8 @@ public class LuceneIndexExtensionService implements ILuceneIndexExtensionService
 
   // do not inject since an extender might use this service
   private List<ILuceneIndexExtender> extenders;
+
+  private PlainTextCommand plainTextCmd = new PlainTextCommand();
 
   private List<ILuceneIndexExtender> getExtenders() {
     if (extenders == null) {
@@ -73,8 +76,9 @@ public class LuceneIndexExtensionService implements ILuceneIndexExtensionService
   @Override
   public IndexExtensionField createField(String name, String value, Index indexType,
       ExtensionType extensionType) {
-    return new IndexExtensionField(extensionType,
-        new Field(name, value.toLowerCase(), Field.Store.YES, indexType));
+    value = plainTextCmd.convertToPlainText(value).toLowerCase();
+    return new IndexExtensionField(extensionType, new Field(name, value, Field.Store.YES,
+        indexType));
   }
 
   @Override
@@ -84,9 +88,9 @@ public class LuceneIndexExtensionService implements ILuceneIndexExtensionService
 
   @Override
   public Collection<IndexExtensionField> createFields(String name, Object value,
-      ExtensionType defaultType) {
+      ExtensionType defaultExtType) {
     Objects.requireNonNull(Strings.emptyToNull(name));
-    Objects.requireNonNull(value);
+    value = (value != null ? value : "");
     Collection<IndexExtensionField> ret = new ArrayList<>();
     if (value instanceof Collection) {
       Iterator<?> iter = ((Collection<?>) value).iterator();
@@ -102,20 +106,20 @@ public class LuceneIndexExtensionService implements ILuceneIndexExtensionService
         value = IndexFields.dateToString((Date) value);
         indexType = Index.NOT_ANALYZED;
       }
-      ret.add(createField(name, value.toString(), indexType, defaultType));
+      ret.add(createField(name, value.toString(), indexType, defaultExtType));
     }
     return ret;
   }
 
   @Override
   public Collection<IndexExtensionField> createFields(Map<String, Object> fieldMap,
-      ExtensionType defaultType) {
+      ExtensionType defaultExtType) {
     Collection<IndexExtensionField> ret = new ArrayList<>();
     for (String name : fieldMap.keySet()) {
       if (Strings.emptyToNull(name) != null) {
         Object value = fieldMap.get(name);
         if (value != null) {
-          ret.addAll(createFields(name, value, defaultType));
+          ret.addAll(createFields(name, value, defaultExtType));
         }
       }
     }

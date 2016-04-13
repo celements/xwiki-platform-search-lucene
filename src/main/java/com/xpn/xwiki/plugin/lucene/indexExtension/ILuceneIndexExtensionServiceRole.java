@@ -21,9 +21,9 @@ public interface ILuceneIndexExtensionServiceRole {
   public IndexExtensionField createRemoveField(String name);
 
   public Collection<IndexExtensionField> createFields(String name, Object value,
-      ExtensionType defaultType);
+      ExtensionType defaultExtType);
 
   public Collection<IndexExtensionField> createFields(Map<String, Object> fieldMap,
-      ExtensionType defaultType);
+      ExtensionType defaultExtType);
 
 }
