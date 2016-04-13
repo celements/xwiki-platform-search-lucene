@@ -124,7 +124,8 @@ public class DocumentData extends AbstractDocumentData {
     // FIXME Can baseProperty really be null?
     if ((baseProperty != null) && (baseProperty.getValue() != null)) {
       if (!(baseObject.getXClass(context).getField(property) instanceof PasswordClass)) {
-        contentText.append(StringUtils.lowerCase(baseProperty.getValue().toString()));
+        contentText.append(plainTextCmd.convertToPlainText(baseProperty.getValue(
+            ).toString()).toLowerCase());
       }
     }
   }

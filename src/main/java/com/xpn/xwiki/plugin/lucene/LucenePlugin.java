@@ -29,7 +29,6 @@ import java.util.List;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.lucene.analysis.Analyzer;
-import org.apache.lucene.index.CorruptIndexException;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
@@ -853,22 +852,15 @@ public class LucenePlugin extends XWikiDefaultPlugin {
     for (String dir : dirs) {
       Directory d = FSDirectory.open(new File(dir));
       while (true) {
-        try {
-          if (!IndexReader.indexExists(d)) {
-            // If there's no index there, create an empty one; otherwise the
-            // reader
-            // constructor will throw an exception and fail to initialize
-            new IndexWriter(d, cfg).close();
-          }
-
-          searchersList.add(new IndexSearcher(d, true));
-          break;
-        } catch (CorruptIndexException e) {
-          handleCorruptIndex();
+        if (!IndexReader.indexExists(d)) {
+          // If there's no index there, create an empty one; otherwise the reader
+          // constructor will throw an exception and fail to initialize
+          new IndexWriter(d, cfg).close();
         }
+        searchersList.add(new IndexSearcher(d, true));
+        break;
       }
     }
-
     return searchersList.toArray(new Searcher[searchersList.size()]);
   }
 

@@ -23,23 +23,28 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.search.BooleanClause;
 import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.Searcher;
 import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.search.TopDocs;
-import org.apache.lucene.store.Directory;
+import org.apache.lucene.search.TotalHitCountCollector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.xwiki.context.Execution;
 import org.xwiki.model.reference.DocumentReference;
 
+import com.celements.web.service.IWebUtilsService;
 import com.xpn.xwiki.XWiki;
 import com.xpn.xwiki.XWikiContext;
 import com.xpn.xwiki.XWikiException;
@@ -118,6 +123,11 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
    */
   private boolean onlyNew = false;
 
+  /**
+   * Indicate if the Lucene index should be cleaned from inexistent documents.
+   */
+  private boolean cleanIndex = false;
+
   public IndexRebuilder(IndexUpdater indexUpdater, XWikiContext context) {
     super(XWikiContext.EXECUTIONCONTEXT_KEY, context.clone());
 
@@ -137,27 +147,15 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
       boolean clearIndex, boolean onlyNew, XWikiContext context) {
     if (this.rebuildInProgress) {
       LOGGER.warn("Cannot launch rebuild because another rebuild is in progress");
-
       return LucenePluginApi.REBUILD_IN_PROGRESS;
     } else {
       if (clearIndex) {
-        if (wikis == null) {
-          this.indexUpdater.cleanIndex();
-        } else {
-          try {
-            IndexWriter writer = this.indexUpdater.openWriter(false);
-            for (String wiki : wikis) {
-              writer.deleteDocuments(new Term(IndexFields.DOCUMENT_WIKI, wiki));
-            }
-          } catch (IOException ex) {
-            LOGGER.warn("Failed to clean wiki index: {}", ex.getMessage());
-          }
-        }
+        clearIndex(wikis);
       }
-
       this.wikis = wikis != null ? new ArrayList<String>(wikis) : null;
       this.hqlFilter = hqlFilter;
       this.onlyNew = onlyNew;
+      this.cleanIndex = !clearIndex;
       this.rebuildInProgress = true;
 
       Thread indexRebuilderThread = new Thread(this, "Lucene Index Rebuilder");
@@ -170,6 +168,25 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
 
       // Too bad that now we can't tell how many items are there to be indexed...
       return 0;
+    }
+  }
+
+  private void clearIndex(Collection<String> wikis) {
+    LOGGER.info("clearIndex: for wikis '{}'", wikis);
+    if (wikis == null) {
+      this.indexUpdater.cleanIndex();
+    } else {
+      IndexWriter writer = null;
+      try {
+        writer = this.indexUpdater.openWriter(false);
+        for (String wiki : wikis) {
+          writer.deleteDocuments(new Term(IndexFields.DOCUMENT_WIKI, wiki));
+        }
+      } catch (IOException ex) {
+        LOGGER.error("Failed to clear wiki index: {}", ex.getMessage());
+      } finally {
+        IOUtils.closeQuietly(writer);
+      }
     }
   }
 
@@ -241,9 +258,7 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
    */
   private int rebuildIndex(XWikiContext context) throws InterruptedException {
     int retval = 0;
-
     Collection<String> wikiServers = this.wikis;
-
     if (wikiServers == null) {
       XWiki xwiki = context.getWiki();
       if (xwiki.isVirtualMode()) {
@@ -260,7 +275,6 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
         wikiServers.add(context.getDatabase());
       }
     }
-
     // Iterate all found virtual wikis
     for (String wikiName : wikiServers) {
       int wikiResult = indexWiki(wikiName, context);
@@ -268,7 +282,6 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
         retval += wikiResult;
       }
     }
-
     return retval;
   }
 
@@ -284,78 +297,91 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
    */
   protected int indexWiki(String wikiName, XWikiContext context)
       throws InterruptedException {
-    LOGGER.info("Reading content of wiki [{}]", wikiName);
-
-    // Number of index entries processed
-    int retval = 0;
-
+    LOGGER.info("indexing wiki '{}'", wikiName);
+    int retval = -1;
     String database = context.getDatabase();
-
+    Searcher searcher = null;
     try {
       context.setDatabase(wikiName);
-
-      // If only not already indexed document has to be indexed create a Searcher to find
-      // out
-      Searcher searcher = this.onlyNew
-          ? createSearcher(this.indexUpdater.getDirectory(), context) : null;
-
-      try {
-        String hql = "select distinct doc.space, doc.name, doc.version, doc.language from XWikiDocument as doc ";
-        if (StringUtils.isNotBlank(this.hqlFilter)) {
-          if ((this.hqlFilter.charAt(0) != ',') && !this.hqlFilter.contains("where")
-              && !this.hqlFilter.contains("WHERE")) {
-            hql += "where ";
-          }
-          hql += this.hqlFilter;
-        }
-
-        List<Object[]> documents = context.getWiki().search(hql, context);
-
-        retval = indexDocuments(wikiName, documents, searcher, context);
-      } catch (XWikiException e) {
-        LOGGER.warn("Error getting document names for wiki [{}] and filter [{}]: {}.",
-            new Object[] { wikiName, this.hqlFilter, e.getMessage() });
-
-        return -1;
-      } finally {
-        if (searcher != null) {
-          try {
-            searcher.close();
-          } catch (IOException e) {
-            LOGGER.error("Failed to close searcher", e);
-          }
-        }
-      }
+      searcher = new IndexSearcher(this.indexUpdater.getDirectory(), true);
+      retval = indexDocuments(wikiName, searcher, context);
+    } catch (IOException exc) {
+      LOGGER.error("Failed reading or writing index for wiki [{}]", wikiName, exc);
+    } catch (XWikiException xwe) {
+      LOGGER.error("Error getting documents for wiki [{}] and filter [{}]", wikiName,
+          this.hqlFilter, xwe);
     } finally {
       context.setDatabase(database);
+      IOUtils.closeQuietly(searcher);
     }
-
     return retval;
   }
 
-  private int indexDocuments(String wikiName, List<Object[]> documents, Searcher searcher,
-      XWikiContext context) throws InterruptedException {
+  private int indexDocuments(String wikiName, Searcher searcher, XWikiContext context)
+      throws InterruptedException, IOException, XWikiException {
     int retval = 0;
-
-    for (Object[] document : documents) {
-      DocumentReference documentReference = new DocumentReference(wikiName,
-          (String) document[0], (String) document[1]);
-      String version = (String) document[2];
-      String language = (String) document[3];
-      if ((searcher == null)
-          || !isIndexed(documentReference, version, language, searcher)) {
-        try {
-          retval += addTranslationOfDocument(documentReference, language, context);
-        } catch (XWikiException e) {
-          LOGGER.error("Error fetching document [{}] for language [{}]",
-              new Object[] { documentReference, language, e });
-
-          return retval;
-        }
+    List<Object[]> documentsToIndex = getAllDocs(wikiName, context);
+    LOGGER.info("adding {} docs to index", documentsToIndex.size());
+    Set<String> remainingDocs = getAllIndexedDocs(wikiName, searcher);
+    for (Object[] docData : documentsToIndex) {
+      DocumentReference docRef = new DocumentReference(wikiName, (String) docData[0],
+          (String) docData[1]);
+      String version = (String) docData[2];
+      String language = (String) docData[3];
+      if (!this.onlyNew || !isIndexed(docRef, version, language, searcher)) {
+        retval += addTranslationOfDocument(docRef, language, context);
+        LOGGER.trace("indexed {}", docRef);
       }
+      remainingDocs.remove(getWebUtils().serializeRef(docRef) + "." + language);
     }
-
+    if (this.cleanIndex) {
+      cleanIndex(remainingDocs);
+    }
     return retval;
+  }
+
+  private List<Object[]> getAllDocs(String wikiName, XWikiContext context)
+      throws XWikiException {
+    String hql = "select distinct doc.space, doc.name, doc.version, doc.language"
+        + "from XWikiDocument as doc ";
+    if (StringUtils.isNotBlank(this.hqlFilter)) {
+      if ((this.hqlFilter.charAt(0) != ',') && !this.hqlFilter.contains("where")
+          && !this.hqlFilter.contains("WHERE")) {
+        hql += "where ";
+      }
+      hql += this.hqlFilter;
+    }
+    return context.getWiki().search(hql, context);
+  }
+
+  public Set<String> getAllIndexedDocs(String wikiName, Searcher searcher)
+      throws IOException {
+    Set<String> ret = new HashSet<>();
+    BooleanQuery query = new BooleanQuery();
+    query.add(new TermQuery(new Term(IndexFields.DOCUMENT_WIKI, wikiName.toLowerCase())),
+        BooleanClause.Occur.MUST);
+    TotalHitCountCollector collector = new TotalHitCountCollector();
+    searcher.search(query, collector);
+    TopDocs topDocs = searcher.search(query, Math.max(1, collector.getTotalHits()));
+    for (ScoreDoc scoreDoc : topDocs.scoreDocs) {
+      ret.add(searcher.doc(scoreDoc.doc).get(IndexFields.DOCUMENT_ID));
+    }
+    LOGGER.info("found {} docs in index", ret.size());
+    return ret;
+  }
+
+  private void cleanIndex(Set<String> danglingDocs) throws IOException {
+    LOGGER.info("cleanIndex: for {} dangling docs", danglingDocs.size());
+    IndexWriter writer = null;
+    try {
+      writer = this.indexUpdater.openWriter(false);
+      for (String docId : danglingDocs) {
+        writer.deleteDocuments(new Term(IndexFields.DOCUMENT_ID, docId));
+        LOGGER.trace("cleanIndex: deleted doc: {}", docId);
+      }
+    } finally {
+      IOUtils.closeQuietly(writer);
+    }
   }
 
   protected int addTranslationOfDocument(DocumentReference documentReference,
@@ -411,60 +437,45 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
     return retval;
   }
 
-  public boolean isIndexed(DocumentReference documentReference, Searcher searcher) {
-    return isIndexed(documentReference, null, null, searcher);
+  public boolean isIndexed(DocumentReference docRef, Searcher searcher)
+      throws IOException {
+    return isIndexed(docRef, null, null, searcher);
   }
 
-  public boolean isIndexed(DocumentReference documentReference, String version,
-      String language, Searcher searcher) {
+  public boolean isIndexed(DocumentReference docRef, String version, String language,
+      Searcher searcher) throws IOException {
     boolean exists = false;
-
     BooleanQuery query = new BooleanQuery();
-
-    query.add(new TermQuery(
-        new Term(IndexFields.DOCUMENT_NAME, documentReference.getName().toLowerCase())),
+    query.add(
+        new TermQuery(
+            new Term(IndexFields.DOCUMENT_NAME, docRef.getName().toLowerCase())),
         BooleanClause.Occur.MUST);
     query.add(
         new TermQuery(new Term(IndexFields.DOCUMENT_SPACE,
-            documentReference.getLastSpaceReference().getName().toLowerCase())),
+            docRef.getLastSpaceReference().getName().toLowerCase())),
         BooleanClause.Occur.MUST);
     query.add(
         new TermQuery(new Term(IndexFields.DOCUMENT_WIKI,
-            documentReference.getWikiReference().getName().toLowerCase())),
+            docRef.getWikiReference().getName().toLowerCase())),
         BooleanClause.Occur.MUST);
-
     if (version != null) {
       query.add(new TermQuery(new Term(IndexFields.DOCUMENT_VERSION, version)),
           BooleanClause.Occur.MUST);
     }
-
     if (language != null) {
       query.add(
           new TermQuery(new Term(IndexFields.DOCUMENT_LANGUAGE,
               StringUtils.isEmpty(language) ? "default" : language)),
           BooleanClause.Occur.MUST);
     }
-
-    try {
-      TopDocs topDocs = searcher.search(query, 1);
-
-      exists = topDocs.totalHits == 1;
-    } catch (IOException e) {
-      LOGGER.error("Faild to search for page [{}] in Lucene index", documentReference, e);
-    }
-
+    TotalHitCountCollector collector = new TotalHitCountCollector();
+    searcher.search(query, collector);
+    exists = collector.getTotalHits() > 0;
     return exists;
   }
 
-  public Searcher createSearcher(Directory directory, XWikiContext context) {
-    Searcher searcher = null;
-
-    try {
-      searcher = new IndexSearcher(directory, true);
-    } catch (Exception e) {
-      LOGGER.error("Faild to create IndexSearcher for Lucene index [{}]", directory, e);
-    }
-
-    return searcher;
+  private IWebUtilsService getWebUtils() {
+    return Utils.getComponent(IWebUtilsService.class);
   }
+
 }
