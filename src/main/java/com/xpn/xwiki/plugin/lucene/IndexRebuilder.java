@@ -174,11 +174,11 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
   private void clearIndex(Collection<String> wikis) {
     LOGGER.info("clearIndex: for wikis '{}'", wikis);
     if (wikis == null) {
-      this.indexUpdater.cleanIndex();
+      indexUpdater.cleanIndex();
     } else {
       IndexWriter writer = null;
       try {
-        writer = this.indexUpdater.openWriter(false);
+        writer = indexUpdater.openWriter(false);
         for (String wiki : wikis) {
           writer.deleteDocuments(new Term(IndexFields.DOCUMENT_WIKI, wiki));
         }
@@ -258,7 +258,7 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
    */
   private int rebuildIndex(XWikiContext context) throws InterruptedException {
     int retval = 0;
-    Collection<String> wikiServers = this.wikis;
+    Collection<String> wikiServers = wikis;
     if (wikiServers == null) {
       XWiki xwiki = context.getWiki();
       if (xwiki.isVirtualMode()) {
@@ -298,13 +298,13 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
     Searcher searcher = null;
     try {
       context.setDatabase(wikiName);
-      searcher = new IndexSearcher(this.indexUpdater.getDirectory(), true);
+      searcher = new IndexSearcher(indexUpdater.getDirectory(), true);
       retval = indexDocuments(wikiName, searcher, context);
     } catch (IOException exc) {
       LOGGER.error("Failed reading or writing index for wiki [{}]", wikiName, exc);
     } catch (XWikiException xwe) {
       LOGGER.error("Error getting documents for wiki [{}] and filter [{}]", wikiName,
-          this.hqlFilter, xwe);
+          hqlFilter, xwe);
     } finally {
       context.setDatabase(database);
       IOUtils.closeQuietly(searcher);
@@ -317,14 +317,17 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
     int retval = 0, count = 0;
     List<Object[]> documentsToIndex = getAllDocs(wikiName, context);
     LOGGER.info("adding {} docs to index", documentsToIndex.size());
-    Set<String> remainingDocs = getAllIndexedDocs(wikiName, searcher);
+    Set<String> remainingDocs = Collections.emptySet();
+    if (cleanIndex && StringUtils.isBlank(hqlFilter)) {
+      remainingDocs = getAllIndexedDocs(wikiName, searcher);
+    }
     for (Object[] docData : documentsToIndex) {
       DocumentReference docRef = new DocumentReference(wikiName, (String) docData[0],
           (String) docData[1]);
       String version = (String) docData[2];
       String language = (String) docData[3];
       String docId = getWebUtils().serializeRef(docRef) + "." + language;
-      if (!this.onlyNew || !isIndexed(docRef, version, language, searcher)) {
+      if (!onlyNew || !isIndexed(docRef, version, language, searcher)) {
         retval += addTranslationOfDocument(docRef, language, context);
         LOGGER.trace("indexed {}", docRef);
       } else {
@@ -338,22 +341,20 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
             documentsToIndex.size(), remainingDocs.size());
       }
     }
-    if (this.cleanIndex) {
-      cleanIndex(remainingDocs);
-    }
+    cleanIndex(remainingDocs);
     return retval;
   }
 
   private List<Object[]> getAllDocs(String wikiName, XWikiContext context)
       throws XWikiException {
-    String hql = "select distinct doc.space, doc.name, doc.version, doc.language"
+    String hql = "select distinct doc.space, doc.name, doc.version, doc.language "
         + "from XWikiDocument as doc ";
-    if (StringUtils.isNotBlank(this.hqlFilter)) {
-      if ((this.hqlFilter.charAt(0) != ',') && !this.hqlFilter.contains("where")
-          && !this.hqlFilter.contains("WHERE")) {
+    hqlFilter = hqlFilter.trim();
+    if (StringUtils.isNotBlank(hqlFilter)) {
+      if ((hqlFilter.charAt(0) != ',') && !hqlFilter.toLowerCase().contains("where")) {
         hql += "where ";
       }
-      hql += this.hqlFilter;
+      hql += hqlFilter;
     }
     return context.getWiki().search(hql, context);
   }
@@ -375,10 +376,10 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
   }
 
   private void cleanIndex(Set<String> danglingDocs) throws IOException {
-    LOGGER.info("cleanIndex: for {} dangling docs", danglingDocs.size());
+    LOGGER.info("cleanIndex: {} for {} dangling docs", cleanIndex, danglingDocs.size());
     IndexWriter writer = null;
     try {
-      writer = this.indexUpdater.openWriter(false);
+      writer = indexUpdater.openWriter(false);
       for (String docId : danglingDocs) {
         writer.deleteDocuments(new Term(IndexFields.DOCUMENT_ID, docId));
         LOGGER.trace("cleanIndex: deleted doc: {}", docId);
@@ -404,7 +405,7 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
     // user trying to save a document would cause an exception. Thus, it is better
     // to limit the index rebuilder thread only, and not the index updater.
     long size = indexUpdater.getQueueSize();
-    while (size > this.indexUpdater.getMaxQueueSize()) {
+    while (size > indexUpdater.getMaxQueueSize()) {
       // Don't leave any database connections open while sleeping
       // This shouldn't be needed, but we never know what bugs might be there
       wikiContext.getWiki().getStore().cleanUp(wikiContext);
@@ -416,7 +417,7 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
     ++retval;
 
     if (document == tdocument) {
-      retval += this.indexUpdater.queueAttachments(document, wikiContext);
+      retval += indexUpdater.queueAttachments(document, wikiContext);
     }
 
     return retval;
@@ -424,7 +425,7 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
 
   protected void addTranslationOfDocument(XWikiDocument document,
       XWikiContext wikiContext) {
-    this.indexUpdater.queueDocument(document, wikiContext, false);
+    indexUpdater.queueDocument(document, wikiContext, false);
   }
 
   private Collection<String> findWikiServers(XWikiContext context) {
