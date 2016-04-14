@@ -407,8 +407,8 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
     // rest of the platform, as the index rebuilder could fill the queue, and then a
     // user trying to save a document would cause an exception. Thus, it is better
     // to limit the index rebuilder thread only, and not the index updater.
-    long size = indexUpdater.getQueueSize();
-    while (size > indexUpdater.getMaxQueueSize()) {
+    long size;
+    while ((size = indexUpdater.getQueueSize()) > indexUpdater.getMaxQueueSize()) {
       // Don't leave any database connections open while sleeping
       // This shouldn't be needed, but we never know what bugs might be there
       wikiContext.getWiki().getStore().cleanUp(wikiContext);
