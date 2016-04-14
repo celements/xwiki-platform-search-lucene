@@ -332,9 +332,9 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
       String docId = getWebUtils().serializeRef(docRef) + "." + language;
       if (!onlyNew || !isIndexed(docRef, version, language, searcher)) {
         retval += addTranslationOfDocument(docRef, language, context);
-        LOGGER.trace("indexed {}", docRef);
+        LOGGER.trace("indexed {}", docId);
       } else {
-        LOGGER.trace("already indexed {}", docRef);
+        LOGGER.trace("already indexed {}", docId);
       }
       if (!remainingDocs.remove(docId)) {
         LOGGER.debug("couldn't reduce remaining docs for docId '{}'", docId);
