@@ -97,6 +97,8 @@ public class LucenePlugin extends XWikiDefaultPlugin {
 
   public static final String PROP_MAX_QUEUE_SIZE = "xwiki.plugins.lucene.maxQueueSize";
 
+  public static final String PROP_UPDATER_RETRY_INTERVAL = "xwiki.plugins.lucene.updaterRetryInterval";
+
   public static final String PROP_RESULT_LIMIT = "xwiki.plugins.lucene.resultLimit";
 
   public static final String PROP_RESULT_LIMIT_WITHOUT_CHECKS = "xwiki.plugins.lucene.resultLimitWithoutChecks";
@@ -721,16 +723,22 @@ public class LucenePlugin extends XWikiDefaultPlugin {
   }
 
   public void init(IndexUpdater indexUpdater, XWikiContext context) {
-    Directory directory = indexUpdater.getDirectory();
-
+    int retryInterval;
+    try {
+      retryInterval = 1000
+          * (int) context.getWiki().ParamAsLong(PROP_UPDATER_RETRY_INTERVAL, 30);
+    } catch (NumberFormatException exp) {
+      LOGGER.warn("Invalid retry interval in configuration.", exp);
+      retryInterval = 30000;
+    }
+    IndexRebuilder indexRebuilder = new IndexRebuilder(indexUpdater, retryInterval,
+        context);
     boolean needInitialRebuild = true;
     try {
-      needInitialRebuild = !IndexReader.indexExists(directory);
+      needInitialRebuild = !IndexReader.indexExists(indexUpdater.getDirectory());
     } catch (IOException exp) {
       LOGGER.warn("Failed to check if index exists: {}", exp);
     }
-
-    IndexRebuilder indexRebuilder = new IndexRebuilder(indexUpdater, context);
     if (needInitialRebuild) {
       indexRebuilder.startRebuildIndex(context);
       LOGGER.info("Launched initial lucene indexing");

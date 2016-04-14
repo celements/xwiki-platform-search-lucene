@@ -96,7 +96,7 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
   /**
    * Amount of time (milliseconds) to sleep while waiting for the indexing queue to empty.
    */
-  private static final int RETRYINTERVAL = 30000;
+  private final int retryInterval;
 
   /**
    * The actual object/thread that indexes data.
@@ -128,10 +128,10 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
    */
   private boolean cleanIndex = false;
 
-  public IndexRebuilder(IndexUpdater indexUpdater, XWikiContext context) {
+  public IndexRebuilder(IndexUpdater indexUpdater, int retryInterval, XWikiContext context) {
     super(XWikiContext.EXECUTIONCONTEXT_KEY, context.clone());
-
     this.indexUpdater = indexUpdater;
+    this.retryInterval = retryInterval;
   }
 
   private XWikiContext getContext() {
@@ -192,7 +192,7 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
 
   @Override
   protected void runInternal() {
-    LOGGER.debug("Starting lucene index rebuild");
+    LOGGER.info("Starting lucene index rebuild");
     XWikiContext context = null;
     try {
       // The context must be cloned, as otherwise setDatabase() might affect the response
@@ -244,7 +244,7 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
       }
     }
 
-    LOGGER.debug("Lucene index rebuild done");
+    LOGGER.info("Lucene index rebuild done");
   }
 
   /**
@@ -263,12 +263,7 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
       XWiki xwiki = context.getWiki();
       if (xwiki.isVirtualMode()) {
         wikiServers = findWikiServers(context);
-        if (LOGGER.isDebugEnabled()) {
-          LOGGER.debug("found [{}] virtual wikis:", wikiServers.size());
-          for (String wikiName : wikiServers) {
-            LOGGER.debug(wikiName);
-          }
-        }
+        LOGGER.debug("found {} virtual wikis: '{}'", wikiServers.size(), wikiServers);
       } else {
         // No virtual wiki configuration, just index the wiki the context belongs to
         wikiServers = new ArrayList<String>();
@@ -319,7 +314,7 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
 
   private int indexDocuments(String wikiName, Searcher searcher, XWikiContext context)
       throws InterruptedException, IOException, XWikiException {
-    int retval = 0;
+    int retval = 0, count = 0;
     List<Object[]> documentsToIndex = getAllDocs(wikiName, context);
     LOGGER.info("adding {} docs to index", documentsToIndex.size());
     Set<String> remainingDocs = getAllIndexedDocs(wikiName, searcher);
@@ -328,11 +323,20 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
           (String) docData[1]);
       String version = (String) docData[2];
       String language = (String) docData[3];
+      String docId = getWebUtils().serializeRef(docRef) + "." + language;
       if (!this.onlyNew || !isIndexed(docRef, version, language, searcher)) {
         retval += addTranslationOfDocument(docRef, language, context);
         LOGGER.trace("indexed {}", docRef);
+      } else {
+        LOGGER.trace("already indexed {}", docRef);
       }
-      remainingDocs.remove(getWebUtils().serializeRef(docRef) + "." + language);
+      if (!remainingDocs.remove(docId)) {
+        LOGGER.debug("couldn't reduce remaining docs for docId '{}", docId);
+      }
+      if ((++count % 500) == 0) {
+        LOGGER.info("indexed docs {}/{}, {} docs remaining", count,
+            documentsToIndex.size(), remainingDocs.size());
+      }
     }
     if (this.cleanIndex) {
       cleanIndex(remainingDocs);
@@ -399,11 +403,13 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
     // rest of the platform, as the index rebuilder could fill the queue, and then a
     // user trying to save a document would cause an exception. Thus, it is better
     // to limit the index rebuilder thread only, and not the index updater.
-    while (this.indexUpdater.getQueueSize() > this.indexUpdater.getMaxQueueSize()) {
+    long size = indexUpdater.getQueueSize();
+    while (size > this.indexUpdater.getMaxQueueSize()) {
       // Don't leave any database connections open while sleeping
       // This shouldn't be needed, but we never know what bugs might be there
       wikiContext.getWiki().getStore().cleanUp(wikiContext);
-      Thread.sleep(RETRYINTERVAL);
+      LOGGER.debug("sleeping for {}ms since queue size {} too big", retryInterval, size);
+      Thread.sleep(retryInterval);
     }
 
     addTranslationOfDocument(tdocument, wikiContext);
