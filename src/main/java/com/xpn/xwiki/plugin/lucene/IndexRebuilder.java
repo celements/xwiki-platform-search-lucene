@@ -316,7 +316,8 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
       throws InterruptedException, IOException, XWikiException {
     int retval = 0, count = 0;
     List<Object[]> documentsToIndex = getAllDocs(wikiName, context);
-    LOGGER.info("adding {} docs to index", documentsToIndex.size());
+    LOGGER.info("adding {} docs to index with filter '{}'", documentsToIndex.size(),
+        hqlFilter);
     Set<String> remainingDocs = Collections.emptySet();
     if (cleanIndex && StringUtils.isBlank(hqlFilter)) {
       remainingDocs = getAllIndexedDocs(wikiName, searcher);
