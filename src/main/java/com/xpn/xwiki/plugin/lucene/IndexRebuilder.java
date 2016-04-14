@@ -45,6 +45,7 @@ import org.xwiki.context.Execution;
 import org.xwiki.model.reference.DocumentReference;
 
 import com.celements.web.service.IWebUtilsService;
+import com.google.common.base.Strings;
 import com.xpn.xwiki.XWiki;
 import com.xpn.xwiki.XWikiContext;
 import com.xpn.xwiki.XWikiException;
@@ -327,6 +328,7 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
           (String) docData[1]);
       String version = (String) docData[2];
       String language = (String) docData[3];
+      language = Strings.isNullOrEmpty(language) ? "default" : language;
       String docId = getWebUtils().serializeRef(docRef) + "." + language;
       if (!onlyNew || !isIndexed(docRef, version, language, searcher)) {
         retval += addTranslationOfDocument(docRef, language, context);
@@ -335,7 +337,7 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
         LOGGER.trace("already indexed {}", docRef);
       }
       if (!remainingDocs.remove(docId)) {
-        LOGGER.debug("couldn't reduce remaining docs for docId '{}", docId);
+        LOGGER.debug("couldn't reduce remaining docs for docId '{}'", docId);
       }
       if ((++count % 500) == 0) {
         LOGGER.info("indexed docs {}/{}, {} docs remaining", count,
@@ -472,8 +474,7 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
     }
     if (language != null) {
       query.add(
-          new TermQuery(new Term(IndexFields.DOCUMENT_LANGUAGE,
-              StringUtils.isEmpty(language) ? "default" : language)),
+          new TermQuery(new Term(IndexFields.DOCUMENT_LANGUAGE, language)),
           BooleanClause.Occur.MUST);
     }
     TotalHitCountCollector collector = new TotalHitCountCollector();
