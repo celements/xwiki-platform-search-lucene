@@ -69,7 +69,7 @@ public class SearcherProvider {
 
   public void connect() {
     if (!checkConnected()) {
-      checkArgument(!markToClose, "you may not connect to a SearchProvider marked to close.");
+      checkState(!markToClose, "you may not connect to a SearchProvider marked to close.");
       LOGGER.debug("connect searcherProvider [{}] to [{}].", System.identityHashCode(this),
           Thread.currentThread());
       connectedThreads.add(Thread.currentThread());
@@ -81,8 +81,8 @@ public class SearcherProvider {
   }
 
   public Searcher[] getSearchers() {
-    checkArgument(!isClosed(), "Getting serachers failed: provider is closed.");
-    checkArgument(checkConnected(), "you must connect to the searcher provider before you can get"
+    checkState(!isClosed(), "Getting serachers failed: provider is closed.");
+    checkState(checkConnected(), "you must connect to the searcher provider before you can get"
         + " any searchers");
     return backedSearchers;
   }
@@ -149,7 +149,7 @@ public class SearcherProvider {
   }
 
   public void connectSearchResults(SearchResults searchResults) {
-    checkArgument(checkConnected(), "you may not connect a searchResult to a SearchProvider from"
+    checkState(checkConnected(), "you may not connect a searchResult to a SearchProvider from"
         + " a not connected thread.");
     getConnectedSearchResultsForCurrentThread().add(searchResults);
   }

@@ -1,5 +1,6 @@
 package com.xpn.xwiki.plugin.lucene.searcherProvider;
 
+import static com.celements.common.test.CelementsTestUtils.*;
 import static org.easymock.EasyMock.*;
 import static org.junit.Assert.*;
 
@@ -7,10 +8,10 @@ import org.apache.lucene.search.Searcher;
 import org.junit.Before;
 import org.junit.Test;
 
-import com.celements.common.test.AbstractBridgedComponentTestCase;
+import com.celements.common.test.AbstractComponentTest;
 import com.xpn.xwiki.plugin.lucene.SearchResults;
 
-public class SearcherProviderTest extends AbstractBridgedComponentTestCase {
+public class SearcherProviderTest extends AbstractComponentTest {
 
   private Searcher theMockSearcher;
   private SearcherProvider searcherProvider;
@@ -66,8 +67,7 @@ public class SearcherProviderTest extends AbstractBridgedComponentTestCase {
     assertTrue(searcherProvider.internal_getConnectedThreads().isEmpty());
     searcherProvider.connect();
     assertFalse(searcherProvider.internal_getConnectedThreads().isEmpty());
-    assertTrue(
-        searcherProvider.internal_getConnectedThreads().contains(Thread.currentThread()));
+    assertTrue(searcherProvider.internal_getConnectedThreads().contains(Thread.currentThread()));
     verifyDefault();
   }
 
@@ -79,8 +79,7 @@ public class SearcherProviderTest extends AbstractBridgedComponentTestCase {
     searcherProvider.markToClose();
     try {
       searcherProvider.connect();
-      fail("expecting illegal state exception if not connected before calling"
-          + " getSearchers");
+      fail("expecting illegal state exception if not connected before calling" + " getSearchers");
     } catch (IllegalStateException exp) {
       // expected
     }
@@ -93,8 +92,7 @@ public class SearcherProviderTest extends AbstractBridgedComponentTestCase {
     try {
       assertNotNull(searcherProvider.getSearchers());
       assertSame(theMockSearcher, searcherProvider.getSearchers()[0]);
-      fail("expecting illegal state exception if not connected before calling"
-          + " getSearchers");
+      fail("expecting illegal state exception if not connected before calling" + " getSearchers");
     } catch (IllegalStateException exp) {
       // expected
     }
