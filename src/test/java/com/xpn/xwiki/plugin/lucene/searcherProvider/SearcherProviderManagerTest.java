@@ -1,29 +1,27 @@
 package com.xpn.xwiki.plugin.lucene.searcherProvider;
 
+import static com.celements.common.test.CelementsTestUtils.*;
 import static junit.framework.Assert.*;
 import static org.easymock.EasyMock.*;
 
-import java.util.Vector;
+import java.util.Set;
 
 import org.apache.lucene.search.Searcher;
 import org.junit.Before;
 import org.junit.Test;
 
-import com.celements.common.test.AbstractBridgedComponentTestCase;
-import com.xpn.xwiki.XWikiContext;
+import com.celements.common.test.AbstractComponentTest;
 import com.xpn.xwiki.plugin.lucene.SearchResults;
 import com.xpn.xwiki.web.Utils;
 
-public class SearcherProviderManagerTest extends AbstractBridgedComponentTestCase {
+public class SearcherProviderManagerTest extends AbstractComponentTest {
 
-  private XWikiContext context;
   private SearcherProviderManager theSearchProvManager;
 
   @Before
   public void setUp_SearcherProviderManagerTest() throws Exception {
-    context = getContext();
-    theSearchProvManager = (SearcherProviderManager) Utils
-        .getComponent(ISearcherProviderRole.class);
+    theSearchProvManager = (SearcherProviderManager) Utils.getComponent(
+        ISearcherProviderRole.class);
   }
 
   @Test
@@ -34,10 +32,9 @@ public class SearcherProviderManagerTest extends AbstractBridgedComponentTestCas
   @Test
   public void testGetAllSearcherProvider() {
     replayDefault();
-    Vector<SearcherProvider> searcherProvList = theSearchProvManager
-        .getAllSearcherProvider();
+    Set<SearcherProvider> searcherProvList = theSearchProvManager.getAllSearcherProviders();
     assertNotNull(searcherProvList);
-    assertSame(searcherProvList, theSearchProvManager.getAllSearcherProvider());
+    assertSame(searcherProvList, theSearchProvManager.getAllSearcherProviders());
     verifyDefault();
   }
 
@@ -45,18 +42,18 @@ public class SearcherProviderManagerTest extends AbstractBridgedComponentTestCas
   public void testCreateSearchProvider() {
     Searcher theMockSearcher = createMockAndAddToDefault(Searcher.class);
     replayDefault();
-    assertTrue(theSearchProvManager.getAllSearcherProvider().isEmpty());
-    SearcherProvider searcherProv = theSearchProvManager
-        .createSearchProvider(new Searcher[] { theMockSearcher });
+    assertTrue(theSearchProvManager.getAllSearcherProviders().isEmpty());
+    SearcherProvider searcherProv = theSearchProvManager.createSearchProvider(new Searcher[] {
+        theMockSearcher });
     assertNotNull(searcherProv);
-    assertEquals(1, theSearchProvManager.getAllSearcherProvider().size());
+    assertEquals(1, theSearchProvManager.getAllSearcherProviders().size());
     verifyDefault();
   }
 
   @Test
   public void testOnEvent_empty() {
     replayDefault();
-    assertTrue(theSearchProvManager.getAllSearcherProvider().isEmpty());
+    assertTrue(theSearchProvManager.getAllSearcherProviders().isEmpty());
     theSearchProvManager.closeAllForCurrentThread();
     verifyDefault();
   }
@@ -66,14 +63,14 @@ public class SearcherProviderManagerTest extends AbstractBridgedComponentTestCas
     Searcher theMockSearcher = createMockAndAddToDefault(Searcher.class);
     SearchResults mockSearchResults = createMockAndAddToDefault(SearchResults.class);
     replayDefault();
-    SearcherProvider searcherProv = theSearchProvManager
-        .createSearchProvider(new Searcher[] { theMockSearcher });
-    assertEquals(1, theSearchProvManager.getAllSearcherProvider().size());
+    SearcherProvider searcherProv = theSearchProvManager.createSearchProvider(new Searcher[] {
+        theMockSearcher });
+    assertEquals(1, theSearchProvManager.getAllSearcherProviders().size());
     searcherProv.connect();
     searcherProv.connectSearchResults(mockSearchResults);
     assertTrue(searcherProv.hasSearchResultsForCurrentThread());
     theSearchProvManager.closeAllForCurrentThread();
-    assertEquals(1, theSearchProvManager.getAllSearcherProvider().size());
+    assertEquals(1, theSearchProvManager.getAllSearcherProviders().size());
     assertFalse(searcherProv.hasSearchResultsForCurrentThread());
     assertTrue(searcherProv.isIdle());
     verifyDefault();
@@ -86,14 +83,14 @@ public class SearcherProviderManagerTest extends AbstractBridgedComponentTestCas
     theMockSearcher.close();
     expectLastCall().once();
     replayDefault();
-    SearcherProvider searcherProv = theSearchProvManager
-        .createSearchProvider(new Searcher[] { theMockSearcher });
-    assertEquals(1, theSearchProvManager.getAllSearcherProvider().size());
+    SearcherProvider searcherProv = theSearchProvManager.createSearchProvider(new Searcher[] {
+        theMockSearcher });
+    assertEquals(1, theSearchProvManager.getAllSearcherProviders().size());
     searcherProv.connect();
     searcherProv.markToClose();
     searcherProv.connectSearchResults(mockSearchResults);
     theSearchProvManager.closeAllForCurrentThread();
-    assertTrue(theSearchProvManager.getAllSearcherProvider().isEmpty());
+    assertTrue(theSearchProvManager.getAllSearcherProviders().isEmpty());
     assertFalse(searcherProv.hasSearchResultsForCurrentThread());
     verifyDefault();
   }
@@ -105,15 +102,15 @@ public class SearcherProviderManagerTest extends AbstractBridgedComponentTestCas
     theMockSearcher.close();
     expectLastCall().once();
     replayDefault();
-    SearcherProvider searcherProv = theSearchProvManager
-        .createSearchProvider(new Searcher[] { theMockSearcher });
-    assertEquals(1, theSearchProvManager.getAllSearcherProvider().size());
+    SearcherProvider searcherProv = theSearchProvManager.createSearchProvider(new Searcher[] {
+        theMockSearcher });
+    assertEquals(1, theSearchProvManager.getAllSearcherProviders().size());
     searcherProv.connect();
     searcherProv.markToClose();
     searcherProv.connectSearchResults(mockSearchResults);
     searcherProv.disconnect();
     theSearchProvManager.closeAllForCurrentThread();
-    assertTrue(theSearchProvManager.getAllSearcherProvider().isEmpty());
+    assertTrue(theSearchProvManager.getAllSearcherProviders().isEmpty());
     assertFalse(searcherProv.hasSearchResultsForCurrentThread());
     verifyDefault();
   }
