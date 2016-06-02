@@ -172,7 +172,7 @@ public class SearcherProvider {
 
   public void cleanUpSearchResults(SearchResults searchResults) throws IOException {
     if (hasSearchResultsForCurrentThread()) {
-      Set<SearchResults> currentThreadSet = connectedSearchResultsMap.get(Thread.currentThread());
+      Set<SearchResults> currentThreadSet = getConnectedSearchResultsForCurrentThread();
       if (currentThreadSet.remove(searchResults)) {
         if (currentThreadSet.isEmpty()) {
           connectedSearchResultsMap.remove(Thread.currentThread());
