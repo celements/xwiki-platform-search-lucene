@@ -23,6 +23,7 @@ import static com.google.common.base.Preconditions.*;
 
 import java.io.IOException;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -155,8 +156,7 @@ public class SearcherProvider {
   }
 
   Set<SearchResults> getConnectedSearchResultsForCurrentThread() {
-    connectedSearchResultsMap.putIfAbsent(Thread.currentThread(), Collections.newSetFromMap(
-        new ConcurrentHashMap<SearchResults, Boolean>()));
+    connectedSearchResultsMap.putIfAbsent(Thread.currentThread(), new HashSet<SearchResults>());
     return connectedSearchResultsMap.get(Thread.currentThread());
   }
 
