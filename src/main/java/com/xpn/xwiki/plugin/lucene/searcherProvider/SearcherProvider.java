@@ -27,6 +27,7 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.lucene.search.Searcher;
 import org.slf4j.Logger;
@@ -44,7 +45,7 @@ public class SearcherProvider {
    */
   private final Searcher[] backedSearchers;
 
-  private volatile boolean markToClose;
+  private final AtomicBoolean markToClose;
 
   private volatile boolean isClosed;
 
@@ -54,7 +55,7 @@ public class SearcherProvider {
 
   SearcherProvider(Searcher[] searchers) {
     this.backedSearchers = searchers;
-    this.markToClose = false;
+    this.markToClose = new AtomicBoolean(false);
     this.connectedThreads = Collections.newSetFromMap(new ConcurrentHashMap<Long, Boolean>());
     this.connectedSearchResultsMap = new ConcurrentHashMap<Long, Set<SearchResults>>();
     LOGGER.debug("create searcherProvider: [" + System.identityHashCode(this) + "].");
@@ -68,12 +69,20 @@ public class SearcherProvider {
     return connectedThreads;
   }
 
+  /**
+   * <code>connect</code> is implemented with a fail-fast behavior. It may happen that a thread
+   * succeeds to connect on a markedToClose SearcherProvider. The guarantee is, that the
+   * SearcherProvider will not close the connected lucene searchers before not all threads
+   * finished with theirs SearcherResults and disconnected.
+   */
   public void connect() {
     if (!checkConnected()) {
-      checkState(!markToClose, "you may not connect to a SearchProvider marked to close.");
-      LOGGER.debug("connect searcherProvider [{}] to [{}].", System.identityHashCode(this),
-          getThreadKey());
-      connectedThreads.add(getThreadKey());
+      synchronized (this) {
+        checkState(!isMarkedToClose(), "you connected to a SearchProvider marked to close.");
+        LOGGER.debug("connect searcherProvider [{}] to [{}].", System.identityHashCode(this),
+            getThreadKey());
+        connectedThreads.add(getThreadKey());
+      }
     }
   }
 
@@ -82,7 +91,7 @@ public class SearcherProvider {
   }
 
   public Searcher[] getSearchers() {
-    checkState(!isClosed(), "Getting serachers failed: provider is closed.");
+    checkState(!isClosed(), "Getting searchers failed: provider is closed.");
     checkState(checkConnected(), "you must connect to the searcher provider before you can get"
         + " any searchers");
     return backedSearchers;
@@ -101,18 +110,17 @@ public class SearcherProvider {
   }
 
   public boolean isMarkedToClose() {
-    return markToClose;
+    return markToClose.get();
   }
 
   public void markToClose() throws IOException {
-    if (!isMarkedToClose()) {
+    if (!markToClose.getAndSet(true)) {
       LOGGER.debug("markToClose searcherProvider [{}].", System.identityHashCode(this));
-      markToClose = true;
       closeIfIdle();
     }
   }
 
-  private void closeIfIdle() throws IOException {
+  private synchronized void closeIfIdle() throws IOException {
     if (canBeClosed()) {
       closeSearchers();
     }
@@ -129,7 +137,7 @@ public class SearcherProvider {
   /**
    * @throws IOException
    */
-  synchronized void closeSearchers() throws IOException {
+  void closeSearchers() throws IOException {
     if (!isClosed()) {
       LOGGER.debug("closeSearchers: for [{}].", System.identityHashCode(this));
       for (Searcher searcher : backedSearchers) {
@@ -144,9 +152,7 @@ public class SearcherProvider {
   @Override
   protected void finalize() throws Throwable {
     super.finalize();
-    if (!isClosed()) {
-      closeSearchers();
-    }
+    closeSearchers();
   }
 
   public void connectSearchResults(SearchResults searchResults) {
