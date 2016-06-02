@@ -48,23 +48,23 @@ public class SearcherProvider {
 
   private volatile boolean isClosed;
 
-  private Set<Thread> connectedThreads;
+  private final Set<Long> connectedThreads;
 
-  private ConcurrentMap<Thread, Set<SearchResults>> connectedSearchResultsMap;
+  private final ConcurrentMap<Long, Set<SearchResults>> connectedSearchResultsMap;
 
   SearcherProvider(Searcher[] searchers) {
     this.backedSearchers = searchers;
     this.markToClose = false;
-    this.connectedThreads = Collections.newSetFromMap(new ConcurrentHashMap<Thread, Boolean>());
-    this.connectedSearchResultsMap = new ConcurrentHashMap<Thread, Set<SearchResults>>();
+    this.connectedThreads = Collections.newSetFromMap(new ConcurrentHashMap<Long, Boolean>());
+    this.connectedSearchResultsMap = new ConcurrentHashMap<Long, Set<SearchResults>>();
     LOGGER.debug("create searcherProvider: [" + System.identityHashCode(this) + "].");
   }
 
-  ConcurrentMap<Thread, Set<SearchResults>> internal_getConnectedSearchResults() {
+  ConcurrentMap<Long, Set<SearchResults>> internal_getConnectedSearchResults() {
     return connectedSearchResultsMap;
   }
 
-  Set<Thread> internal_getConnectedThreads() {
+  Set<Long> internal_getConnectedThreads() {
     return connectedThreads;
   }
 
@@ -72,8 +72,8 @@ public class SearcherProvider {
     if (!checkConnected()) {
       checkState(!markToClose, "you may not connect to a SearchProvider marked to close.");
       LOGGER.debug("connect searcherProvider [{}] to [{}].", System.identityHashCode(this),
-          Thread.currentThread());
-      connectedThreads.add(Thread.currentThread());
+          getThreadKey());
+      connectedThreads.add(getThreadKey());
     }
   }
 
@@ -89,13 +89,13 @@ public class SearcherProvider {
   }
 
   private boolean checkConnected() {
-    return connectedThreads.contains(Thread.currentThread());
+    return connectedThreads.contains(getThreadKey());
   }
 
   public void disconnect() throws IOException {
-    if (connectedThreads.remove(Thread.currentThread())) {
+    if (connectedThreads.remove(getThreadKey())) {
       LOGGER.debug("disconnect searcherProvider [{}] to [{}], markedToClose [{}].",
-          System.identityHashCode(this), Thread.currentThread(), isMarkedToClose());
+          System.identityHashCode(this), getThreadKey(), isMarkedToClose());
       closeIfIdle();
     }
   }
@@ -156,18 +156,22 @@ public class SearcherProvider {
   }
 
   Set<SearchResults> getConnectedSearchResultsForCurrentThread() {
-    connectedSearchResultsMap.putIfAbsent(Thread.currentThread(), new HashSet<SearchResults>());
-    return connectedSearchResultsMap.get(Thread.currentThread());
+    connectedSearchResultsMap.putIfAbsent(getThreadKey(), new HashSet<SearchResults>());
+    return connectedSearchResultsMap.get(getThreadKey());
   }
 
   public boolean hasSearchResultsForCurrentThread() {
-    return connectedSearchResultsMap.containsKey(Thread.currentThread());
+    return connectedSearchResultsMap.containsKey(getThreadKey());
   }
 
   public void cleanUpAllSearchResultsForThread() throws IOException {
-    if (connectedSearchResultsMap.remove(Thread.currentThread()) != null) {
+    if (connectedSearchResultsMap.remove(getThreadKey()) != null) {
       closeIfIdle();
     }
+  }
+
+  public Long getThreadKey() {
+    return Thread.currentThread().getId();
   }
 
   public void cleanUpSearchResults(SearchResults searchResults) throws IOException {
@@ -175,7 +179,7 @@ public class SearcherProvider {
       Set<SearchResults> currentThreadSet = getConnectedSearchResultsForCurrentThread();
       if (currentThreadSet.remove(searchResults)) {
         if (currentThreadSet.isEmpty()) {
-          connectedSearchResultsMap.remove(Thread.currentThread());
+          connectedSearchResultsMap.remove(getThreadKey());
         }
         closeIfIdle();
       }
