@@ -27,7 +27,6 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.lucene.search.Searcher;
 import org.slf4j.Logger;
@@ -45,7 +44,7 @@ public class SearcherProvider {
    */
   private final Searcher[] backedSearchers;
 
-  private final AtomicBoolean markToClose;
+  private volatile boolean markToClose;
 
   private volatile boolean isClosed;
 
@@ -55,7 +54,7 @@ public class SearcherProvider {
 
   SearcherProvider(Searcher[] searchers) {
     this.backedSearchers = searchers;
-    this.markToClose = new AtomicBoolean(false);
+    this.markToClose = false;
     this.connectedThreads = Collections.newSetFromMap(new ConcurrentHashMap<Long, Boolean>());
     this.connectedSearchResultsMap = new ConcurrentHashMap<Long, Set<SearchResults>>();
     LOGGER.debug("create searcherProvider: [" + System.identityHashCode(this) + "].");
@@ -70,10 +69,10 @@ public class SearcherProvider {
   }
 
   /**
-   * <code>connect</code> is implemented with a fail-fast behavior. It may happen that a thread
-   * succeeds to connect on a markedToClose SearcherProvider. The guarantee is, that the
+   * <code>connect</code> is implemented with a fail-fast behavior. The guarantee is, that the
    * SearcherProvider will not close the connected lucene searchers before not all threads
-   * finished with theirs SearcherResults and disconnected.
+   * finished with theirs SearcherResults and disconnected AND that no thread can connect after
+   * marking a SearchProvider for closing.
    */
   public void connect() {
     if (!checkConnected()) {
@@ -110,11 +109,12 @@ public class SearcherProvider {
   }
 
   public boolean isMarkedToClose() {
-    return markToClose.get();
+    return markToClose;
   }
 
-  public void markToClose() throws IOException {
-    if (!markToClose.getAndSet(true)) {
+  public synchronized void markToClose() throws IOException {
+    if (!markToClose) {
+      markToClose = true;
       LOGGER.debug("markToClose searcherProvider [{}].", System.identityHashCode(this));
       closeIfIdle();
     }
