@@ -136,16 +136,16 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
   }
 
   private XWikiContext getContext() {
-    return (XWikiContext) Utils.getComponent(Execution.class).getContext()
-        .getProperty(XWikiContext.EXECUTIONCONTEXT_KEY);
+    return (XWikiContext) Utils.getComponent(Execution.class).getContext().getProperty(
+        XWikiContext.EXECUTIONCONTEXT_KEY);
   }
 
   public int startRebuildIndex(XWikiContext context) {
     return startIndex(null, "", true, false, context);
   }
 
-  public synchronized int startIndex(Collection<String> wikis, String hqlFilter,
-      boolean clearIndex, boolean onlyNew, XWikiContext context) {
+  public synchronized int startIndex(Collection<String> wikis, String hqlFilter, boolean clearIndex,
+      boolean onlyNew, XWikiContext context) {
     if (this.rebuildInProgress) {
       LOGGER.warn("Cannot launch rebuild because another rebuild is in progress");
       return LucenePluginApi.REBUILD_IN_PROGRESS;
@@ -291,8 +291,7 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
    * @return the number of indexed elements
    * @throws InterruptedException
    */
-  protected int indexWiki(String wikiName, XWikiContext context)
-      throws InterruptedException {
+  protected int indexWiki(String wikiName, XWikiContext context) throws InterruptedException {
     LOGGER.info("indexing wiki '{}'", wikiName);
     int retval = -1;
     String database = context.getDatabase();
@@ -304,8 +303,8 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
     } catch (IOException exc) {
       LOGGER.error("Failed reading or writing index for wiki [{}]", wikiName, exc);
     } catch (XWikiException xwe) {
-      LOGGER.error("Error getting documents for wiki [{}] and filter [{}]", wikiName,
-          hqlFilter, xwe);
+      LOGGER.error("Error getting documents for wiki [{}] and filter [{}]", wikiName, hqlFilter,
+          xwe);
     } finally {
       context.setDatabase(database);
       IOUtils.closeQuietly(searcher);
@@ -317,8 +316,7 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
       throws InterruptedException, IOException, XWikiException {
     int retval = 0, count = 0;
     List<Object[]> documentsToIndex = getAllDocs(wikiName, context);
-    LOGGER.info("adding {} docs to index with filter '{}'", documentsToIndex.size(),
-        hqlFilter);
+    LOGGER.info("adding {} docs to index with filter '{}'", documentsToIndex.size(), hqlFilter);
     Set<String> remainingDocs = Collections.emptySet();
     if (cleanIndex && StringUtils.isBlank(hqlFilter)) {
       remainingDocs = getAllIndexedDocs(wikiName, searcher);
@@ -340,16 +338,15 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
         LOGGER.debug("couldn't reduce remaining docs for docId '{}'", docId);
       }
       if ((++count % 500) == 0) {
-        LOGGER.info("indexed docs {}/{}, {} docs remaining", count,
-            documentsToIndex.size(), remainingDocs.size());
+        LOGGER.info("indexed docs {}/{}, {} docs remaining", count, documentsToIndex.size(),
+            remainingDocs.size());
       }
     }
     cleanIndex(remainingDocs);
     return retval;
   }
 
-  private List<Object[]> getAllDocs(String wikiName, XWikiContext context)
-      throws XWikiException {
+  private List<Object[]> getAllDocs(String wikiName, XWikiContext context) throws XWikiException {
     String hql = "select distinct doc.space, doc.name, doc.version, doc.language "
         + "from XWikiDocument as doc ";
     hqlFilter = hqlFilter.trim();
@@ -362,8 +359,7 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
     return context.getWiki().search(hql, context);
   }
 
-  public Set<String> getAllIndexedDocs(String wikiName, Searcher searcher)
-      throws IOException {
+  public Set<String> getAllIndexedDocs(String wikiName, Searcher searcher) throws IOException {
     Set<String> ret = new HashSet<>();
     BooleanQuery query = new BooleanQuery();
     query.add(new TermQuery(new Term(IndexFields.DOCUMENT_WIKI, wikiName.toLowerCase())),
@@ -392,13 +388,11 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
     }
   }
 
-  protected int addTranslationOfDocument(DocumentReference documentReference,
-      String language, XWikiContext wikiContext)
-          throws XWikiException, InterruptedException {
+  protected int addTranslationOfDocument(DocumentReference documentReference, String language,
+      XWikiContext wikiContext) throws XWikiException, InterruptedException {
     int retval = 0;
 
-    XWikiDocument document = wikiContext.getWiki().getDocument(documentReference,
-        wikiContext);
+    XWikiDocument document = wikiContext.getWiki().getDocument(documentReference, wikiContext);
     XWikiDocument tdocument = document.getTranslatedDocument(language, wikiContext);
 
     // In order not to load the whole database in memory, we're limiting the number
@@ -426,8 +420,7 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
     return retval;
   }
 
-  protected void addTranslationOfDocument(XWikiDocument document,
-      XWikiContext wikiContext) {
+  protected void addTranslationOfDocument(XWikiDocument document, XWikiContext wikiContext) {
     indexUpdater.queueDocument(document, wikiContext, false);
   }
 
@@ -447,8 +440,7 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
     return retval;
   }
 
-  public boolean isIndexed(DocumentReference docRef, Searcher searcher)
-      throws IOException {
+  public boolean isIndexed(DocumentReference docRef, Searcher searcher) throws IOException {
     return isIndexed(docRef, null, null, searcher);
   }
 
@@ -456,25 +448,18 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
       Searcher searcher) throws IOException {
     boolean exists = false;
     BooleanQuery query = new BooleanQuery();
-    query.add(
-        new TermQuery(
-            new Term(IndexFields.DOCUMENT_NAME, docRef.getName().toLowerCase())),
+    query.add(new TermQuery(new Term(IndexFields.DOCUMENT_NAME, docRef.getName().toLowerCase())),
         BooleanClause.Occur.MUST);
-    query.add(
-        new TermQuery(new Term(IndexFields.DOCUMENT_SPACE,
-            docRef.getLastSpaceReference().getName().toLowerCase())),
-        BooleanClause.Occur.MUST);
-    query.add(
-        new TermQuery(new Term(IndexFields.DOCUMENT_WIKI,
-            docRef.getWikiReference().getName().toLowerCase())),
-        BooleanClause.Occur.MUST);
+    query.add(new TermQuery(new Term(IndexFields.DOCUMENT_SPACE,
+        docRef.getLastSpaceReference().getName().toLowerCase())), BooleanClause.Occur.MUST);
+    query.add(new TermQuery(new Term(IndexFields.DOCUMENT_WIKI,
+        docRef.getWikiReference().getName().toLowerCase())), BooleanClause.Occur.MUST);
     if (version != null) {
       query.add(new TermQuery(new Term(IndexFields.DOCUMENT_VERSION, version)),
           BooleanClause.Occur.MUST);
     }
     if (language != null) {
-      query.add(
-          new TermQuery(new Term(IndexFields.DOCUMENT_LANGUAGE, language)),
+      query.add(new TermQuery(new Term(IndexFields.DOCUMENT_LANGUAGE, language)),
           BooleanClause.Occur.MUST);
     }
     TotalHitCountCollector collector = new TotalHitCountCollector();

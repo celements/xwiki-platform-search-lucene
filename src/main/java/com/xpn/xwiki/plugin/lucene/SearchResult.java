@@ -98,25 +98,23 @@ public class SearchResult {
     this.creator = doc.get(IndexFields.DOCUMENT_CREATOR);
     this.language = doc.get(IndexFields.DOCUMENT_LANGUAGE);
     this.date = IndexFields.stringToDate(doc.get(IndexFields.DOCUMENT_DATE));
-    this.creationDate = IndexFields
-        .stringToDate(doc.get(IndexFields.DOCUMENT_CREATIONDATE));
+    this.creationDate = IndexFields.stringToDate(doc.get(IndexFields.DOCUMENT_CREATIONDATE));
     this.hidden = IndexFields.stringToBoolean(doc.get(IndexFields.DOCUMENT_HIDDEN));
     this.reference = new DocumentReference(wiki, space, name);
     if (this.isAttachment()) {
       this.filename = doc.get(IndexFields.FILENAME);
-      this.reference = new AttachmentReference(this.filename,
-          (DocumentReference) this.reference);
+      this.reference = new AttachmentReference(this.filename, (DocumentReference) this.reference);
       Document document;
-      final String fullDocName = new StringBuffer(this.wiki).append(":")
-          .append(this.space).append(".").append(this.name).toString();
+      final String fullDocName = new StringBuffer(this.wiki).append(":").append(this.space).append(
+          ".").append(this.name).toString();
       try {
         document = xwiki.getDocument(fullDocName);
         if (document != null) {
           this.url = document.getAttachmentURL(this.filename, "download");
         }
       } catch (XWikiException e) {
-        LOGGER.error("error retrieving url for attachment [{}] of document [{}]",
-            new Object[] { this.filename, fullDocName, e });
+        LOGGER.error("error retrieving url for attachment [{}] of document [{}]", new Object[] {
+            this.filename, fullDocName, e });
       }
     } else {
       this.objects = doc.getValues("object");

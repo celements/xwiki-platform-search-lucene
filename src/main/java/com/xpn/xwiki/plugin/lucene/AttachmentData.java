@@ -83,8 +83,7 @@ public class AttachmentData extends AbstractDocumentData {
 
   private String mimetype;
 
-  public AttachmentData(XWikiAttachment attachment, XWikiContext context,
-      boolean deleted) {
+  public AttachmentData(XWikiAttachment attachment, XWikiContext context, boolean deleted) {
     super(LucenePlugin.DOCTYPE_ATTACHMENT, attachment.getDoc(), context, deleted);
 
     setModificationDate(attachment.getDate());
@@ -114,10 +113,10 @@ public class AttachmentData extends AbstractDocumentData {
       }
     }
     if (this.filename != null) {
-      addFieldToDocument(IndexFields.FILENAME, this.filename, Field.Store.YES,
-          Field.Index.ANALYZED, FILENAME_BOOST, luceneDoc);
-      addFieldToDocument(IndexFields.MIMETYPE, this.mimetype, Field.Store.YES,
-          Field.Index.ANALYZED, MIMETYPE_BOOST, luceneDoc);
+      addFieldToDocument(IndexFields.FILENAME, this.filename, Field.Store.YES, Field.Index.ANALYZED,
+          FILENAME_BOOST, luceneDoc);
+      addFieldToDocument(IndexFields.MIMETYPE, this.mimetype, Field.Store.YES, Field.Index.ANALYZED,
+          MIMETYPE_BOOST, luceneDoc);
     }
     // Decrease the global score of attachments
     luceneDoc.setBoost(ATTACHMENT_GLOBAL_BOOST);
@@ -176,8 +175,7 @@ public class AttachmentData extends AbstractDocumentData {
    */
   @Override
   public String getId() {
-    return new StringBuffer(super.getId()).append(".file.").append(this.filename)
-        .toString();
+    return new StringBuffer(super.getId()).append(".file.").append(this.filename).toString();
   }
 
   /**
@@ -217,11 +215,11 @@ public class AttachmentData extends AbstractDocumentData {
       Metadata metadata = new Metadata();
       metadata.set(TikaMetadataKeys.RESOURCE_NAME_KEY, this.filename);
 
-      contentText = StringUtils
-          .lowerCase(tika.parseToString(att.getContentInputStream(context), metadata));
+      contentText = StringUtils.lowerCase(tika.parseToString(att.getContentInputStream(context),
+          metadata));
     } catch (Throwable ex) {
-      LOGGER.error("error getting content of attachment [{}] for document [{}]",
-          this.filename, doc.getDocumentReference(), ex);
+      LOGGER.error("error getting content of attachment [{}] for document [{}]", this.filename,
+          doc.getDocumentReference(), ex);
     }
 
     return contentText;
