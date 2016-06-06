@@ -20,7 +20,11 @@
 package com.xpn.xwiki.plugin.lucene.searcherProvider;
 
 import java.io.IOException;
-import java.util.Vector;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 import javax.inject.Singleton;
 
@@ -35,14 +39,17 @@ public class SearcherProviderManager implements ISearcherProviderRole {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SearcherProviderManager.class);
 
-  private Vector<SearcherProvider> allSearcherProvider;
+  private Set<SearcherProvider> allSearcherProviderSet = Collections.newSetFromMap(
+      new ConcurrentHashMap<SearcherProvider, Boolean>());
 
   @Override
   public void closeAllForCurrentThread() {
-    LOGGER.debug("closeAllForCurrentThread start in manager [" + System.identityHashCode(this)
-        + "]: remaining [" + getAllSearcherProvider().size() + "] searchProviders.");
-    Vector<SearcherProvider> searcherProviderToRemove = new Vector<SearcherProvider>();
-    for (SearcherProvider searcherProvider : getAllSearcherProvider()) {
+    int numSearchProviders = getAllSearcherProviders().size();
+    LOGGER.debug("closeAllForCurrentThread start in manager [{}]: remaining [{}] searchProviders.",
+        System.identityHashCode(this), numSearchProviders);
+    List<SearcherProvider> searcherProviderToRemove = new ArrayList<SearcherProvider>(
+        numSearchProviders);
+    for (SearcherProvider searcherProvider : getAllSearcherProviders()) {
       try {
         LOGGER.trace("before cleanup for searchProvider [" + System.identityHashCode(
             searcherProvider) + "], isIdle [" + searcherProvider.isIdle() + "].");
@@ -57,28 +64,26 @@ public class SearcherProviderManager implements ISearcherProviderRole {
         searcherProviderToRemove.add(searcherProvider);
       }
     }
-    for (SearcherProvider removeSP : searcherProviderToRemove) {
-      getAllSearcherProvider().remove(removeSP);
-    }
-    LOGGER.info("closeAllForCurrentThread finish in manager [" + System.identityHashCode(this)
-        + "]: remaining [" + getAllSearcherProvider().size() + "] searchProviders. removed ["
-        + searcherProviderToRemove.size() + "].");
+    getAllSearcherProviders().removeAll(searcherProviderToRemove);
+    LOGGER.info("closeAllForCurrentThread finish in manager [{}]: remaining [{}] searchProviders."
+        + " removed [{}].", System.identityHashCode(this), getAllSearcherProviders().size(),
+        searcherProviderToRemove.size());
   }
 
-  public Vector<SearcherProvider> getAllSearcherProvider() {
-    if (allSearcherProvider == null) {
-      allSearcherProvider = new Vector<SearcherProvider>();
-    }
-    return allSearcherProvider;
+  Set<SearcherProvider> getAllSearcherProviders() {
+    return allSearcherProviderSet;
   }
 
   @Override
-  public SearcherProvider createSearchProvider(Searcher[] theSearchers) {
+  synchronized public SearcherProvider createSearchProvider(Searcher[] theSearchers) {
+    /*
+     * createSearchProvider must be synchronized to ensure that all threads will see a fully
+     * initialized SearcherProvider object
+     */
     SearcherProvider newSearcherProvider = new SearcherProvider(theSearchers);
-    getAllSearcherProvider().add(newSearcherProvider);
-    LOGGER.debug("createSearchProvider in manager [" + System.identityHashCode(this)
-        + "]: returning new SearchProvider and added to list [" + getAllSearcherProvider().size()
-        + "].");
+    getAllSearcherProviders().add(newSearcherProvider);
+    LOGGER.debug("createSearchProvider in manager [{}]: returning new SearchProvider and added to"
+        + " list [{}].", System.identityHashCode(this), getAllSearcherProviders().size());
     return newSearcherProvider;
   }
 

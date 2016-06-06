@@ -638,9 +638,8 @@ public class LucenePlugin extends XWikiDefaultPlugin {
     if (valueArray.length > 1) {
       // build a query like this: <valueArray[0]> OR <valueArray[1]> OR ...
       BooleanQuery orQuery = new BooleanQuery();
-      for (int i = 0; i < valueArray.length; i++) {
-        orQuery.add(new TermQuery(new Term(fieldname, valueArray[i].trim())),
-            BooleanClause.Occur.SHOULD);
+      for (String element : valueArray) {
+        orQuery.add(new TermQuery(new Term(fieldname, element.trim())), BooleanClause.Occur.SHOULD);
       }
 
       return orQuery;
