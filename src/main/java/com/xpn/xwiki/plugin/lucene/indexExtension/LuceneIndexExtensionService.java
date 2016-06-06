@@ -25,8 +25,7 @@ import com.xpn.xwiki.web.Utils;
 @Component
 public class LuceneIndexExtensionService implements ILuceneIndexExtensionServiceRole {
 
-  private static final Logger LOGGER = LoggerFactory
-      .getLogger(LuceneIndexExtensionService.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(LuceneIndexExtensionService.class);
 
   // do not inject since an extender might use this service
   private List<ILuceneIndexExtender> extenders;
@@ -59,13 +58,12 @@ public class LuceneIndexExtensionService implements ILuceneIndexExtensionService
                   luceneDoc.removeFields(extField.getName());
                   break;
               }
-              LOGGER.debug("extendend field '{}' by extender '{}' for data '{}' ",
-                  extField, ext.getName(), data);
+              LOGGER.debug("extendend field '{}' by extender '{}' for data '{}' ", extField,
+                  ext.getName(), data);
             }
           }
         } else {
-          LOGGER.debug("extend: not eligible extender '{}' for data '{}' ", ext.getName(),
-              data);
+          LOGGER.debug("extend: not eligible extender '{}' for data '{}' ", ext.getName(), data);
         }
       } catch (Exception exc) {
         LOGGER.error("Failed to extend lucene index for '{}'", ext.getName(), exc);

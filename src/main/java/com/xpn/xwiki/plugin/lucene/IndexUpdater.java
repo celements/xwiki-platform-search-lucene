@@ -85,10 +85,9 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
    */
   private static final int EXIT_INTERVAL = 3000;
 
-  private static final List<Event> EVENTS = Arrays.<Event>asList(
-      new DocumentUpdatedEvent(), new DocumentCreatedEvent(), new DocumentDeletedEvent(),
-      new AttachmentAddedEvent(), new AttachmentDeletedEvent(),
-      new AttachmentUpdatedEvent());
+  private static final List<Event> EVENTS = Arrays.<Event>asList(new DocumentUpdatedEvent(),
+      new DocumentCreatedEvent(), new DocumentDeletedEvent(), new AttachmentAddedEvent(),
+      new AttachmentDeletedEvent(), new AttachmentUpdatedEvent());
 
   /**
    * Collecting all the fields for using up in search
@@ -129,8 +128,8 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
 
   private Analyzer analyzer;
 
-  IndexUpdater(Directory directory, int indexingInterval, int maxQueueSize,
-      LucenePlugin plugin, XWikiContext context) {
+  IndexUpdater(Directory directory, int indexingInterval, int maxQueueSize, LucenePlugin plugin,
+      XWikiContext context) {
     super(XWikiContext.EXECUTIONCONTEXT_KEY, context.clone());
 
     this.plugin = plugin;
@@ -142,8 +141,8 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
   }
 
   private XWikiContext getContext() {
-    return (XWikiContext) Utils.getComponent(Execution.class).getContext()
-        .getProperty(XWikiContext.EXECUTIONCONTEXT_KEY);
+    return (XWikiContext) Utils.getComponent(Execution.class).getContext().getProperty(
+        XWikiContext.EXECUTIONCONTEXT_KEY);
   }
 
   public void doExit() {
@@ -214,8 +213,7 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
       try {
         while (!this.queue.isEmpty()) {
           AbstractIndexData data = this.queue.remove();
-          getContext().setDatabase(getWebUtils().getWikiRef(data.getEntityReference()
-              ).getName());
+          getContext().setDatabase(getWebUtils().getWikiRef(data.getEntityReference()).getName());
           try {
             if (data.isDeleted()) {
               removeFromIndex(writer, data);
@@ -264,8 +262,8 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
     }
   }
 
-  private void addToIndex(IndexWriter writer, AbstractIndexData data)
-      throws IOException, XWikiException {
+  private void addToIndex(IndexWriter writer, AbstractIndexData data) throws IOException,
+      XWikiException {
     LOGGER.debug("addToIndex: '{}'", data);
     EntityReference ref = data.getEntityReference();
     notify(new LuceneDocumentIndexingEvent(ref));
@@ -312,8 +310,7 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
     }
   }
 
-  public void queueDocument(XWikiDocument document, XWikiContext context,
-      boolean deleted) {
+  public void queueDocument(XWikiDocument document, XWikiContext context, boolean deleted) {
     LOGGER.debug("IndexUpdater: adding '{}' to queue ",
         document.getDocumentReference().getLastSpaceReference().getName() + "."
             + document.getDocumentReference().getName());
@@ -322,26 +319,24 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
         + queue.isEmpty());
   }
 
-  public void queueAttachment(XWikiAttachment attachment, XWikiContext context,
-      boolean deleted) {
+  public void queueAttachment(XWikiAttachment attachment, XWikiContext context, boolean deleted) {
     if ((attachment != null) && (context != null)) {
       this.queue.add(new AttachmentData(attachment, context, deleted));
     } else {
-      LOGGER.error("Invalid parameters given to {} attachment '{}' of document '{}'",
-          new Object[] { deleted ? "deleted" : "added",
-              attachment == null ? null : attachment.getFilename(),
-              (attachment == null) || (attachment.getDoc() == null) ? null
-                  : attachment.getDoc().getDocumentReference() });
+      LOGGER.error("Invalid parameters given to {} attachment '{}' of document '{}'", new Object[] {
+          deleted ? "deleted" : "added", attachment == null ? null : attachment.getFilename(),
+          (attachment == null) || (attachment.getDoc() == null) ? null
+              : attachment.getDoc().getDocumentReference() });
     }
   }
 
-  public void addAttachment(XWikiDocument document, String attachmentName,
-      XWikiContext context, boolean deleted) {
+  public void addAttachment(XWikiDocument document, String attachmentName, XWikiContext context,
+      boolean deleted) {
     if ((document != null) && (attachmentName != null) && (context != null)) {
       this.queue.add(new AttachmentData(document, attachmentName, context, deleted));
     } else {
-      LOGGER.error("Invalid parameters given to {} attachment '{}' of document '{}'",
-          new Object[] { (deleted ? "deleted" : "added"), attachmentName, document });
+      LOGGER.error("Invalid parameters given to {} attachment '{}' of document '{}'", new Object[] {
+          (deleted ? "deleted" : "added"), attachmentName, document });
     }
   }
 
@@ -349,8 +344,8 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
     if (wikiId != null) {
       this.queue.add(new WikiData(new WikiReference(wikiId), deleted));
     } else {
-      LOGGER.error("Invalid parameters given to {} wiki '{}'",
-          (deleted ? "deleted" : "added"), wikiId);
+      LOGGER.error("Invalid parameters given to {} wiki '{}'", (deleted ? "deleted" : "added"),
+          wikiId);
     }
   }
 
@@ -363,8 +358,8 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
       try {
         queueAttachment(attachment, context, false);
       } catch (Exception e) {
-        LOGGER.error("Failed to retrieve attachment '{}' of document '{}'",
-            new Object[] { attachment.getFilename(), document, e });
+        LOGGER.error("Failed to retrieve attachment '{}' of document '{}'", new Object[] {
+            attachment.getFilename(), document, e });
       }
     }
 
@@ -387,21 +382,20 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
   @Override
   public void onEvent(Event event, Object source, Object data) {
     XWikiContext context = (XWikiContext) data;
-    LOGGER.debug("IndexUpdater: onEvent for [" + event.getClass() + "] on ["
-        + source.toString() + "].");
+    LOGGER.debug("IndexUpdater: onEvent for [" + event.getClass() + "] on [" + source.toString()
+        + "].");
     try {
-      if ((event instanceof DocumentUpdatedEvent)
-          || (event instanceof DocumentCreatedEvent)) {
+      if ((event instanceof DocumentUpdatedEvent) || (event instanceof DocumentCreatedEvent)) {
         queueDocument((XWikiDocument) source, context, false);
       } else if (event instanceof DocumentDeletedEvent) {
         queueDocument((XWikiDocument) source, context, true);
       } else if ((event instanceof AttachmentUpdatedEvent)
           || (event instanceof AttachmentAddedEvent)) {
-        queueAttachment(((XWikiDocument) source)
-            .getAttachment(((AbstractAttachmentEvent) event).getName()), context, false);
+        queueAttachment(((XWikiDocument) source).getAttachment(
+            ((AbstractAttachmentEvent) event).getName()), context, false);
       } else if (event instanceof AttachmentDeletedEvent) {
-        addAttachment((XWikiDocument) source, ((AbstractAttachmentEvent) event).getName(),
-            context, true);
+        addAttachment((XWikiDocument) source, ((AbstractAttachmentEvent) event).getName(), context,
+            true);
       } else if (event instanceof WikiDeletedEvent) {
         addWiki((String) source, true);
       }
@@ -439,8 +433,7 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
   }
 
   private void notify(AbstractEntityEvent event) {
-    Utils.getComponent(ObservationManager.class).notify(event, event.getReference(),
-        getContext());
+    Utils.getComponent(ObservationManager.class).notify(event, event.getReference(), getContext());
   }
 
   public ILuceneIndexExtensionServiceRole getLuceneExtensionService() {

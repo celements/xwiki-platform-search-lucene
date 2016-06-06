@@ -79,8 +79,7 @@ public class SearchResults extends Api {
    *          xwiki instance for access rights checking
    */
   SearchResults(TopDocsCollector<? extends ScoreDoc> results, Searcher searcher,
-      SearcherProvider theSearcherProvider, boolean skipChecks, XWiki xwiki,
-      XWikiContext context) {
+      SearcherProvider theSearcherProvider, boolean skipChecks, XWiki xwiki, XWikiContext context) {
     super(context);
 
     this.results = results;
@@ -96,14 +95,13 @@ public class SearchResults extends Api {
       this.relevantResults = new ArrayList<SearchResult>();
       try {
         TopDocs docs = this.results.topDocs();
-        LOGGER.debug("getRelevantResults: checking access to scoreDocs ["
-            + docs.scoreDocs.length + "] for results [" + results.getTotalHits()
-            + "] with class [" + results.getClass() + "] and id-Hash ["
-            + System.identityHashCode(results) + "].");
+        LOGGER.debug("getRelevantResults: checking access to scoreDocs [" + docs.scoreDocs.length
+            + "] for results [" + results.getTotalHits() + "] with class [" + results.getClass()
+            + "] and id-Hash [" + System.identityHashCode(results) + "].");
         for (ScoreDoc scoreDoc : docs.scoreDocs) {
           try {
-            SearchResult result = new SearchResult(searcher.doc(scoreDoc.doc),
-                scoreDoc.score, this.xwiki);
+            SearchResult result = new SearchResult(searcher.doc(scoreDoc.doc), scoreDoc.score,
+                this.xwiki);
             if (result.isWikiContent()) {
               try {
                 if (skipChecks || check(result.getDocumentReference())) {
@@ -120,8 +118,7 @@ public class SearchResults extends Api {
                   + " (wiki-Document or wiki-Doc-Attachment).");
             }
           } catch (IOException ioe) {
-            LOGGER.error("Error getting result doc '" + scoreDoc + "' from searcher",
-                ioe);
+            LOGGER.error("Error getting result doc '" + scoreDoc + "' from searcher", ioe);
           }
         }
       } finally {
@@ -132,16 +129,15 @@ public class SearchResults extends Api {
         }
       }
     } else {
-      LOGGER.debug("getRelevantResults: returning cached relevantResults ["
-          + relevantResults.size() + "].");
+      LOGGER.debug("getRelevantResults: returning cached relevantResults [" + relevantResults.size()
+          + "].");
     }
 
     return this.relevantResults;
   }
 
   private boolean check(DocumentReference docRef) throws XWikiException {
-    return xwiki.exists(docRef)
-        && getRightsAccess().hasAccessLevel(docRef, EAccessLevel.VIEW);
+    return xwiki.exists(docRef) && getRightsAccess().hasAccessLevel(docRef, EAccessLevel.VIEW);
   }
 
   /**

@@ -138,8 +138,7 @@ public abstract class IndexFields {
    */
   public static final String DATE_FORMAT = "yyyyMMddHHmm";
 
-  private static final FastDateFormat DF = FastDateFormat
-      .getInstance(IndexFields.DATE_FORMAT);
+  private static final FastDateFormat DF = FastDateFormat.getInstance(IndexFields.DATE_FORMAT);
 
   public static final String dateToString(Date date) {
     return DF.format(date);

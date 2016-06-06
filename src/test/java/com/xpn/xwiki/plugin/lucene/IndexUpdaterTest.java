@@ -76,8 +76,7 @@ public class IndexUpdaterTest extends AbstractBridgedComponentTestCase {
 
   private class TestIndexRebuilder extends IndexRebuilder {
 
-    public TestIndexRebuilder(IndexUpdater indexUpdater, int retryInterval,
-        XWikiContext context) {
+    public TestIndexRebuilder(IndexUpdater indexUpdater, int retryInterval, XWikiContext context) {
       super(indexUpdater, retryInterval, context);
     }
 
@@ -140,18 +139,18 @@ public class IndexUpdaterTest extends AbstractBridgedComponentTestCase {
     expectLastCall().anyTimes();
 
     mockXWiki = getWikiMock();
-    expect(mockXWiki.getDocument(eq(this.loremIpsum.getDocumentReference()),
-        anyObject(XWikiContext.class))).andReturn(loremIpsum).anyTimes();
-    expect(mockXWiki.Param(eq(LucenePlugin.PROP_RESULT_LIMIT), eq("1000")))
-        .andReturn("123").anyTimes();
-    expect(mockXWiki.Param(anyObject(String.class), anyObject(String.class)))
-        .andReturn("").anyTimes();
-    expect(mockXWiki.Param(eq(LucenePlugin.PROP_INDEX_DIR)))
-        .andReturn(IndexUpdaterTest.INDEXDIR).anyTimes();
-    expect(mockXWiki.ParamAsLong(eq(LucenePlugin.PROP_UPDATER_RETRY_INTERVAL), eq(30L))
-        ).andReturn(1L).anyTimes();
-    expect(mockXWiki.search(anyObject(String.class), anyObject(XWikiContext.class)))
-        .andReturn(Collections.emptyList()).anyTimes();
+    expect(mockXWiki.getDocument(eq(this.loremIpsum.getDocumentReference()), anyObject(
+        XWikiContext.class))).andReturn(loremIpsum).anyTimes();
+    expect(mockXWiki.Param(eq(LucenePlugin.PROP_RESULT_LIMIT), eq("1000"))).andReturn(
+        "123").anyTimes();
+    expect(mockXWiki.Param(anyObject(String.class), anyObject(String.class))).andReturn(
+        "").anyTimes();
+    expect(mockXWiki.Param(eq(LucenePlugin.PROP_INDEX_DIR))).andReturn(
+        IndexUpdaterTest.INDEXDIR).anyTimes();
+    expect(mockXWiki.ParamAsLong(eq(LucenePlugin.PROP_UPDATER_RETRY_INTERVAL), eq(30L))).andReturn(
+        1L).anyTimes();
+    expect(mockXWiki.search(anyObject(String.class), anyObject(XWikiContext.class))).andReturn(
+        Collections.emptyList()).anyTimes();
     expect(mockXWiki.isVirtualMode()).andReturn(false).anyTimes();
     expect(mockXWiki.getStore()).andReturn(this.mockXWikiStoreInterface).anyTimes();
     getContext().setWiki(mockXWiki);
@@ -170,10 +169,8 @@ public class IndexUpdaterTest extends AbstractBridgedComponentTestCase {
     Directory directory = FSDirectory.open(f);
 
     LucenePlugin plugin = new LucenePlugin("Monkey", "Monkey", getContext());
-    IndexUpdater indexUpdater = new TestIndexUpdater(directory, 100, 1000, plugin,
-        getContext());
-    IndexRebuilder indexRebuilder = new TestIndexRebuilder(indexUpdater, 1000,
-        getContext());
+    IndexUpdater indexUpdater = new TestIndexUpdater(directory, 100, 1000, plugin, getContext());
+    IndexRebuilder indexRebuilder = new TestIndexRebuilder(indexUpdater, 1000, getContext());
     indexRebuilder.startRebuildIndex(getContext());
 
     this.rebuildDone.acquireUninterruptibly();
@@ -198,10 +195,9 @@ public class IndexUpdaterTest extends AbstractBridgedComponentTestCase {
     maxQueueSize = 1000;
 
     LucenePlugin plugin = new LucenePlugin("Monkey", "Monkey", getContext());
-    IndexUpdater indexUpdater = new TestIndexUpdater(directory, indexingInterval,
-        maxQueueSize, plugin, getContext());
-    IndexRebuilder indexRebuilder = new TestIndexRebuilder(indexUpdater, 1000,
-        getContext());
+    IndexUpdater indexUpdater = new TestIndexUpdater(directory, indexingInterval, maxQueueSize,
+        plugin, getContext());
+    IndexRebuilder indexRebuilder = new TestIndexRebuilder(indexUpdater, 1000, getContext());
     Thread writerBlocker = new Thread(indexUpdater, "writerBlocker");
     writerBlocker.start();
     plugin.init(indexUpdater, indexRebuilder, getContext());
@@ -232,13 +228,13 @@ public class IndexUpdaterTest extends AbstractBridgedComponentTestCase {
     try {
       searcher = new IndexSearcher(directory, true);
       TopDocs t = searcher.search(q, null, 10);
-//      assertEquals(1, t.totalHits); FIXME this sometimes fails when releasing ...
+      // assertEquals(1, t.totalHits); FIXME this sometimes fails when releasing ...
     } finally {
       IOUtils.closeQuietly(searcher);
     }
 
-    SearchResults results = plugin.getSearchResultsFromIndexes("Ipsum",
-        "target/lucenetest", null, getContext());
+    SearchResults results = plugin.getSearchResultsFromIndexes("Ipsum", "target/lucenetest", null,
+        getContext());
 
     assertEquals(1, results.getTotalHitcount());
     verifyDefault();
@@ -297,8 +293,8 @@ public class IndexUpdaterTest extends AbstractBridgedComponentTestCase {
 
     try {
       if (!IndexWriter.isLocked(indexUpdater.getDirectory())) {
-        new IndexWriter(indexUpdater.getDirectory(),
-            new StandardAnalyzer(Version.LUCENE_34), MaxFieldLength.LIMITED);
+        new IndexWriter(indexUpdater.getDirectory(), new StandardAnalyzer(Version.LUCENE_34),
+            MaxFieldLength.LIMITED);
       } else {
         wasActuallyLocked = true;
       }
@@ -326,11 +322,11 @@ public class IndexUpdaterTest extends AbstractBridgedComponentTestCase {
     assertFalse(IndexWriter.isLocked(indexUpdater.getDirectory()));
     IndexWriter w = null;
     try {
-      new IndexWriter(indexUpdater.getDirectory(),
-          new StandardAnalyzer(Version.LUCENE_34), MaxFieldLength.LIMITED);
+      new IndexWriter(indexUpdater.getDirectory(), new StandardAnalyzer(Version.LUCENE_34),
+          MaxFieldLength.LIMITED);
     } finally {
       IOUtils.closeQuietly(w);
-    }    
+    }
     verifyDefault();
   }
 

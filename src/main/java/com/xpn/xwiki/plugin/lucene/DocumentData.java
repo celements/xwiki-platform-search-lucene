@@ -64,11 +64,10 @@ public class DocumentData extends AbstractDocumentData {
   private PlainTextCommand plainTextCmd = new PlainTextCommand();
 
   /** Reference serializer which removes the wiki prefix. */
-  private EntityReferenceSerializer<String> localEntityReferenceSerializer = Utils
-      .getComponent(EntityReferenceSerializer.class, "local");
+  private EntityReferenceSerializer<String> localEntityReferenceSerializer = Utils.getComponent(
+      EntityReferenceSerializer.class, "local");
 
-  public DocumentData(final XWikiDocument doc, final XWikiContext context,
-      final boolean deleted) {
+  public DocumentData(final XWikiDocument doc, final XWikiContext context, final boolean deleted) {
     super(LucenePlugin.DOCTYPE_WIKIPAGE, doc, context, deleted);
 
     setAuthor(doc.getAuthor());
@@ -100,8 +99,7 @@ public class DocumentData extends AbstractDocumentData {
    * content (values of title,category,content and extract ) XWiki.ArticleClass Object, as
    * far as it could be extracted.
    */
-  private void getObjectFullText(StringBuilder sb, XWikiDocument doc,
-      XWikiContext context) {
+  private void getObjectFullText(StringBuilder sb, XWikiDocument doc, XWikiContext context) {
     getObjectContentAsText(sb, doc, context);
   }
 
@@ -109,8 +107,7 @@ public class DocumentData extends AbstractDocumentData {
    * Add to the string builder the value of title,category,content and extract of
    * XWiki.ArticleClass
    */
-  private void getObjectContentAsText(StringBuilder sb, XWikiDocument doc,
-      XWikiContext context) {
+  private void getObjectContentAsText(StringBuilder sb, XWikiDocument doc, XWikiContext context) {
     for (List<BaseObject> objects : doc.getXObjects().values()) {
       for (BaseObject obj : objects) {
         extractObjectContent(sb, obj, context);
@@ -124,8 +121,8 @@ public class DocumentData extends AbstractDocumentData {
     // FIXME Can baseProperty really be null?
     if ((baseProperty != null) && (baseProperty.getValue() != null)) {
       if (!(baseObject.getXClass(context).getField(property) instanceof PasswordClass)) {
-        contentText.append(plainTextCmd.convertToPlainText(baseProperty.getValue(
-            ).toString()).toLowerCase());
+        contentText.append(plainTextCmd.convertToPlainText(
+            baseProperty.getValue().toString()).toLowerCase());
       }
     }
   }
@@ -149,10 +146,9 @@ public class DocumentData extends AbstractDocumentData {
     for (List<BaseObject> objects : doc.getXObjects().values()) {
       for (BaseObject obj : objects) {
         if (obj != null) {
-          addFieldToDocument(IndexFields.OBJECT,
-              this.localEntityReferenceSerializer.serialize(obj.getXClassReference())
-                  .toLowerCase(),
-              Field.Store.YES, Field.Index.NOT_ANALYZED, CLASSNAME_BOOST, luceneDoc);
+          addFieldToDocument(IndexFields.OBJECT, this.localEntityReferenceSerializer.serialize(
+              obj.getXClassReference()).toLowerCase(), Field.Store.YES, Field.Index.NOT_ANALYZED,
+              CLASSNAME_BOOST, luceneDoc);
           Object[] propertyNames = obj.getPropertyNames();
           for (int i = 0; i < propertyNames.length; i++) {
             indexProperty(luceneDoc, obj, (String) propertyNames[i], context);
@@ -162,18 +158,16 @@ public class DocumentData extends AbstractDocumentData {
     }
   }
 
-  private void indexProperty(Document luceneDoc, BaseObject baseObject,
-      String propertyName, XWikiContext context) {
+  private void indexProperty(Document luceneDoc, BaseObject baseObject, String propertyName,
+      XWikiContext context) {
     String fieldFullName = baseObject.getClassName() + "." + propertyName;
     BaseClass bClass = baseObject.getXClass(context);
     PropertyInterface prop = bClass.getField(propertyName);
 
     if (prop instanceof PasswordClass) {
       // Do not index passwords
-    } else if ((prop instanceof StaticListClass)
-        && ((StaticListClass) prop).isMultiSelect()) {
-      indexStaticList(luceneDoc, baseObject, (StaticListClass) prop, propertyName,
-          context);
+    } else if ((prop instanceof StaticListClass) && ((StaticListClass) prop).isMultiSelect()) {
+      indexStaticList(luceneDoc, baseObject, (StaticListClass) prop, propertyName, context);
     } else if (prop instanceof DateClass) {
       // Date properties are indexed the same as document dates: formatted
       // through IndexFields.dateToString() and
@@ -183,8 +177,8 @@ public class DocumentData extends AbstractDocumentData {
     } else {
       StringBuilder sb = new StringBuilder();
       getObjectContentAsText(sb, baseObject, propertyName, context);
-      addFieldToDocument(fieldFullName, sb.toString(), Field.Store.YES,
-          Field.Index.ANALYZED, OBJECT_PROPERTY_BOOST, luceneDoc);
+      addFieldToDocument(fieldFullName, sb.toString(), Field.Store.YES, Field.Index.ANALYZED,
+          OBJECT_PROPERTY_BOOST, luceneDoc);
     }
   }
 
@@ -200,8 +194,8 @@ public class DocumentData extends AbstractDocumentData {
     return "";
   }
 
-  private void indexStaticList(Document luceneDoc, BaseObject baseObject,
-      StaticListClass prop, String propertyName, XWikiContext context) {
+  private void indexStaticList(Document luceneDoc, BaseObject baseObject, StaticListClass prop,
+      String propertyName, XWikiContext context) {
     Map<String, ListItem> possibleValues = prop.getMap(context);
     String fieldFullName = baseObject.getClassName() + "." + propertyName;
 
@@ -214,15 +208,15 @@ public class DocumentData extends AbstractDocumentData {
             OBJECT_PROPERTY_BOOST, luceneDoc);
         // We index the value
         fieldName = fieldFullName + ".value";
-        addFieldToDocument(fieldName, item.getValue(), Field.Store.YES,
-            Field.Index.ANALYZED, OBJECT_PROPERTY_BOOST, luceneDoc);
+        addFieldToDocument(fieldName, item.getValue(), Field.Store.YES, Field.Index.ANALYZED,
+            OBJECT_PROPERTY_BOOST, luceneDoc);
 
         // If the key and value are not the same, we index both
         // The key is always indexed outside the if block, so here we just index
         // the value
         if (!item.getId().equals(item.getValue())) {
-          addFieldToDocument(fieldFullName, item.getValue(), Field.Store.YES,
-              Field.Index.ANALYZED, OBJECT_PROPERTY_BOOST, luceneDoc);
+          addFieldToDocument(fieldFullName, item.getValue(), Field.Store.YES, Field.Index.ANALYZED,
+              OBJECT_PROPERTY_BOOST, luceneDoc);
         }
       }
 

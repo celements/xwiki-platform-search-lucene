@@ -22,8 +22,8 @@ public class SearcherProviderManagerTest extends AbstractBridgedComponentTestCas
   @Before
   public void setUp_SearcherProviderManagerTest() throws Exception {
     context = getContext();
-    theSearchProvManager = (SearcherProviderManager) Utils
-        .getComponent(ISearcherProviderRole.class);
+    theSearchProvManager = (SearcherProviderManager) Utils.getComponent(
+        ISearcherProviderRole.class);
   }
 
   @Test
@@ -34,8 +34,7 @@ public class SearcherProviderManagerTest extends AbstractBridgedComponentTestCas
   @Test
   public void testGetAllSearcherProvider() {
     replayDefault();
-    Vector<SearcherProvider> searcherProvList = theSearchProvManager
-        .getAllSearcherProvider();
+    Vector<SearcherProvider> searcherProvList = theSearchProvManager.getAllSearcherProvider();
     assertNotNull(searcherProvList);
     assertSame(searcherProvList, theSearchProvManager.getAllSearcherProvider());
     verifyDefault();
@@ -46,8 +45,8 @@ public class SearcherProviderManagerTest extends AbstractBridgedComponentTestCas
     Searcher theMockSearcher = createMockAndAddToDefault(Searcher.class);
     replayDefault();
     assertTrue(theSearchProvManager.getAllSearcherProvider().isEmpty());
-    SearcherProvider searcherProv = theSearchProvManager
-        .createSearchProvider(new Searcher[] { theMockSearcher });
+    SearcherProvider searcherProv = theSearchProvManager.createSearchProvider(new Searcher[] {
+        theMockSearcher });
     assertNotNull(searcherProv);
     assertEquals(1, theSearchProvManager.getAllSearcherProvider().size());
     verifyDefault();
@@ -66,8 +65,8 @@ public class SearcherProviderManagerTest extends AbstractBridgedComponentTestCas
     Searcher theMockSearcher = createMockAndAddToDefault(Searcher.class);
     SearchResults mockSearchResults = createMockAndAddToDefault(SearchResults.class);
     replayDefault();
-    SearcherProvider searcherProv = theSearchProvManager
-        .createSearchProvider(new Searcher[] { theMockSearcher });
+    SearcherProvider searcherProv = theSearchProvManager.createSearchProvider(new Searcher[] {
+        theMockSearcher });
     assertEquals(1, theSearchProvManager.getAllSearcherProvider().size());
     searcherProv.connect();
     searcherProv.connectSearchResults(mockSearchResults);
@@ -86,8 +85,8 @@ public class SearcherProviderManagerTest extends AbstractBridgedComponentTestCas
     theMockSearcher.close();
     expectLastCall().once();
     replayDefault();
-    SearcherProvider searcherProv = theSearchProvManager
-        .createSearchProvider(new Searcher[] { theMockSearcher });
+    SearcherProvider searcherProv = theSearchProvManager.createSearchProvider(new Searcher[] {
+        theMockSearcher });
     assertEquals(1, theSearchProvManager.getAllSearcherProvider().size());
     searcherProv.connect();
     searcherProv.markToClose();
@@ -105,8 +104,8 @@ public class SearcherProviderManagerTest extends AbstractBridgedComponentTestCas
     theMockSearcher.close();
     expectLastCall().once();
     replayDefault();
-    SearcherProvider searcherProv = theSearchProvManager
-        .createSearchProvider(new Searcher[] { theMockSearcher });
+    SearcherProvider searcherProv = theSearchProvManager.createSearchProvider(new Searcher[] {
+        theMockSearcher });
     assertEquals(1, theSearchProvManager.getAllSearcherProvider().size());
     searcherProv.connect();
     searcherProv.markToClose();

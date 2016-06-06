@@ -5,7 +5,7 @@ import java.util.Objects;
 import org.apache.lucene.document.Fieldable;
 
 public class IndexExtensionField {
-  
+
   public enum ExtensionType {
     ADD, REPLACE, REMOVE;
   }
@@ -37,7 +37,7 @@ public class IndexExtensionField {
   public Fieldable getLuceneField() {
     return luceneField;
   }
-  
+
   public IndexExtensionField setBoost(float boost) {
     getLuceneField().setBoost(boost);
     return this;
@@ -45,8 +45,8 @@ public class IndexExtensionField {
 
   @Override
   public String toString() {
-    return "IndexExtensionField [name=" + getName() + ", extensionType="
-        + getExtensionType() + ", luceneField=" + getLuceneField() + "]";
+    return "IndexExtensionField [name=" + getName() + ", extensionType=" + getExtensionType()
+        + ", luceneField=" + getLuceneField() + "]";
   }
 
 }

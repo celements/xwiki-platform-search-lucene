@@ -33,27 +33,23 @@ import org.xwiki.component.annotation.Component;
 @Singleton
 public class SearcherProviderManager implements ISearcherProviderRole {
 
-  private static final Logger LOGGER = LoggerFactory
-      .getLogger(SearcherProviderManager.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(SearcherProviderManager.class);
 
   private Vector<SearcherProvider> allSearcherProvider;
 
   @Override
   public void closeAllForCurrentThread() {
-    LOGGER.debug(
-        "closeAllForCurrentThread start in manager [" + System.identityHashCode(this)
-            + "]: remaining [" + getAllSearcherProvider().size() + "] searchProviders.");
+    LOGGER.debug("closeAllForCurrentThread start in manager [" + System.identityHashCode(this)
+        + "]: remaining [" + getAllSearcherProvider().size() + "] searchProviders.");
     Vector<SearcherProvider> searcherProviderToRemove = new Vector<SearcherProvider>();
     for (SearcherProvider searcherProvider : getAllSearcherProvider()) {
       try {
-        LOGGER.trace("before cleanup for searchProvider ["
-            + System.identityHashCode(searcherProvider) + "], isIdle ["
-            + searcherProvider.isIdle() + "].");
+        LOGGER.trace("before cleanup for searchProvider [" + System.identityHashCode(
+            searcherProvider) + "], isIdle [" + searcherProvider.isIdle() + "].");
         searcherProvider.disconnect();
         searcherProvider.cleanUpAllSearchResultsForThread();
-        LOGGER.trace("after cleanup for searchProvider ["
-            + System.identityHashCode(searcherProvider) + "], isIdle ["
-            + searcherProvider.isIdle() + "].");
+        LOGGER.trace("after cleanup for searchProvider [" + System.identityHashCode(
+            searcherProvider) + "], isIdle [" + searcherProvider.isIdle() + "].");
       } catch (IOException exp) {
         LOGGER.error("Failed to disconnect searcherProvider from thread.", exp);
       }
@@ -64,10 +60,9 @@ public class SearcherProviderManager implements ISearcherProviderRole {
     for (SearcherProvider removeSP : searcherProviderToRemove) {
       getAllSearcherProvider().remove(removeSP);
     }
-    LOGGER.info(
-        "closeAllForCurrentThread finish in manager [" + System.identityHashCode(this)
-            + "]: remaining [" + getAllSearcherProvider().size()
-            + "] searchProviders. removed [" + searcherProviderToRemove.size() + "].");
+    LOGGER.info("closeAllForCurrentThread finish in manager [" + System.identityHashCode(this)
+        + "]: remaining [" + getAllSearcherProvider().size() + "] searchProviders. removed ["
+        + searcherProviderToRemove.size() + "].");
   }
 
   public Vector<SearcherProvider> getAllSearcherProvider() {
@@ -82,8 +77,8 @@ public class SearcherProviderManager implements ISearcherProviderRole {
     SearcherProvider newSearcherProvider = new SearcherProvider(theSearchers);
     getAllSearcherProvider().add(newSearcherProvider);
     LOGGER.debug("createSearchProvider in manager [" + System.identityHashCode(this)
-        + "]: returning new SearchProvider and added to list ["
-        + getAllSearcherProvider().size() + "].");
+        + "]: returning new SearchProvider and added to list [" + getAllSearcherProvider().size()
+        + "].");
     return newSearcherProvider;
   }
 

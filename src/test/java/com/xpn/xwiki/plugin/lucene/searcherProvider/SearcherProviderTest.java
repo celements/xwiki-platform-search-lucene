@@ -66,8 +66,7 @@ public class SearcherProviderTest extends AbstractBridgedComponentTestCase {
     assertTrue(searcherProvider.internal_getConnectedThreads().isEmpty());
     searcherProvider.connect();
     assertFalse(searcherProvider.internal_getConnectedThreads().isEmpty());
-    assertTrue(
-        searcherProvider.internal_getConnectedThreads().contains(Thread.currentThread()));
+    assertTrue(searcherProvider.internal_getConnectedThreads().contains(Thread.currentThread()));
     verifyDefault();
   }
 
@@ -79,8 +78,7 @@ public class SearcherProviderTest extends AbstractBridgedComponentTestCase {
     searcherProvider.markToClose();
     try {
       searcherProvider.connect();
-      fail("expecting illegal state exception if not connected before calling"
-          + " getSearchers");
+      fail("expecting illegal state exception if not connected before calling" + " getSearchers");
     } catch (IllegalStateException exp) {
       // expected
     }
@@ -93,8 +91,7 @@ public class SearcherProviderTest extends AbstractBridgedComponentTestCase {
     try {
       assertNotNull(searcherProvider.getSearchers());
       assertSame(theMockSearcher, searcherProvider.getSearchers()[0]);
-      fail("expecting illegal state exception if not connected before calling"
-          + " getSearchers");
+      fail("expecting illegal state exception if not connected before calling" + " getSearchers");
     } catch (IllegalStateException exp) {
       // expected
     }

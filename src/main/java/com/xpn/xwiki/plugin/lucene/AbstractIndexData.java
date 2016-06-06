@@ -42,8 +42,7 @@ public abstract class AbstractIndexData {
 
   private EntityReference entityReference;
 
-  public AbstractIndexData(String type, EntityReference entityReference,
-      boolean deleted) {
+  public AbstractIndexData(String type, EntityReference entityReference, boolean deleted) {
     this.type = type;
 
     setEntityReference(entityReference);
@@ -103,8 +102,7 @@ public abstract class AbstractIndexData {
     return sb.toString();
   }
 
-  protected abstract void getFullText(StringBuilder sb, XWikiDocument doc,
-      XWikiContext context);
+  protected abstract void getFullText(StringBuilder sb, XWikiDocument doc, XWikiContext context);
 
   public String getType() {
     return this.type;
@@ -151,13 +149,13 @@ public abstract class AbstractIndexData {
   }
 
   public String getDocumentFullName() {
-    return (String) Utils.getComponent(EntityReferenceSerializer.class, "local")
-        .serialize(getEntityReference());
+    return (String) Utils.getComponent(EntityReferenceSerializer.class, "local").serialize(
+        getEntityReference());
   }
 
   public String getFullName() {
-    return (String) Utils.getComponent(EntityReferenceSerializer.class)
-        .serialize(getEntityReference());
+    return (String) Utils.getComponent(EntityReferenceSerializer.class).serialize(
+        getEntityReference());
   }
 
   // Object

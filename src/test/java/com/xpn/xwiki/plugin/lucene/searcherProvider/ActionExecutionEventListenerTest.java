@@ -27,8 +27,8 @@ public class ActionExecutionEventListenerTest extends AbstractBridgedComponentTe
   @Before
   public void setUp_ActionExecutionEventListener() throws Exception {
     context = getContext();
-    theActionExecListener = (ActionExecutionEventListener) Utils
-        .getComponent(EventListener.class, "SearcherProviderManager");
+    theActionExecListener = (ActionExecutionEventListener) Utils.getComponent(EventListener.class,
+        "SearcherProviderManager");
     searcherProviderManager = createMockAndAddToDefault(ISearcherProviderRole.class);
     storeSearchProviderManager = theActionExecListener.searchProviderManager;
     theActionExecListener.searchProviderManager = searcherProviderManager;
@@ -41,16 +41,14 @@ public class ActionExecutionEventListenerTest extends AbstractBridgedComponentTe
 
   @Test
   public void testSingletonComponent() {
-    assertSame(theActionExecListener,
-        Utils.getComponent(EventListener.class, "SearcherProviderManager"));
+    assertSame(theActionExecListener, Utils.getComponent(EventListener.class,
+        "SearcherProviderManager"));
   }
 
   @Test
   public void testGetEvents() {
-    List<Event> expectedEventsList = Arrays.asList(
-        (Event) new ActionExecutionEvent("view"),
-        (Event) new ActionExecutionEvent("edit"),
-        (Event) new ActionExecutionEvent("admin"),
+    List<Event> expectedEventsList = Arrays.asList((Event) new ActionExecutionEvent("view"),
+        (Event) new ActionExecutionEvent("edit"), (Event) new ActionExecutionEvent("admin"),
         (Event) new ActionExecutionEvent("import"));
     replayDefault();
     assertEquals(expectedEventsList, theActionExecListener.getEvents());

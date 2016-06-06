@@ -61,16 +61,15 @@ public class AttachmentDataTest extends AbstractBridgedComponentTestCase {
     this.attachment = new XWikiAttachment(this.document, "filename");
     this.document.getAttachmentList().add(this.attachment);
 
-    XWikiRenderingEngine renderEngineMock = createMockAndAddToDefault(
-        XWikiRenderingEngine.class);
+    XWikiRenderingEngine renderEngineMock = createMockAndAddToDefault(XWikiRenderingEngine.class);
     expect(getWikiMock().getRenderingEngine()).andReturn(renderEngineMock).once();
-    expect(renderEngineMock.interpretText(eq(docRef.getName()), same(document),
-        same(getContext()))).andReturn(docRef.getName()).once();
+    expect(renderEngineMock.interpretText(eq(docRef.getName()), same(document), same(
+        getContext()))).andReturn(docRef.getName()).once();
 
     servletContext = createMockAndAddToDefault(ServletContext.class);
     getContext().setEngineContext(new XWikiServletContext(servletContext));
-    expect(servletContext.getAttribute(eq("javax.servlet.context.tempdir")))
-        .andReturn(new File("./", "")).anyTimes();
+    expect(servletContext.getAttribute(eq("javax.servlet.context.tempdir"))).andReturn(new File(
+        "./", "")).anyTimes();
   }
 
   @Test
@@ -139,10 +138,9 @@ public class AttachmentDataTest extends AbstractBridgedComponentTestCase {
     replayDefault();
     this.attachmentData = new AttachmentData(this.attachment, getContext(), false);
     this.attachmentData.setFilename(filename);
-    assertEquals("Wrong attachment content indexed", content,
-        attachmentData.getFullText(document, getContext()));
-    assertEquals("Wrong mimetype content indexed", mimetype,
-        attachmentData.getMimeType());
+    assertEquals("Wrong attachment content indexed", content, attachmentData.getFullText(document,
+        getContext()));
+    assertEquals("Wrong mimetype content indexed", mimetype, attachmentData.getMimeType());
     verifyDefault();
   }
 

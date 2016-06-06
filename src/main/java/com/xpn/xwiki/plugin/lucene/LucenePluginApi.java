@@ -120,8 +120,8 @@ public class LucenePluginApi extends PluginApi<LucenePlugin> {
       // protected hql custom filter
       String secureHqlFilter = hasProgrammingRights() ? hqlFilter : null;
 
-      return getProtectedPlugin().startIndex(secureWikis, secureHqlFilter, clearIndex,
-          onlyNew, this.context);
+      return getProtectedPlugin().startIndex(secureWikis, secureHqlFilter, clearIndex, onlyNew,
+          this.context);
     }
 
     return REBUILD_NOT_ALLOWED;
@@ -151,8 +151,7 @@ public class LucenePluginApi extends PluginApi<LucenePlugin> {
     try {
       return getProtectedPlugin().getQueueSize();
     } catch (Exception e) {
-      LOGGER.error(
-          "Failed to get the remaining number of documents to index in the queue", e);
+      LOGGER.error("Failed to get the remaining number of documents to index in the queue", e);
 
       return 0;
     }
@@ -186,11 +185,11 @@ public class LucenePluginApi extends PluginApi<LucenePlugin> {
   public SearchResults getSearchResultsFromIndexes(String query, String indexDirs,
       String languages) {
     try {
-      return getProtectedPlugin().getSearchResults(query, (String) null, indexDirs,
-          languages, this.context);
+      return getProtectedPlugin().getSearchResults(query, (String) null, indexDirs, languages,
+          this.context);
     } catch (Exception ex) {
-      LOGGER.error("Failed to search: query=[{}], indexDirs=[{}], languages=[{}]",
-          new Object[] { query, indexDirs, languages, ex }, ex);
+      LOGGER.error("Failed to search: query=[{}], indexDirs=[{}], languages=[{}]", new Object[] {
+          query, indexDirs, languages, ex }, ex);
     }
 
     return null;
@@ -236,14 +235,13 @@ public class LucenePluginApi extends PluginApi<LucenePlugin> {
    *          all languages reference to xwiki
    * @return {@link SearchResults} instance containing the results.
    */
-  public SearchResults getSearchResultsFromIndexes(String query, String sortField,
-      String indexDirs, String languages) {
+  public SearchResults getSearchResultsFromIndexes(String query, String sortField, String indexDirs,
+      String languages) {
     try {
       return getProtectedPlugin().getSearchResults(query, sortField, indexDirs, languages,
           this.context);
     } catch (Exception ex) {
-      LOGGER.error(
-          "Failed to search: query=[{}], sortField=[{}], indexDirs=[{}], languages=[{}]",
+      LOGGER.error("Failed to search: query=[{}], sortField=[{}], indexDirs=[{}], languages=[{}]",
           new Object[] { query, sortField, indexDirs, languages, ex });
     }
 
@@ -270,8 +268,7 @@ public class LucenePluginApi extends PluginApi<LucenePlugin> {
       return getProtectedPlugin().getSearchResults(query, sortField, indexDirs, languages,
           this.context);
     } catch (Exception ex) {
-      LOGGER.error(
-          "Failed to search: query=[{}], sortField=[{}], indexDirs=[{}], languages=[{}]",
+      LOGGER.error("Failed to search: query=[{}], sortField=[{}], indexDirs=[{}], languages=[{}]",
           new Object[] { query, sortField, indexDirs, languages, ex });
     }
 
@@ -302,8 +299,7 @@ public class LucenePluginApi extends PluginApi<LucenePlugin> {
    *          </ul>
    * @return a {@link SearchResults} instance containing the results.
    */
-  public SearchResults getSearchResults(String query, String sortField,
-      String languages) {
+  public SearchResults getSearchResults(String query, String sortField, String languages) {
     return getSearchResultsFromIndexes(query, sortField, null, languages);
   }
 
@@ -332,16 +328,16 @@ public class LucenePluginApi extends PluginApi<LucenePlugin> {
    *          </ul>
    * @return a {@link SearchResults} instance containing the results.
    */
-  public SearchResults getSearchResults(String query, String sortField,
-      String virtualWikiNames, String languages) {
+  public SearchResults getSearchResults(String query, String sortField, String virtualWikiNames,
+      String languages) {
     try {
       SearchResults retval = getProtectedPlugin().getSearchResults(query, sortField,
           virtualWikiNames, languages, this.context);
       LOGGER.debug("returning {} results", retval.getHitcount());
       return retval;
     } catch (Exception ex) {
-      LOGGER.error("Failed to search: query=[{}], sortField=[{}], languages=[{}]",
-          new Object[] { query, sortField, languages, ex });
+      LOGGER.error("Failed to search: query=[{}], sortField=[{}], languages=[{}]", new Object[] {
+          query, sortField, languages, ex });
     }
 
     return null;
@@ -369,8 +365,7 @@ public class LucenePluginApi extends PluginApi<LucenePlugin> {
    *          </ul>
    * @return a {@link SearchResults} instance containing the results.
    */
-  public SearchResults getSearchResults(String query, String[] sortField,
-      String languages) {
+  public SearchResults getSearchResults(String query, String[] sortField, String languages) {
     return getSearchResultsFromIndexes(query, sortField, null, languages);
   }
 
@@ -399,8 +394,8 @@ public class LucenePluginApi extends PluginApi<LucenePlugin> {
    *          </ul>
    * @return a {@link SearchResults} instance containing the results.
    */
-  public SearchResults getSearchResults(String query, String[] sortField,
-      String virtualWikiNames, String languages) {
+  public SearchResults getSearchResults(String query, String[] sortField, String virtualWikiNames,
+      String languages) {
     try {
       SearchResults retval = getProtectedPlugin().getSearchResults(query, sortField,
           virtualWikiNames, languages, this.context);
