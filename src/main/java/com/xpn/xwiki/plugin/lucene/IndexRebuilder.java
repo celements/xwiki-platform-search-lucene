@@ -172,8 +172,8 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
     }
   }
 
-  // FIXME this method blocks the IndexUpdater completely (and potentially for a long time) because
-  // it keeps a writer opened while looping
+  // FIXME CELDEV-275 this method blocks the IndexUpdater completely (and potentially for a long
+  // time) because it keeps a writer opened while looping
   private void wipeIndex(Collection<String> wikis) {
     LOGGER.info("wipeIndex: for wikis '{}'", wikis);
     if (wikis == null) {
@@ -376,8 +376,8 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
     return ret;
   }
 
-  // FIXME this method blocks the IndexUpdater completely (and potentially for a long time) because
-  // it keeps a writer opened while looping
+  // FIXME CELDEV-275 this method blocks the IndexUpdater completely (and potentially for a long
+  // time) because it keeps a writer opened while looping
   private void cleanIndex(Set<String> danglingDocs) throws IOException {
     LOGGER.info("cleanIndex: {} for {} dangling docs", cleanIndex, danglingDocs.size());
     IndexWriter writer = null;

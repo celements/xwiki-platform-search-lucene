@@ -231,9 +231,6 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
     }
   }
 
-  /**
-   * this method blocks index updating for the time it requires to optimize the index
-   */
   private void optimizeIndex() {
     if (optimize.compareAndSet(true, false)) {
       IndexWriter writer = null;
@@ -457,8 +454,8 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
   /**
    * @return the number of documents in Lucene index writer.
    */
-  // FIXME this method blocks the IndexUpdater completely because it keeps a writer opened while
-  // counting
+  // FIXME CELDEV-275 this method blocks the IndexUpdater completely because it keeps a writer
+  // opened while counting
   public long getLuceneDocCount() {
     int n = -1;
     IndexWriter writer = null;
