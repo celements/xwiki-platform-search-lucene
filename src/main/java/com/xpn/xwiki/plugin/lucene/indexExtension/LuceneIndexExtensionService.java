@@ -11,6 +11,7 @@ import java.util.Objects;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.Field.Index;
+import org.apache.lucene.document.NumericField;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.xwiki.component.annotation.Component;
@@ -72,6 +73,23 @@ public class LuceneIndexExtensionService implements ILuceneIndexExtensionService
   }
 
   @Override
+  public IndexExtensionField createField(String name, Number value, ExtensionType extensionType) {
+    NumericField field = new NumericField(name, Field.Store.YES, true);
+    if ((value instanceof Integer) || (value instanceof Short) || (value instanceof Byte)) {
+      field.setIntValue(value.intValue());
+    } else if (value instanceof Long) {
+      field.setLongValue(value.longValue());
+    } else if (value instanceof Float) {
+      field.setFloatValue(value.floatValue());
+    } else if (value instanceof Double) {
+      field.setDoubleValue(value.doubleValue());
+    } else if (value != null) {
+      throw new IllegalArgumentException("Numer is of unsupported type '" + value.toString() + "'");
+    }
+    return new IndexExtensionField(extensionType, field);
+  }
+
+  @Override
   public IndexExtensionField createField(String name, String value, Index indexType,
       ExtensionType extensionType) {
     value = plainTextCmd.convertToPlainText(value).toLowerCase();
@@ -98,13 +116,13 @@ public class LuceneIndexExtensionService implements ILuceneIndexExtensionService
           ret.addAll(createFields(name, nextVal, ExtensionType.ADD));
         }
       }
+    } else if (value instanceof Number) {
+      ret.add(createField(name, (Number) value, defaultExtType));
+    } else if (value instanceof Date) {
+      ret.add(createField(name, IndexFields.dateToString((Date) value), Index.NOT_ANALYZED,
+          defaultExtType));
     } else {
-      Index indexType = Index.ANALYZED;
-      if (value instanceof Date) {
-        value = IndexFields.dateToString((Date) value);
-        indexType = Index.NOT_ANALYZED;
-      }
-      ret.add(createField(name, value.toString(), indexType, defaultExtType));
+      ret.add(createField(name, value.toString(), Index.ANALYZED, defaultExtType));
     }
     return ret;
   }

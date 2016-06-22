@@ -15,6 +15,8 @@ public interface ILuceneIndexExtensionServiceRole {
 
   public void extend(AbstractIndexData data, Document luceneDoc);
 
+  public IndexExtensionField createField(String name, Number value, ExtensionType extensionType);
+
   public IndexExtensionField createField(String name, String value, Index indexType,
       ExtensionType extensionType);
 
