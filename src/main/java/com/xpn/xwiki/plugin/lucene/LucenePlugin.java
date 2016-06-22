@@ -97,6 +97,8 @@ public class LucenePlugin extends XWikiDefaultPlugin {
 
   public static final String PROP_MAX_QUEUE_SIZE = "xwiki.plugins.lucene.maxQueueSize";
 
+  public static final String PROP_COMMIT_INTERVAL = "xwiki.plugins.lucene.commitinterval";
+
   public static final String PROP_UPDATER_RETRY_INTERVAL = "xwiki.plugins.lucene.updaterRetryInterval";
 
   public static final String PROP_RESULT_LIMIT = "xwiki.plugins.lucene.resultLimit";
@@ -179,9 +181,9 @@ public class LucenePlugin extends XWikiDefaultPlugin {
     return this.indexRebuilder.startRebuildIndex(getContext());
   }
 
-  public int startIndex(Collection<String> wikis, String hqlFilter, boolean clearIndex,
+  public int startIndex(Collection<String> wikis, String hqlFilter, boolean wipeIndex,
       boolean onlyNew, XWikiContext context) {
-    return this.indexRebuilder.startIndex(wikis, hqlFilter, clearIndex, onlyNew, context);
+    return this.indexRebuilder.startIndex(wikis, hqlFilter, wipeIndex, onlyNew, context);
   }
 
   /**
@@ -693,36 +695,17 @@ public class LucenePlugin extends XWikiDefaultPlugin {
   }
 
   public void init(Directory directory, XWikiContext context) {
-    int indexingInterval;
-    try {
-      indexingInterval = 1000 * (int) context.getWiki().ParamAsLong(PROP_INDEXING_INTERVAL, 30);
-    } catch (NumberFormatException exp) {
-      LOGGER.warn("Invalid indexing interval in configuration.", exp);
-      indexingInterval = 30000;
-    }
-
-    int maxQueueSize;
-    try {
-      maxQueueSize = (int) context.getWiki().ParamAsLong(LucenePlugin.PROP_MAX_QUEUE_SIZE, 1000);
-    } catch (NumberFormatException exp) {
-      LOGGER.warn("Invalid max queue size in configuration.", exp);
-      maxQueueSize = 1000;
-    }
-
-    IndexUpdater indexUpdater = new IndexUpdater(directory, indexingInterval, maxQueueSize, this,
-        context);
-
+    int indexingInterval = 1000 * (int) context.getWiki().ParamAsLong(PROP_INDEXING_INTERVAL, 30);
+    int maxQueueSize = (int) context.getWiki().ParamAsLong(LucenePlugin.PROP_MAX_QUEUE_SIZE, 1000);
+    int commitInterval = (int) context.getWiki().ParamAsLong(LucenePlugin.PROP_COMMIT_INTERVAL,
+        1000);
+    IndexUpdater indexUpdater = new IndexUpdater(directory, indexingInterval, maxQueueSize,
+        commitInterval, this, context);
     init(indexUpdater, context);
   }
 
   public void init(IndexUpdater indexUpdater, XWikiContext context) {
-    int retryInterval;
-    try {
-      retryInterval = 1000 * (int) context.getWiki().ParamAsLong(PROP_UPDATER_RETRY_INTERVAL, 30);
-    } catch (NumberFormatException exp) {
-      LOGGER.warn("Invalid retry interval in configuration.", exp);
-      retryInterval = 30000;
-    }
+    int retryInterval = 1000 * (int) context.getWiki().ParamAsLong(PROP_UPDATER_RETRY_INTERVAL, 30);
     IndexRebuilder indexRebuilder = new IndexRebuilder(indexUpdater, retryInterval, context);
     boolean needInitialRebuild = true;
     try {
@@ -919,6 +902,10 @@ public class LucenePlugin extends XWikiDefaultPlugin {
    */
   public long getLuceneDocCount() {
     return this.indexUpdater.getLuceneDocCount();
+  }
+
+  public void optimizeIndex() {
+    indexUpdater.doOptimize();
   }
 
   /**
