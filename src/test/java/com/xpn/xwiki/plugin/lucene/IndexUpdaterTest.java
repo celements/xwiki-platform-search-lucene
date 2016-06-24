@@ -77,8 +77,8 @@ public class IndexUpdaterTest extends AbstractBridgedComponentTestCase {
 
   private class TestIndexRebuilder extends IndexRebuilder {
 
-    public TestIndexRebuilder(IndexUpdater indexUpdater, int retryInterval, XWikiContext context) {
-      super(indexUpdater, retryInterval, context);
+    public TestIndexRebuilder(IndexUpdater indexUpdater, XWikiContext context) {
+      super(indexUpdater, context);
     }
 
     @Override
@@ -90,9 +90,9 @@ public class IndexUpdaterTest extends AbstractBridgedComponentTestCase {
 
   private class TestIndexUpdater extends IndexUpdater {
 
-    TestIndexUpdater(Directory directory, int indexingInterval, int maxQueueSize,
-        int commitInterval, LucenePlugin plugin, XWikiContext context) throws IOException {
-      super(directory, indexingInterval, maxQueueSize, commitInterval, plugin, context);
+    TestIndexUpdater(Directory directory, LucenePlugin plugin, XWikiContext context)
+        throws IOException {
+      super(directory, plugin, context);
     }
 
     @Override
@@ -148,8 +148,8 @@ public class IndexUpdaterTest extends AbstractBridgedComponentTestCase {
         "").anyTimes();
     expect(mockXWiki.Param(eq(LucenePlugin.PROP_INDEX_DIR))).andReturn(
         IndexUpdaterTest.INDEXDIR).anyTimes();
-    expect(mockXWiki.ParamAsLong(eq(LucenePlugin.PROP_UPDATER_RETRY_INTERVAL), eq(30L))).andReturn(
-        1L).anyTimes();
+    expect(mockXWiki.ParamAsLong(eq(IndexRebuilder.PROP_UPDATER_RETRY_INTERVAL), eq(
+        30L))).andReturn(1L).anyTimes();
     expect(mockXWiki.search(anyObject(String.class), anyObject(XWikiContext.class))).andReturn(
         Collections.emptyList()).anyTimes();
     expect(mockXWiki.isVirtualMode()).andReturn(false).anyTimes();
@@ -170,10 +170,9 @@ public class IndexUpdaterTest extends AbstractBridgedComponentTestCase {
     Directory directory = FSDirectory.open(f);
 
     LucenePlugin plugin = new LucenePlugin("Monkey", "Monkey", getContext());
-    IndexUpdater indexUpdater = new TestIndexUpdater(directory, 100, 1000, 1000, plugin,
-        getContext());
-    IndexRebuilder indexRebuilder = new TestIndexRebuilder(indexUpdater, 1000, getContext());
-    indexRebuilder.startRebuildIndex(getContext());
+    IndexUpdater indexUpdater = new TestIndexUpdater(directory, plugin, getContext());
+    IndexRebuilder indexRebuilder = new TestIndexRebuilder(indexUpdater, getContext());
+    indexRebuilder.startRebuildIndex();
 
     this.rebuildDone.acquireUninterruptibly();
 
@@ -192,20 +191,21 @@ public class IndexUpdaterTest extends AbstractBridgedComponentTestCase {
     directory = FSDirectory.open(f);
 
     LucenePlugin plugin = new LucenePlugin("Monkey", "Monkey", getContext());
-    IndexUpdater indexUpdater = new TestIndexUpdater(directory, 100, 1000, 1000, plugin,
-        getContext());
-    IndexRebuilder indexRebuilder = new TestIndexRebuilder(indexUpdater, 1000, getContext());
+    IndexUpdater indexUpdater = new TestIndexUpdater(directory, plugin, getContext());
+    IndexRebuilder indexRebuilder = new TestIndexRebuilder(indexUpdater, getContext());
     Thread writerBlocker = new Thread(indexUpdater, "writerBlocker");
     writerBlocker.start();
-    plugin.initInternal(indexUpdater, indexRebuilder, getContext());
+    plugin.init(getContext());
+    plugin.indexUpdater = indexUpdater;
+    plugin.indexRebuilder = indexRebuilder;
 
     indexUpdater.wipeIndex();
 
     Thread indexUpdaterThread = new Thread(indexUpdater, "Lucene Index Updater");
     indexUpdaterThread.start();
 
-    indexUpdater.queueDocument(this.loremIpsum.clone(), getContext(), false);
-    indexUpdater.queueDocument(this.loremIpsum.clone(), getContext(), false);
+    indexUpdater.queueDocument(this.loremIpsum.clone(), false);
+    indexUpdater.queueDocument(this.loremIpsum.clone(), false);
 
     try {
       Thread.sleep(1000);
@@ -250,10 +250,10 @@ public class IndexUpdaterTest extends AbstractBridgedComponentTestCase {
 
     LucenePlugin plugin = new LucenePlugin("Monkey", "Monkey", getContext());
 
-    final IndexUpdater indexUpdater = new TestIndexUpdater(directory, 100, 1000, 1000, plugin,
-        getContext());
+    final IndexUpdater indexUpdater = new TestIndexUpdater(directory, plugin, getContext());
 
-    plugin.initInternal(indexUpdater, getContext());
+    plugin.init(getContext());
+    plugin.indexUpdater = indexUpdater;
 
     Thread permanentBlocker = new Thread(indexUpdater, "permanentBlocker");
     permanentBlocker.start();

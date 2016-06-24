@@ -75,18 +75,21 @@ import com.xpn.xwiki.web.Utils;
  */
 public class IndexUpdater extends AbstractXWikiRunnable implements EventListener {
 
-  /**
-   * Logging helper.
-   */
   private static final Logger LOGGER = LoggerFactory.getLogger(IndexUpdater.class);
 
-  private static final String NAME = "lucene";
+  static final String PROP_INDEXING_INTERVAL = "xwiki.plugins.lucene.indexinterval";
+
+  static final String PROP_MAX_QUEUE_SIZE = "xwiki.plugins.lucene.maxQueueSize";
+
+  static final String PROP_COMMIT_INTERVAL = "xwiki.plugins.lucene.commitinterval";
+
+  public static final String NAME = "lucene";
 
   /**
    * The maximum number of milliseconds we have to wait before this thread is safely
    * closed.
    */
-  private static final int EXIT_INTERVAL = 3000;
+  private static final long EXIT_INTERVAL = 3000;
 
   private static final List<Event> EVENTS = Arrays.<Event>asList(new DocumentUpdatedEvent(),
       new DocumentCreatedEvent(), new DocumentDeletedEvent(), new AttachmentAddedEvent(),
@@ -105,16 +108,11 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
   /**
    * Milliseconds of sleep between checks for changed documents.
    */
-  private final int indexingInterval;
+  private final long indexingInterval;
 
   private final Directory directory;
 
   private final XWikiDocumentQueue queue = new XWikiDocumentQueue();
-
-  /**
-   * Milliseconds left till the next check for changed documents.
-   */
-  private int indexingTimer = 0;
 
   /**
    * Soft threshold after which no more documents will be added to the indexing queue.
@@ -123,24 +121,21 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
    * size will get back bellow this threshold. This does not affect normal indexing
    * through wiki updates.
    */
-  private final int maxQueueSize;
+  private final long maxQueueSize;
 
-  private final int commitInterval;
+  private final long commitInterval;
 
   private final AtomicBoolean exit = new AtomicBoolean(false);
 
   private final AtomicBoolean optimize = new AtomicBoolean(false);
 
-  private long lastCommitTime;
-
-  IndexUpdater(Directory directory, int indexingInterval, int maxQueueSize, int commitInterval,
-      LucenePlugin plugin, XWikiContext context) throws IOException {
+  IndexUpdater(Directory directory, LucenePlugin plugin, XWikiContext context) throws IOException {
     super(XWikiContext.EXECUTIONCONTEXT_KEY, context.clone());
     this.plugin = plugin;
     this.directory = directory;
-    this.indexingInterval = indexingInterval;
-    this.maxQueueSize = maxQueueSize;
-    this.commitInterval = commitInterval;
+    this.indexingInterval = 1000 * context.getWiki().ParamAsLong(PROP_INDEXING_INTERVAL, 30);
+    this.maxQueueSize = context.getWiki().ParamAsLong(PROP_MAX_QUEUE_SIZE, 1000);
+    this.commitInterval = context.getWiki().ParamAsLong(PROP_COMMIT_INTERVAL, 1000);
     this.writer = openWriter(OpenMode.CREATE_OR_APPEND);
   }
 
@@ -206,18 +201,19 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
    * Main loop. Polls the queue for documents to be indexed.
    */
   private void runMainLoop() {
+    long indexingTimer = 0;
     while (!exit.get()) {
       try {
         // Check if the indexing interval elapsed.
-        if (this.indexingTimer == 0) {
+        if (indexingTimer == 0) {
           // Reset the indexing timer.
-          this.indexingTimer = this.indexingInterval;
+          indexingTimer = this.indexingInterval;
           pollIndexQueue(); // Poll the queue for documents to be indexed
           optimizeIndex(); // optimize index if requested
         }
         // Remove the exit interval from the indexing timer.
-        int sleepInterval = Math.min(EXIT_INTERVAL, this.indexingTimer);
-        this.indexingTimer -= sleepInterval;
+        long sleepInterval = Math.min(EXIT_INTERVAL, indexingTimer);
+        indexingTimer -= sleepInterval;
         Thread.sleep(sleepInterval);
       } catch (IOException ioExc) {
         LOGGER.error("failed to update index", ioExc);
@@ -315,7 +311,7 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
 
   public void commitIndex() throws IOException {
     getWriter().commit();
-    plugin.openSearchers(getContext());
+    plugin.openSearchers();
   }
 
   /**
@@ -331,18 +327,18 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
     }
   }
 
-  public void queueDocument(XWikiDocument document, XWikiContext context, boolean deleted) {
+  public void queueDocument(XWikiDocument document, boolean deleted) {
     LOGGER.debug("IndexUpdater: adding '{}' to queue ",
         document.getDocumentReference().getLastSpaceReference().getName() + "."
             + document.getDocumentReference().getName());
-    this.queue.add(new DocumentData(document, context, deleted));
+    this.queue.add(new DocumentData(document, getContext(), deleted));
     LOGGER.debug("IndexUpdater: queue has now size " + getQueueSize() + ", is empty: "
         + queue.isEmpty());
   }
 
-  public void queueAttachment(XWikiAttachment attachment, XWikiContext context, boolean deleted) {
-    if ((attachment != null) && (context != null)) {
-      this.queue.add(new AttachmentData(attachment, context, deleted));
+  public void queueAttachment(XWikiAttachment attachment, boolean deleted) {
+    if (attachment != null) {
+      this.queue.add(new AttachmentData(attachment, getContext(), deleted));
     } else {
       LOGGER.error("Invalid parameters given to {} attachment '{}' of document '{}'", new Object[] {
           deleted ? "deleted" : "added", attachment == null ? null : attachment.getFilename(),
@@ -351,10 +347,9 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
     }
   }
 
-  public void addAttachment(XWikiDocument document, String attachmentName, XWikiContext context,
-      boolean deleted) {
-    if ((document != null) && (attachmentName != null) && (context != null)) {
-      this.queue.add(new AttachmentData(document, attachmentName, context, deleted));
+  public void addAttachment(XWikiDocument document, String attachmentName, boolean deleted) {
+    if ((document != null) && (attachmentName != null)) {
+      this.queue.add(new AttachmentData(document, attachmentName, getContext(), deleted));
     } else {
       LOGGER.error("Invalid parameters given to {} attachment '{}' of document '{}'", new Object[] {
           (deleted ? "deleted" : "added"), attachmentName, document });
@@ -370,14 +365,14 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
     }
   }
 
-  public int queueAttachments(XWikiDocument document, XWikiContext context) {
+  public int queueAttachments(XWikiDocument document) {
     int retval = 0;
 
     final List<XWikiAttachment> attachmentList = document.getAttachmentList();
     retval += attachmentList.size();
     for (XWikiAttachment attachment : attachmentList) {
       try {
-        queueAttachment(attachment, context, false);
+        queueAttachment(attachment, false);
       } catch (Exception e) {
         LOGGER.error("Failed to retrieve attachment '{}' of document '{}'", new Object[] {
             attachment.getFilename(), document, e });
@@ -402,21 +397,19 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
   // @Override
   @Override
   public void onEvent(Event event, Object source, Object data) {
-    XWikiContext context = (XWikiContext) data;
     LOGGER.debug("IndexUpdater: onEvent for [" + event.getClass() + "] on [" + source.toString()
         + "].");
     try {
       if ((event instanceof DocumentUpdatedEvent) || (event instanceof DocumentCreatedEvent)) {
-        queueDocument((XWikiDocument) source, context, false);
+        queueDocument((XWikiDocument) source, false);
       } else if (event instanceof DocumentDeletedEvent) {
-        queueDocument((XWikiDocument) source, context, true);
+        queueDocument((XWikiDocument) source, true);
       } else if ((event instanceof AttachmentUpdatedEvent)
           || (event instanceof AttachmentAddedEvent)) {
         queueAttachment(((XWikiDocument) source).getAttachment(
-            ((AbstractAttachmentEvent) event).getName()), context, false);
+            ((AbstractAttachmentEvent) event).getName()), false);
       } else if (event instanceof AttachmentDeletedEvent) {
-        addAttachment((XWikiDocument) source, ((AbstractAttachmentEvent) event).getName(), context,
-            true);
+        addAttachment((XWikiDocument) source, ((AbstractAttachmentEvent) event).getName(), true);
       } else if (event instanceof WikiDeletedEvent) {
         addWiki((String) source, true);
       }
@@ -448,8 +441,8 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
     return n;
   }
 
-  public int getMaxQueueSize() {
-    return this.maxQueueSize;
+  public long getMaxQueueSize() {
+    return maxQueueSize;
   }
 
   public Set<String> getCollectedFields() {
