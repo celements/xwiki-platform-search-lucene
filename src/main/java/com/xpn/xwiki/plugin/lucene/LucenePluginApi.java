@@ -97,11 +97,11 @@ public class LucenePluginApi extends PluginApi<LucenePlugin> {
    * Starts a rebuild of the whole index.
    *
    * @param hqlFilter
-   * @param clearIndex
+   * @param wipeIndex
    * @param onlyNew
    * @return number of documents scheduled for indexing. -1 in case of errors
    */
-  public int startIndex(Collection<String> wikis, String hqlFilter, boolean clearIndex,
+  public int startIndex(Collection<String> wikis, String hqlFilter, boolean wipeIndex,
       boolean onlyNew) {
     if (hasAdminRights()) {
       // protected custom list of wikis
@@ -120,7 +120,7 @@ public class LucenePluginApi extends PluginApi<LucenePlugin> {
       // protected hql custom filter
       String secureHqlFilter = hasProgrammingRights() ? hqlFilter : null;
 
-      return getProtectedPlugin().startIndex(secureWikis, secureHqlFilter, clearIndex, onlyNew,
+      return getProtectedPlugin().startIndex(secureWikis, secureHqlFilter, wipeIndex, onlyNew,
           this.context);
     }
 

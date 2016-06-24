@@ -33,6 +33,7 @@ import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriter.MaxFieldLength;
+import org.apache.lucene.index.IndexWriterConfig.OpenMode;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
@@ -90,22 +91,22 @@ public class IndexUpdaterTest extends AbstractBridgedComponentTestCase {
   private class TestIndexUpdater extends IndexUpdater {
 
     TestIndexUpdater(Directory directory, int indexingInterval, int maxQueueSize,
-        LucenePlugin plugin, XWikiContext context) {
-      super(directory, indexingInterval, maxQueueSize, plugin, context);
+        int commitInterval, LucenePlugin plugin, XWikiContext context) {
+      super(directory, indexingInterval, maxQueueSize, commitInterval, plugin, context);
     }
 
     @Override
     protected void runInternal() {
       if (Thread.currentThread().getName().equals("writerBlocker")) {
         try {
-          IndexWriter writer = openWriter(true);
+          IndexWriter writer = openWriter(OpenMode.CREATE);
           Thread.sleep(5000);
           writer.close();
         } catch (Exception e) {
         }
       } else if (Thread.currentThread().getName().equals("permanentBlocker")) {
         try {
-          IndexWriter writer = openWriter(false);
+          IndexWriter writer = openWriter(OpenMode.CREATE_OR_APPEND);
           IndexUpdaterTest.this.writeBlockerAcquiresLock.release();
           IndexUpdaterTest.this.writeBlockerWait.acquireUninterruptibly();
           writer.close();
@@ -169,7 +170,8 @@ public class IndexUpdaterTest extends AbstractBridgedComponentTestCase {
     Directory directory = FSDirectory.open(f);
 
     LucenePlugin plugin = new LucenePlugin("Monkey", "Monkey", getContext());
-    IndexUpdater indexUpdater = new TestIndexUpdater(directory, 100, 1000, plugin, getContext());
+    IndexUpdater indexUpdater = new TestIndexUpdater(directory, 100, 1000, 1000, plugin,
+        getContext());
     IndexRebuilder indexRebuilder = new TestIndexRebuilder(indexUpdater, 1000, getContext());
     indexRebuilder.startRebuildIndex(getContext());
 
@@ -189,20 +191,15 @@ public class IndexUpdaterTest extends AbstractBridgedComponentTestCase {
     }
     directory = FSDirectory.open(f);
 
-    int indexingInterval;
-    indexingInterval = 100;
-    int maxQueueSize;
-    maxQueueSize = 1000;
-
     LucenePlugin plugin = new LucenePlugin("Monkey", "Monkey", getContext());
-    IndexUpdater indexUpdater = new TestIndexUpdater(directory, indexingInterval, maxQueueSize,
-        plugin, getContext());
+    IndexUpdater indexUpdater = new TestIndexUpdater(directory, 100, 1000, 1000, plugin,
+        getContext());
     IndexRebuilder indexRebuilder = new TestIndexRebuilder(indexUpdater, 1000, getContext());
     Thread writerBlocker = new Thread(indexUpdater, "writerBlocker");
     writerBlocker.start();
     plugin.init(indexUpdater, indexRebuilder, getContext());
 
-    indexUpdater.cleanIndex();
+    indexUpdater.wipeIndex();
 
     Thread indexUpdaterThread = new Thread(indexUpdater, "Lucene Index Updater");
     indexUpdaterThread.start();
@@ -245,10 +242,6 @@ public class IndexUpdaterTest extends AbstractBridgedComponentTestCase {
     replayDefault();
     Directory directory;
     File f = new File(INDEXDIR);
-    int indexingInterval;
-    indexingInterval = 100;
-    int maxQueueSize;
-    maxQueueSize = 1000;
 
     if (!f.exists()) {
       f.mkdirs();
@@ -257,8 +250,8 @@ public class IndexUpdaterTest extends AbstractBridgedComponentTestCase {
 
     LucenePlugin plugin = new LucenePlugin("Monkey", "Monkey", getContext());
 
-    final IndexUpdater indexUpdater = new TestIndexUpdater(directory, indexingInterval,
-        maxQueueSize, plugin, getContext());
+    final IndexUpdater indexUpdater = new TestIndexUpdater(directory, 100, 1000, 1000, plugin,
+        getContext());
 
     plugin.init(indexUpdater, getContext());
 
@@ -274,7 +267,7 @@ public class IndexUpdaterTest extends AbstractBridgedComponentTestCase {
 
       @Override
       public void run() {
-        indexUpdater.cleanIndex();
+        indexUpdater.wipeIndex();
 
         doneCleaningIndex[0] = true;
       }
