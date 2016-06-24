@@ -179,16 +179,14 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
     if (wikis == null) {
       indexUpdater.wipeIndex();
     } else {
-      IndexWriter writer = null;
       try {
-        writer = indexUpdater.openWriter();
+        IndexWriter writer = indexUpdater.getWriter();
         for (String wiki : wikis) {
           writer.deleteDocuments(new Term(IndexFields.DOCUMENT_WIKI, wiki));
         }
+        indexUpdater.commitIndex();
       } catch (IOException ex) {
         LOGGER.error("Failed to wipe wiki index: {}", ex.getMessage());
-      } finally {
-        IOUtils.closeQuietly(writer);
       }
     }
   }
@@ -380,16 +378,12 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
   // time) because it keeps a writer opened while looping
   private void cleanIndex(Set<String> danglingDocs) throws IOException {
     LOGGER.info("cleanIndex: {} for {} dangling docs", cleanIndex, danglingDocs.size());
-    IndexWriter writer = null;
-    try {
-      writer = indexUpdater.openWriter();
-      for (String docId : danglingDocs) {
-        writer.deleteDocuments(new Term(IndexFields.DOCUMENT_ID, docId));
-        LOGGER.trace("cleanIndex: deleted doc: {}", docId);
-      }
-    } finally {
-      IOUtils.closeQuietly(writer);
+    IndexWriter writer = indexUpdater.getWriter();
+    for (String docId : danglingDocs) {
+      writer.deleteDocuments(new Term(IndexFields.DOCUMENT_ID, docId));
+      LOGGER.trace("cleanIndex: deleted doc: {}", docId);
     }
+    indexUpdater.commitIndex();
   }
 
   protected int addTranslationOfDocument(DocumentReference documentReference, String language,

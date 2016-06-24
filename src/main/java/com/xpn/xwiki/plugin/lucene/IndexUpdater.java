@@ -20,14 +20,16 @@
 package com.xpn.xwiki.plugin.lucene;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.commons.io.IOUtils;
-import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Fieldable;
 import org.apache.lucene.index.CorruptIndexException;
@@ -93,9 +95,12 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
   /**
    * Collecting all the fields for using up in search
    */
-  static final List<String> fields = new ArrayList<String>();
+  private static final Set<String> COLLECTED_FIELDS = Collections.newSetFromMap(
+      new ConcurrentHashMap<String, Boolean>());
 
   private final LucenePlugin plugin;
+
+  private final IndexWriter writer;
 
   /**
    * Milliseconds of sleep between checks for changed documents.
@@ -122,27 +127,21 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
 
   private final int commitInterval;
 
-  /**
-   * volatile forces the VM to check for changes every time the variable is accessed since
-   * it is not otherwise changed in the main loop the VM could "optimize" the check out
-   * and possibly never exit
-   */
   private final AtomicBoolean exit = new AtomicBoolean(false);
 
   private final AtomicBoolean optimize = new AtomicBoolean(false);
 
   private long lastCommitTime;
 
-  private Analyzer analyzer;
-
   IndexUpdater(Directory directory, int indexingInterval, int maxQueueSize, int commitInterval,
-      LucenePlugin plugin, XWikiContext context) {
+      LucenePlugin plugin, XWikiContext context) throws IOException {
     super(XWikiContext.EXECUTIONCONTEXT_KEY, context.clone());
     this.plugin = plugin;
     this.directory = directory;
     this.indexingInterval = indexingInterval;
     this.maxQueueSize = maxQueueSize;
     this.commitInterval = commitInterval;
+    this.writer = openWriter(OpenMode.CREATE_OR_APPEND);
   }
 
   private XWikiContext getContext() {
@@ -158,25 +157,20 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
     optimize.set(true);
   }
 
-  /**
-   * this method blocks as long as a writer is already in use somewhere
-   *
-   * @return newly opened {@link IndexWriter}
-   * @throws IOException
-   */
-  public IndexWriter openWriter() throws IOException {
-    return openWriter(null);
+  public IndexWriter getWriter() {
+    return writer;
   }
 
   IndexWriter openWriter(OpenMode openMode) throws IOException {
     IndexWriter ret = null;
     while (ret == null) {
       try {
-        IndexWriterConfig cfg = new IndexWriterConfig(Version.LUCENE_34, this.analyzer);
+        IndexWriterConfig cfg = new IndexWriterConfig(Version.LUCENE_34, plugin.getAnalyzer());
+        // cfg.setRAMBufferSizeMB(ramBufferSizeMB); TODO
         if (openMode != null) {
           cfg.setOpenMode(openMode);
         }
-        ret = new IndexWriter(this.directory, cfg);
+        ret = new IndexWriter(getDirectory(), cfg);
       } catch (LockObtainFailedException exc) {
         try {
           int ms = new Random().nextInt(1000);
@@ -213,94 +207,86 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
    */
   private void runMainLoop() {
     while (!exit.get()) {
-      // Check if the indexing interval elapsed.
-      if (this.indexingTimer == 0) {
-        // Reset the indexing timer.
-        this.indexingTimer = this.indexingInterval;
-        updateIndex(); // Poll the queue for documents to be indexed
-        optimizeIndex(); // optimize index if requested
-      }
-      // Remove the exit interval from the indexing timer.
-      int sleepInterval = Math.min(EXIT_INTERVAL, this.indexingTimer);
-      this.indexingTimer -= sleepInterval;
       try {
+        // Check if the indexing interval elapsed.
+        if (this.indexingTimer == 0) {
+          // Reset the indexing timer.
+          this.indexingTimer = this.indexingInterval;
+          pollIndexQueue(); // Poll the queue for documents to be indexed
+          optimizeIndex(); // optimize index if requested
+        }
+        // Remove the exit interval from the indexing timer.
+        int sleepInterval = Math.min(EXIT_INTERVAL, this.indexingTimer);
+        this.indexingTimer -= sleepInterval;
         Thread.sleep(sleepInterval);
-      } catch (InterruptedException e) {
-        LOGGER.warn("Error while sleeping", e);
+      } catch (IOException ioExc) {
+        LOGGER.error("failed to update index", ioExc);
+        doExit();
+      } catch (InterruptedException exc) {
+        LOGGER.warn("Error while sleeping", exc);
       }
     }
   }
 
-  private void optimizeIndex() {
+  private void optimizeIndex() throws IOException {
     if (optimize.compareAndSet(true, false)) {
-      IndexWriter writer = null;
-      try {
-        writer = openWriter();
-        writer.optimize();
-      } catch (IOException exc) {
-        LOGGER.error("failed to opimize index", exc);
-      } finally {
-        IOUtils.closeQuietly(writer);
-      }
+      getWriter().optimize();
     }
   }
 
   /**
    * Polls the queue for documents to be indexed.
+   *
+   * @throws IOException
    */
-  private void updateIndex() {
-    if (this.queue.isEmpty()) {
-      LOGGER.debug("IndexUpdater: queue empty, nothing to do");
+  private void pollIndexQueue() throws IOException {
+    if (queue.isEmpty()) {
+      LOGGER.debug("pollIndexQueue: queue empty, nothing to do");
     } else {
-      LOGGER.debug("IndexUpdater: documents in queue, start indexing");
+      LOGGER.debug("pollIndexQueue: documents in queue, start indexing");
       String curDB = getContext().getDatabase();
-      getContext().getWiki().getStore().cleanUp(getContext());
-      IndexWriter writer = null;
-      boolean reopenSearcherAfter = false;
       try {
-        writer = openWriter();
-        lastCommitTime = System.currentTimeMillis();
-        while (!this.queue.isEmpty()) {
-          AbstractIndexData data = this.queue.remove();
-          getContext().setDatabase(getWebUtils().getWikiRef(data.getEntityReference()).getName());
-          reopenSearcherAfter = !indexData(writer, data);
-        }
-      } catch (IOException exc) {
-        throw new RuntimeException("Failed to open index", exc);
+        updateIndex();
       } finally {
-        IOUtils.closeQuietly(writer);
         getContext().setDatabase(curDB);
-        getContext().getWiki().getStore().cleanUp(getContext());
       }
-      if (reopenSearcherAfter) {
-        plugin.openSearchers(getContext());
-      }
-      LOGGER.info("updateIndex finished");
     }
   }
 
-  private boolean indexData(IndexWriter writer, AbstractIndexData data) {
-    boolean commited = false;
-    try {
-      if (data.isDeleted()) {
-        removeFromIndex(writer, data);
-      } else {
-        addToIndex(writer, data);
+  private void updateIndex() throws IOException {
+    LOGGER.info("updateIndex started");
+    boolean hasUncommitedWrites = false;
+    long lastCommitTime = System.currentTimeMillis();
+    while (!queue.isEmpty()) {
+      AbstractIndexData data = queue.remove();
+      try {
+        indexData(data);
+        hasUncommitedWrites = true;
+        if ((System.currentTimeMillis() - lastCommitTime) >= commitInterval) {
+          commitIndex();
+          lastCommitTime = System.currentTimeMillis();
+          hasUncommitedWrites = false;
+        }
+      } catch (IOException | XWikiException exc) {
+        LOGGER.error("error indexing document '{}'", data, exc);
       }
-      if ((System.currentTimeMillis() - lastCommitTime) >= commitInterval) {
-        writer.commit();
-        plugin.openSearchers(getContext());
-        lastCommitTime = System.currentTimeMillis();
-        commited = true;
-      }
-    } catch (IOException | XWikiException exc) {
-      LOGGER.error("error indexing document '{}'", data, exc);
     }
-    return commited;
+    if (hasUncommitedWrites) {
+      commitIndex();
+    }
+    LOGGER.info("updateIndex finished");
   }
 
-  private void addToIndex(IndexWriter writer, AbstractIndexData data) throws IOException,
-      XWikiException {
+  private void indexData(AbstractIndexData data) throws IOException, XWikiException {
+    getContext().setDatabase(getWebUtils().getWikiRef(data.getEntityReference()).getName());
+    if (data.isDeleted()) {
+      removeFromIndex(data);
+    } else {
+      addToIndex(data);
+    }
+  }
+
+  private void addToIndex(AbstractIndexData data) throws IOException, XWikiException {
     LOGGER.debug("addToIndex: '{}'", data);
     EntityReference ref = data.getEntityReference();
     notify(new LuceneDocumentIndexingEvent(ref));
@@ -308,39 +294,34 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
     data.addDataToLuceneDocument(luceneDoc, getContext());
     getLuceneExtensionService().extend(data, luceneDoc);
     collectFields(luceneDoc);
-    writer.updateDocument(data.getTerm(), luceneDoc);
+    getWriter().updateDocument(data.getTerm(), luceneDoc);
     notify(new LuceneDocumentIndexedEvent(ref));
   }
 
   // collecting all the fields for using up in search
   private void collectFields(Document luceneDoc) {
     for (Fieldable field : luceneDoc.getFields()) {
-      if (!fields.contains(field.name())) {
-        fields.add(field.name());
-      }
+      COLLECTED_FIELDS.add(field.name());
     }
   }
 
-  private void removeFromIndex(IndexWriter writer, AbstractIndexData data)
-      throws CorruptIndexException, IOException {
+  private void removeFromIndex(AbstractIndexData data) throws CorruptIndexException, IOException {
     LOGGER.debug("removeFromIndex: '{}'", data);
     EntityReference ref = data.getEntityReference();
     notify(new LuceneDocumentDeletingEvent(ref));
-    writer.deleteDocuments(data.getTerm());
+    getWriter().deleteDocuments(data.getTerm());
     notify(new LuceneDocumentDeletedEvent(ref));
   }
 
-  /**
-   * @param analyzer
-   *          The analyzer to set.
-   */
-  public void setAnalyzer(Analyzer analyzer) {
-    this.analyzer = analyzer;
+  public void commitIndex() throws IOException {
+    getWriter().commit();
+    plugin.openSearchers(getContext());
   }
 
   /**
    * ATTENTION: this call wipes the index from the disk, use with caution
    */
+  // TODO this will always block right now
   public void wipeIndex() {
     LOGGER.info("trying to wipe index for rebuilding");
     try {
@@ -456,22 +437,23 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
    */
   // FIXME CELDEV-275 this method blocks the IndexUpdater completely because it keeps a writer
   // opened while counting
+  // TODO why is writer used for this?
   public long getLuceneDocCount() {
     int n = -1;
-    IndexWriter writer = null;
     try {
-      writer = openWriter();
-      n = writer.numDocs();
+      n = getWriter().numDocs();
     } catch (IOException e) {
       LOGGER.error("Failed to get the number of documents in Lucene index writer", e);
-    } finally {
-      IOUtils.closeQuietly(writer);
     }
     return n;
   }
 
   public int getMaxQueueSize() {
     return this.maxQueueSize;
+  }
+
+  public Set<String> getCollectedFields() {
+    return new HashSet<>(COLLECTED_FIELDS);
   }
 
   private void notify(AbstractEntityEvent event) {

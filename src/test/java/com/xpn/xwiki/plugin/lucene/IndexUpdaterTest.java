@@ -91,7 +91,7 @@ public class IndexUpdaterTest extends AbstractBridgedComponentTestCase {
   private class TestIndexUpdater extends IndexUpdater {
 
     TestIndexUpdater(Directory directory, int indexingInterval, int maxQueueSize,
-        int commitInterval, LucenePlugin plugin, XWikiContext context) {
+        int commitInterval, LucenePlugin plugin, XWikiContext context) throws IOException {
       super(directory, indexingInterval, maxQueueSize, commitInterval, plugin, context);
     }
 
@@ -197,7 +197,7 @@ public class IndexUpdaterTest extends AbstractBridgedComponentTestCase {
     IndexRebuilder indexRebuilder = new TestIndexRebuilder(indexUpdater, 1000, getContext());
     Thread writerBlocker = new Thread(indexUpdater, "writerBlocker");
     writerBlocker.start();
-    plugin.init(indexUpdater, indexRebuilder, getContext());
+    plugin.initInternal(indexUpdater, indexRebuilder, getContext());
 
     indexUpdater.wipeIndex();
 
@@ -253,7 +253,7 @@ public class IndexUpdaterTest extends AbstractBridgedComponentTestCase {
     final IndexUpdater indexUpdater = new TestIndexUpdater(directory, 100, 1000, 1000, plugin,
         getContext());
 
-    plugin.init(indexUpdater, getContext());
+    plugin.initInternal(indexUpdater, getContext());
 
     Thread permanentBlocker = new Thread(indexUpdater, "permanentBlocker");
     permanentBlocker.start();

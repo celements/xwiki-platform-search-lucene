@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -82,6 +83,8 @@ import com.xpn.xwiki.web.Utils;
 public class LucenePlugin extends XWikiDefaultPlugin {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(LucenePlugin.class);
+
+  public static final Version VERSION = Version.LUCENE_34;
 
   public static final String SORT_FIELD_SCORE = "score";
 
@@ -579,7 +582,7 @@ public class LucenePlugin extends XWikiDefaultPlugin {
     if (query.startsWith("PROP ")) {
       String property = query.substring(0, query.indexOf(":"));
       query = query.substring(query.indexOf(":") + 1, query.length());
-      QueryParser qp = new QueryParser(Version.LUCENE_34, property, this.analyzer);
+      QueryParser qp = new QueryParser(VERSION, property, this.analyzer);
       parsedQuery = qp.parse(query);
       bQuery.add(parsedQuery, BooleanClause.Occur.MUST);
     } else if (query.startsWith("MULTI ")) {
@@ -587,14 +590,13 @@ public class LucenePlugin extends XWikiDefaultPlugin {
       // XXX several problems in Multi search:
       // XXX 1. prefix "MULTI " not removed
       // XXX 2. IndexUpdater.fields after restart empty
-      List<String> fieldList = IndexUpdater.fields;
-      String[] fields = fieldList.toArray(new String[fieldList.size()]);
+      Set<String> collectedFields = indexUpdater.getCollectedFields();
+      String[] fields = collectedFields.toArray(new String[collectedFields.size()]);
       BooleanClause.Occur[] flags = new BooleanClause.Occur[fields.length];
       for (int i = 0; i < flags.length; i++) {
         flags[i] = BooleanClause.Occur.SHOULD;
       }
-      parsedQuery = MultiFieldQueryParser.parse(Version.LUCENE_34, query, fields, flags,
-          this.analyzer);
+      parsedQuery = MultiFieldQueryParser.parse(VERSION, query, fields, flags, this.analyzer);
       bQuery.add(parsedQuery, BooleanClause.Occur.MUST);
     } else {
       String[] fields = new String[] { IndexFields.FULLTEXT, IndexFields.DOCUMENT_TITLE,
@@ -605,7 +607,7 @@ public class LucenePlugin extends XWikiDefaultPlugin {
       }
       LOGGER.debug("init MultiFieldQueryParser with [{}] and analyzer {}", Arrays.toString(fields),
           analyzer.getClass());
-      QueryParser parser = new MultiFieldQueryParser(Version.LUCENE_34, fields, this.analyzer);
+      QueryParser parser = new MultiFieldQueryParser(VERSION, fields, this.analyzer);
       parsedQuery = parser.parse(query);
       // Since the sub-queries are OR-ed, each sub-query score is normally
       // divided by the number of sub-queries,
@@ -686,25 +688,26 @@ public class LucenePlugin extends XWikiDefaultPlugin {
         f.mkdirs();
       }
       directory = FSDirectory.open(f);
+      initInternal(directory, context);
     } catch (IOException e) {
       LOGGER.error("Failed to open the index directory: ", e);
       throw new RuntimeException(e);
     }
 
-    init(directory, context);
   }
 
-  public void init(Directory directory, XWikiContext context) {
+  private void initInternal(Directory directory, XWikiContext context) throws IOException {
     int indexingInterval = 1000 * (int) context.getWiki().ParamAsLong(PROP_INDEXING_INTERVAL, 30);
     int maxQueueSize = (int) context.getWiki().ParamAsLong(LucenePlugin.PROP_MAX_QUEUE_SIZE, 1000);
     int commitInterval = (int) context.getWiki().ParamAsLong(LucenePlugin.PROP_COMMIT_INTERVAL,
         1000);
     IndexUpdater indexUpdater = new IndexUpdater(directory, indexingInterval, maxQueueSize,
         commitInterval, this, context);
-    init(indexUpdater, context);
+    initAnalyzer();
+    initInternal(indexUpdater, context);
   }
 
-  public void init(IndexUpdater indexUpdater, XWikiContext context) {
+  void initInternal(IndexUpdater indexUpdater, XWikiContext context) {
     int retryInterval = 1000 * (int) context.getWiki().ParamAsLong(PROP_UPDATER_RETRY_INTERVAL, 30);
     IndexRebuilder indexRebuilder = new IndexRebuilder(indexUpdater, retryInterval, context);
     boolean needInitialRebuild = true;
@@ -718,30 +721,12 @@ public class LucenePlugin extends XWikiDefaultPlugin {
       LOGGER.info("Launched initial lucene indexing");
     }
 
-    init(indexUpdater, indexRebuilder, context);
+    initInternal(indexUpdater, indexRebuilder, context);
   }
 
-  public void init(IndexUpdater indexUpdater, IndexRebuilder indexRebuilder, XWikiContext context) {
+  void initInternal(IndexUpdater indexUpdater, IndexRebuilder indexRebuilder,
+      XWikiContext context) {
     super.init(context);
-
-    try {
-      @SuppressWarnings("unchecked")
-      Class<? extends Analyzer> clazz = (Class<? extends Analyzer>) Class.forName(
-          context.getWiki().Param(PROP_ANALYZER, DEFAULT_ANALYZER));
-      this.analyzer = clazz.getConstructor(Version.class).newInstance(Version.LUCENE_34);
-    } catch (Exception e) {
-      LOGGER.error("Error instantiating analyzer: {}", e.getMessage());
-      LOGGER.warn("Using default analyzer class: " + DEFAULT_ANALYZER);
-      try {
-        @SuppressWarnings("unchecked")
-        Class<? extends Analyzer> clazz = (Class<? extends Analyzer>) Class.forName(
-            DEFAULT_ANALYZER);
-        this.analyzer = clazz.getConstructor(Version.class).newInstance(Version.LUCENE_34);
-      } catch (Exception e1) {
-        throw new RuntimeException("Instantiation of default analyzer " + DEFAULT_ANALYZER
-            + " failed", e1);
-      }
-    }
 
     LOGGER.debug("Assigning index updater: {}", indexUpdater);
 
@@ -754,7 +739,6 @@ public class LucenePlugin extends XWikiDefaultPlugin {
     }
 
     this.indexUpdater = indexUpdater;
-    this.indexUpdater.setAnalyzer(this.analyzer);
     this.indexUpdaterThread = new Thread(indexUpdater, "Lucene Index Updater");
     this.indexUpdaterThread.start();
     this.indexRebuilder = indexRebuilder;
@@ -771,6 +755,28 @@ public class LucenePlugin extends XWikiDefaultPlugin {
     }
 
     LOGGER.debug("Lucene plugin initialized.");
+  }
+
+  private void initAnalyzer() {
+    String analyzerClassName = getContext().getWiki().Param(PROP_ANALYZER, DEFAULT_ANALYZER);
+    try {
+      LOGGER.info("Instantiating analyzer '{}'", analyzerClassName);
+      analyzer = getAnalyzerInternal(analyzerClassName);
+    } catch (ReflectiveOperationException exc) {
+      LOGGER.warn("Unable to instantiate analyzer '{}', using default instead ", analyzerClassName);
+      try {
+        analyzer = getAnalyzerInternal(DEFAULT_ANALYZER);
+      } catch (ReflectiveOperationException exc2) {
+        throw new RuntimeException("Unable to instantiate default analyzer", exc2);
+      }
+    }
+  }
+
+  @SuppressWarnings("unchecked")
+  private Analyzer getAnalyzerInternal(String analyzerClassName)
+      throws ReflectiveOperationException {
+    Class<? extends Analyzer> clazz = (Class<? extends Analyzer>) Class.forName(analyzerClassName);
+    return clazz.getConstructor(Version.class).newInstance(VERSION);
   }
 
   @Override
@@ -827,7 +833,7 @@ public class LucenePlugin extends XWikiDefaultPlugin {
   public Searcher[] createSearchers(String indexDirs) throws IOException {
     String[] dirs = StringUtils.split(indexDirs, ",");
     List<IndexSearcher> searchersList = new ArrayList<IndexSearcher>();
-    IndexWriterConfig cfg = new IndexWriterConfig(Version.LUCENE_34, this.analyzer);
+    IndexWriterConfig cfg = new IndexWriterConfig(VERSION, this.analyzer);
     for (String dir : dirs) {
       Directory d = FSDirectory.open(new File(dir));
       while (true) {
@@ -906,6 +912,10 @@ public class LucenePlugin extends XWikiDefaultPlugin {
 
   public void optimizeIndex() {
     indexUpdater.doOptimize();
+  }
+
+  public Analyzer getAnalyzer() {
+    return analyzer;
   }
 
   /**
