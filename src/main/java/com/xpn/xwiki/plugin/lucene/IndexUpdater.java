@@ -29,7 +29,6 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.apache.commons.io.IOUtils;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Fieldable;
 import org.apache.lucene.index.CorruptIndexException;
@@ -79,8 +78,6 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
 
   static final String PROP_INDEXING_INTERVAL = "xwiki.plugins.lucene.indexinterval";
 
-  static final String PROP_MAX_QUEUE_SIZE = "xwiki.plugins.lucene.maxQueueSize";
-
   static final String PROP_COMMIT_INTERVAL = "xwiki.plugins.lucene.commitinterval";
 
   public static final String NAME = "lucene";
@@ -103,6 +100,8 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
 
   private final LucenePlugin plugin;
 
+  private final Directory directory;
+
   private final IndexWriter writer;
 
   /**
@@ -110,20 +109,9 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
    */
   private final long indexingInterval;
 
-  private final Directory directory;
+  private final long commitInterval;
 
   private final XWikiDocumentQueue queue = new XWikiDocumentQueue();
-
-  /**
-   * Soft threshold after which no more documents will be added to the indexing queue.
-   * When the queue size gets larger than this value, the index rebuilding thread will
-   * sleep chunks of {@code IndexRebuilder#retryInterval} milliseconds until the queue
-   * size will get back bellow this threshold. This does not affect normal indexing
-   * through wiki updates.
-   */
-  private final long maxQueueSize;
-
-  private final long commitInterval;
 
   private final AtomicBoolean exit = new AtomicBoolean(false);
 
@@ -134,7 +122,6 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
     this.plugin = plugin;
     this.directory = directory;
     this.indexingInterval = 1000 * context.getWiki().ParamAsLong(PROP_INDEXING_INTERVAL, 30);
-    this.maxQueueSize = context.getWiki().ParamAsLong(PROP_MAX_QUEUE_SIZE, 1000);
     this.commitInterval = context.getWiki().ParamAsLong(PROP_COMMIT_INTERVAL, 1000);
     this.writer = openWriter(OpenMode.CREATE_OR_APPEND);
   }
@@ -150,10 +137,6 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
 
   public void doOptimize() {
     optimize.set(true);
-  }
-
-  public IndexWriter getWriter() {
-    return writer;
   }
 
   IndexWriter openWriter(OpenMode openMode) throws IOException {
@@ -226,7 +209,7 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
 
   private void optimizeIndex() throws IOException {
     if (optimize.compareAndSet(true, false)) {
-      getWriter().optimize();
+      writer.optimize();
     }
   }
 
@@ -290,7 +273,7 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
     data.addDataToLuceneDocument(luceneDoc, getContext());
     getLuceneExtensionService().extend(data, luceneDoc);
     collectFields(luceneDoc);
-    getWriter().updateDocument(data.getTerm(), luceneDoc);
+    writer.updateDocument(data.getTerm(), luceneDoc);
     notify(new LuceneDocumentIndexedEvent(ref));
   }
 
@@ -304,27 +287,25 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
   private void removeFromIndex(AbstractIndexData data) throws CorruptIndexException, IOException {
     LOGGER.debug("removeFromIndex: '{}'", data);
     EntityReference ref = data.getEntityReference();
-    notify(new LuceneDocumentDeletingEvent(ref));
-    getWriter().deleteDocuments(data.getTerm());
-    notify(new LuceneDocumentDeletedEvent(ref));
+    if (ref != null) {
+      notify(new LuceneDocumentDeletingEvent(ref));
+    }
+    writer.deleteDocuments(data.getTerm());
+    if (ref != null) {
+      notify(new LuceneDocumentDeletedEvent(ref));
+    }
   }
 
   public void commitIndex() throws IOException {
-    getWriter().commit();
+    writer.commit();
     plugin.openSearchers();
   }
 
-  /**
-   * ATTENTION: this call wipes the index from the disk, use with caution
-   */
-  // TODO this will always block right now
-  public void wipeIndex() {
-    LOGGER.info("trying to wipe index for rebuilding");
-    try {
-      IOUtils.closeQuietly(openWriter(OpenMode.CREATE));
-    } catch (IOException e) {
-      LOGGER.error("Failed to wipe index", e);
-    }
+  public void queueDeletion(String docId) {
+    LOGGER.debug("IndexUpdater: adding '{}' to queue", docId);
+    this.queue.add(new DeleteData(docId));
+    LOGGER.debug("IndexUpdater: queue has now size " + getQueueSize() + ", is empty: "
+        + queue.isEmpty());
   }
 
   public void queueDocument(XWikiDocument document, boolean deleted) {
@@ -347,7 +328,7 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
     }
   }
 
-  public void addAttachment(XWikiDocument document, String attachmentName, boolean deleted) {
+  public void queueAttachment(XWikiDocument document, String attachmentName, boolean deleted) {
     if ((document != null) && (attachmentName != null)) {
       this.queue.add(new AttachmentData(document, attachmentName, getContext(), deleted));
     } else {
@@ -356,12 +337,12 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
     }
   }
 
-  public void addWiki(String wikiId, boolean deleted) {
-    if (wikiId != null) {
-      this.queue.add(new WikiData(new WikiReference(wikiId), deleted));
+  public void queueWiki(WikiReference wikiRef, boolean deleted) {
+    if (wikiRef != null) {
+      this.queue.add(new WikiData(wikiRef, deleted));
     } else {
       LOGGER.error("Invalid parameters given to {} wiki '{}'", (deleted ? "deleted" : "added"),
-          wikiId);
+          wikiRef);
     }
   }
 
@@ -409,9 +390,9 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
         queueAttachment(((XWikiDocument) source).getAttachment(
             ((AbstractAttachmentEvent) event).getName()), false);
       } else if (event instanceof AttachmentDeletedEvent) {
-        addAttachment((XWikiDocument) source, ((AbstractAttachmentEvent) event).getName(), true);
+        queueAttachment((XWikiDocument) source, ((AbstractAttachmentEvent) event).getName(), true);
       } else if (event instanceof WikiDeletedEvent) {
-        addWiki((String) source, true);
+        queueWiki(getWebUtils().resolveReference((String) source, WikiReference.class), true);
       }
     } catch (Exception e) {
       LOGGER.error("error in notify", e);
@@ -428,21 +409,15 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
   /**
    * @return the number of documents in Lucene index writer.
    */
-  // FIXME CELDEV-275 this method blocks the IndexUpdater completely because it keeps a writer
-  // opened while counting
   // TODO why is writer used for this?
   public long getLuceneDocCount() {
     int n = -1;
     try {
-      n = getWriter().numDocs();
+      n = writer.numDocs();
     } catch (IOException e) {
       LOGGER.error("Failed to get the number of documents in Lucene index writer", e);
     }
     return n;
-  }
-
-  public long getMaxQueueSize() {
-    return maxQueueSize;
   }
 
   public Set<String> getCollectedFields() {

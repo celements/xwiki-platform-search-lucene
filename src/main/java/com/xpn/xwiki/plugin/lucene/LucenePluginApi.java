@@ -20,7 +20,6 @@
 package com.xpn.xwiki.plugin.lucene;
 
 import java.util.Collection;
-import java.util.Collections;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -71,25 +70,6 @@ public class LucenePluginApi extends PluginApi<LucenePlugin> {
    * @return number of documents scheduled for indexing. -1 in case of errors
    */
   public int rebuildIndex() {
-    if (hasAdminRights()) {
-      Collection<String> wikis = null;
-
-      String database = this.context.getDatabase();
-      try {
-        this.context.setDatabase(this.context.getMainXWiki());
-
-        // if not farm administrator, the user does not have right to rebuild index of the
-        // whole farm
-        if (!hasAdminRights()) {
-          wikis = Collections.singletonList(database);
-        }
-      } finally {
-        this.context.setDatabase(database);
-      }
-
-      return getProtectedPlugin().startIndex(wikis, "", true, false, this.context);
-    }
-
     return REBUILD_NOT_ALLOWED;
   }
 
@@ -103,27 +83,6 @@ public class LucenePluginApi extends PluginApi<LucenePlugin> {
    */
   public int startIndex(Collection<String> wikis, String hqlFilter, boolean wipeIndex,
       boolean onlyNew) {
-    if (hasAdminRights()) {
-      // protected custom list of wikis
-      Collection<String> secureWikis = wikis;
-      String currentWiki = this.context.getDatabase();
-      try {
-        this.context.setDatabase(this.context.getMainXWiki());
-
-        if (!hasAdminRights()) {
-          secureWikis = Collections.singletonList(currentWiki);
-        }
-      } finally {
-        this.context.setDatabase(currentWiki);
-      }
-
-      // protected hql custom filter
-      String secureHqlFilter = hasProgrammingRights() ? hqlFilter : null;
-
-      return getProtectedPlugin().startIndex(secureWikis, secureHqlFilter, wipeIndex, onlyNew,
-          this.context);
-    }
-
     return REBUILD_NOT_ALLOWED;
   }
 
@@ -137,10 +96,6 @@ public class LucenePluginApi extends PluginApi<LucenePlugin> {
    */
   @Deprecated
   public int rebuildIndex(com.xpn.xwiki.api.XWiki wiki, Context context) {
-    if (wiki.hasAdminRights()) {
-      return getProtectedPlugin().rebuildIndex(context.getContext());
-    }
-
     return REBUILD_NOT_ALLOWED;
   }
 

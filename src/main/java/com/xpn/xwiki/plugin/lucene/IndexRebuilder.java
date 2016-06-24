@@ -21,7 +21,6 @@ package com.xpn.xwiki.plugin.lucene;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -30,13 +29,11 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.search.BooleanClause;
 import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.ScoreDoc;
-import org.apache.lucene.search.Searcher;
 import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.search.TotalHitCountCollector;
@@ -44,6 +41,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.xwiki.context.Execution;
 import org.xwiki.model.reference.DocumentReference;
+import org.xwiki.model.reference.SpaceReference;
+import org.xwiki.model.reference.WikiReference;
+import org.xwiki.query.Query;
+import org.xwiki.query.QueryException;
+import org.xwiki.query.QueryManager;
 
 import com.celements.web.service.IWebUtilsService;
 import com.google.common.base.Strings;
@@ -93,10 +95,21 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
 
   static final String PROP_UPDATER_RETRY_INTERVAL = "xwiki.plugins.lucene.updaterRetryInterval";
 
+  static final String PROP_MAX_QUEUE_SIZE = "xwiki.plugins.lucene.maxQueueSize";
+
   /**
    * Amount of time (milliseconds) to sleep while waiting for the indexing queue to empty.
    */
   private final int retryInterval;
+
+  /**
+   * Soft threshold after which no more documents will be added to the indexing queue.
+   * When the queue size gets larger than this value, the index rebuilding thread will
+   * sleep chunks of {@code IndexRebuilder#retryInterval} milliseconds until the queue
+   * size will get back bellow this threshold. This does not affect normal indexing
+   * through wiki updates.
+   */
+  private final long maxQueueSize;
 
   /**
    * The actual object/thread that indexes data.
@@ -111,7 +124,7 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
   /**
    * Wikis where to search.
    */
-  private Collection<String> wikis = null;
+  private List<WikiReference> wikis = null;
 
   /**
    * Hibernate filtering query to reindex with.
@@ -124,15 +137,17 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
   private boolean onlyNew = false;
 
   /**
-   * Indicate if the Lucene index should be cleaned from inexistent documents.
+   * Indicate if the Lucene index should be wiped, if false index will be cleaned from inexistent
+   * documents.
    */
-  private boolean cleanIndex = false;
+  private boolean wipeIndex = false;
 
   public IndexRebuilder(IndexUpdater indexUpdater, XWikiContext context) {
     super(XWikiContext.EXECUTIONCONTEXT_KEY, context.clone());
     this.indexUpdater = indexUpdater;
     this.retryInterval = 1000 * (int) context.getWiki().ParamAsLong(PROP_UPDATER_RETRY_INTERVAL,
         30);
+    this.maxQueueSize = context.getWiki().ParamAsLong(PROP_MAX_QUEUE_SIZE, 1000);
   }
 
   private XWikiContext getContext() {
@@ -140,53 +155,53 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
         XWikiContext.EXECUTIONCONTEXT_KEY);
   }
 
-  public int startRebuildIndex() {
-    return startIndex(null, "", true, false);
+  public boolean startIndexRebuild() {
+    return startIndexRebuild(null, "", false);
   }
 
-  public int startIndex(Collection<String> wikis, String hqlFilter, boolean wipeIndex,
+  public boolean startIndexRebuildWithWipe(List<WikiReference> wikis, String hqlFilter,
       boolean onlyNew) {
+    this.wipeIndex = true;
+    return startIndexRebuild(wikis, hqlFilter, onlyNew);
+  }
+
+  public boolean startIndexRebuild(List<WikiReference> wikis, String hqlFilter, boolean onlyNew) {
     if (rebuildInProgress.compareAndSet(false, true)) {
-      if (wipeIndex) {
-        wipeIndex(wikis);
-      }
-      this.wikis = wikis != null ? new ArrayList<String>(wikis) : null;
+      this.wikis = getWikis(wikis);
       this.hqlFilter = hqlFilter;
       this.onlyNew = onlyNew;
-      this.cleanIndex = !wipeIndex;
-
       Thread indexRebuilderThread = new Thread(this, "Lucene Index Rebuilder");
-      // The JVM should be allowed to shutdown while this thread is running
-      indexRebuilderThread.setDaemon(true);
-      // Client requests are more important than indexing
-      indexRebuilderThread.setPriority(3);
-      // Finally, start the rebuild in the background
+      indexRebuilderThread.setDaemon(true); // The JVM should be allowed to shutdown while this
+                                            // thread is running
+      indexRebuilderThread.setPriority(3);// Client requests are more important than indexing
       indexRebuilderThread.start();
-
-      // Too bad that now we can't tell how many items are there to be indexed...
-      return 0;
+      return true;
     } else {
       LOGGER.warn("Cannot launch rebuild because another rebuild is in progress");
-      return LucenePluginApi.REBUILD_IN_PROGRESS;
+      return false;
     }
   }
 
-  // FIXME CELDEV-275 this method blocks the IndexUpdater completely (and potentially for a long
-  // time) because it keeps a writer opened while looping
-  private void wipeIndex(Collection<String> wikis) {
-    LOGGER.info("wipeIndex: for wikis '{}'", wikis);
-    if (wikis == null) {
-      indexUpdater.wipeIndex();
+  private List<WikiReference> getWikis(List<WikiReference> wikis) {
+    if (wikis != null) {
+      return wikis;
     } else {
-      try {
-        IndexWriter writer = indexUpdater.getWriter();
-        for (String wiki : wikis) {
-          writer.deleteDocuments(new Term(IndexFields.DOCUMENT_WIKI, wiki));
+      Set<WikiReference> ret = new HashSet<>();
+      if (getContext().getWiki().isVirtualMode()) {
+        try {
+          for (String wiki : getContext().getWiki().getVirtualWikisDatabaseNames(getContext())) {
+            ret.add(new WikiReference(wiki));
+          }
+          ret.add(new WikiReference(getContext().getMainXWiki()));
+        } catch (XWikiException xwe) {
+          LOGGER.error("failed to load virtual wiki names", xwe);
         }
-        indexUpdater.commitIndex();
-      } catch (IOException ex) {
-        LOGGER.error("Failed to wipe wiki index: {}", ex.getMessage());
+        LOGGER.debug("found {} virtual wikis: '{}'", ret.size(), ret);
+      } else {
+        // No virtual wiki configuration, just index the wiki the context belongs to
+        ret.add(getWebUtils().getWikiRef());
       }
+      return new ArrayList<>(ret);
     }
   }
 
@@ -232,8 +247,6 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
       context.setResponse(null);
 
       rebuildIndex();
-    } catch (InterruptedException e) {
-      LOGGER.warn("The index rebuilder thread has been interrupted");
     } catch (Exception e) {
       LOGGER.error("Error in lucene rebuild thread: {}", e.getMessage(), e);
     } finally {
@@ -251,80 +264,47 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
    * attachments for re-addition to the index.
    *
    * @return the number of indexed elements
-   * @throws InterruptedException
    */
-  private int rebuildIndex() throws InterruptedException {
+  private int rebuildIndex() {
     int retval = 0;
-    Collection<String> wikiServers = wikis;
-    if (wikiServers == null) {
-      if (getContext().getWiki().isVirtualMode()) {
-        wikiServers = findWikiServers();
-        LOGGER.debug("found {} virtual wikis: '{}'", wikiServers.size(), wikiServers);
-      } else {
-        // No virtual wiki configuration, just index the wiki the context belongs to
-        wikiServers = new ArrayList<String>();
-        wikiServers.add(getContext().getDatabase());
-      }
-    }
-    // Iterate all found virtual wikis
-    for (String wikiName : wikiServers) {
-      int wikiResult = indexWiki(wikiName);
-      if (wikiResult > 0) {
-        retval += wikiResult;
+    for (WikiReference wikiRef : wikis) {
+      LOGGER.info("indexing wiki '{}'", wikiRef);
+      String database = getContext().getDatabase();
+      IndexSearcher searcher = null;
+      try {
+        getContext().setDatabase(wikiRef.getName());
+        searcher = new IndexSearcher(indexUpdater.getDirectory(), true);
+        retval += rebuildWiki(wikiRef, searcher);
+      } catch (IOException | XWikiException | QueryException | InterruptedException exc) {
+        LOGGER.error("Failed rebulding wiki [{}]", wikiRef, exc);
+      } finally {
+        getContext().setDatabase(database);
+        IOUtils.closeQuietly(searcher);
       }
     }
     return retval;
   }
 
-  /**
-   * Adds the content of a given wiki to the indexUpdater's queue.
-   *
-   * @param wikiName
-   *          the name of the wiki to index
-   * @param context
-   *          the XWiki context
-   * @return the number of indexed elements
-   * @throws InterruptedException
-   */
-  protected int indexWiki(String wikiName) throws InterruptedException {
-    LOGGER.info("indexing wiki '{}'", wikiName);
-    int retval = -1;
-    String database = getContext().getDatabase();
-    Searcher searcher = null;
-    try {
-      getContext().setDatabase(wikiName);
-      searcher = new IndexSearcher(indexUpdater.getDirectory(), true);
-      retval = indexDocuments(wikiName, searcher);
-    } catch (IOException exc) {
-      LOGGER.error("Failed reading or writing index for wiki [{}]", wikiName, exc);
-    } catch (XWikiException xwe) {
-      LOGGER.error("Error getting documents for wiki [{}] and filter [{}]", wikiName, hqlFilter,
-          xwe);
-    } finally {
-      getContext().setDatabase(database);
-      IOUtils.closeQuietly(searcher);
-    }
-    return retval;
-  }
-
-  private int indexDocuments(String wikiName, Searcher searcher) throws InterruptedException,
-      IOException, XWikiException {
-    int retval = 0, count = 0;
-    List<Object[]> documentsToIndex = getAllDocs(wikiName);
-    LOGGER.info("adding {} docs to index with filter '{}'", documentsToIndex.size(), hqlFilter);
+  private int rebuildWiki(WikiReference wikiRef, IndexSearcher searcher) throws IOException,
+      XWikiException, QueryException, InterruptedException {
     Set<String> remainingDocs = Collections.emptySet();
-    if (cleanIndex && StringUtils.isBlank(hqlFilter)) {
-      remainingDocs = getAllIndexedDocs(wikiName, searcher);
+    if (wipeIndex) {
+      wipeWikiIndex(wikiRef);
+    } else if (StringUtils.isBlank(hqlFilter)) { // clean only possible if no hql filter set
+      remainingDocs = getAllIndexedDocs(wikiRef, searcher);
     }
+    int retval = 0, count = 0;
+    List<Object[]> documentsToIndex = getAllDocsQuery(wikiRef).execute();
+    LOGGER.info("adding {} docs to index with filter '{}'", documentsToIndex.size(), hqlFilter);
     for (Object[] docData : documentsToIndex) {
-      DocumentReference docRef = new DocumentReference(wikiName, (String) docData[0],
-          (String) docData[1]);
+      DocumentReference docRef = new DocumentReference((String) docData[0], new SpaceReference(
+          (String) docData[1], wikiRef));
       String version = (String) docData[2];
       String language = (String) docData[3];
       language = Strings.isNullOrEmpty(language) ? "default" : language;
       String docId = getWebUtils().serializeRef(docRef) + "." + language;
       if (!onlyNew || !isIndexed(docRef, version, language, searcher)) {
-        retval += addTranslationOfDocument(docRef, language);
+        retval += queueDocument(docRef, language);
         LOGGER.trace("indexed {}", docId);
       } else {
         LOGGER.trace("already indexed {}", docId);
@@ -341,8 +321,8 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
     return retval;
   }
 
-  private List<Object[]> getAllDocs(String wikiName) throws XWikiException {
-    String hql = "select distinct doc.space, doc.name, doc.version, doc.language "
+  private Query getAllDocsQuery(WikiReference wikiRef) throws QueryException {
+    String hql = "select distinct doc.name, doc.space, doc.version, doc.language "
         + "from XWikiDocument as doc ";
     hqlFilter = hqlFilter.trim();
     if (StringUtils.isNotBlank(hqlFilter)) {
@@ -351,13 +331,16 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
       }
       hql += hqlFilter;
     }
-    return getContext().getWiki().search(hql, getContext());
+    Query query = getQueryManager().createQuery(hql, Query.HQL);
+    query.setWiki(wikiRef.getName());
+    return query;
   }
 
-  public Set<String> getAllIndexedDocs(String wikiName, Searcher searcher) throws IOException {
+  public Set<String> getAllIndexedDocs(WikiReference wikiRef, IndexSearcher searcher)
+      throws IOException {
     Set<String> ret = new HashSet<>();
     BooleanQuery query = new BooleanQuery();
-    query.add(new TermQuery(new Term(IndexFields.DOCUMENT_WIKI, wikiName.toLowerCase())),
+    query.add(new TermQuery(new Term(IndexFields.DOCUMENT_WIKI, wikiRef.getName().toLowerCase())),
         BooleanClause.Occur.MUST);
     TotalHitCountCollector collector = new TotalHitCountCollector();
     searcher.search(query, collector);
@@ -369,19 +352,22 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
     return ret;
   }
 
-  // FIXME CELDEV-275 this method blocks the IndexUpdater completely (and potentially for a long
-  // time) because it keeps a writer opened while looping
-  private void cleanIndex(Set<String> danglingDocs) throws IOException {
-    LOGGER.info("cleanIndex: {} for {} dangling docs", cleanIndex, danglingDocs.size());
-    IndexWriter writer = indexUpdater.getWriter();
-    for (String docId : danglingDocs) {
-      writer.deleteDocuments(new Term(IndexFields.DOCUMENT_ID, docId));
-      LOGGER.trace("cleanIndex: deleted doc: {}", docId);
-    }
-    indexUpdater.commitIndex();
+  private void wipeWikiIndex(WikiReference wikiRef) throws InterruptedException {
+    waitForLowQueueSize();
+    LOGGER.info("wiping index for wiki '{}'", wikiRef);
+    indexUpdater.queueWiki(wikiRef, true);
   }
 
-  protected int addTranslationOfDocument(DocumentReference documentReference, String language)
+  private void cleanIndex(Set<String> danglingDocs) throws InterruptedException {
+    LOGGER.info("cleanIndex: {} for {} dangling docs", !wipeIndex, danglingDocs.size());
+    for (String docId : danglingDocs) {
+      waitForLowQueueSize();
+      indexUpdater.queueDeletion(docId);
+      LOGGER.trace("cleanIndex: deleted doc: {}", docId);
+    }
+  }
+
+  protected int queueDocument(DocumentReference documentReference, String language)
       throws XWikiException, InterruptedException {
     int retval = 0;
     XWikiDocument document = getContext().getWiki().getDocument(documentReference, getContext());
@@ -403,7 +389,7 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
   // to limit the index rebuilder thread only, and not the index updater.
   private void waitForLowQueueSize() throws InterruptedException {
     long size;
-    while ((size = indexUpdater.getQueueSize()) > indexUpdater.getMaxQueueSize()) {
+    while ((size = indexUpdater.getQueueSize()) > maxQueueSize) {
       // Don't leave any database connections open while sleeping
       // This shouldn't be needed, but we never know what bugs might be there
       getContext().getWiki().getStore().cleanUp(getContext());
@@ -412,25 +398,12 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
     }
   }
 
-  private Collection<String> findWikiServers() {
-    List<String> retval = Collections.emptyList();
-    try {
-      retval = getContext().getWiki().getVirtualWikisDatabaseNames(getContext());
-      if (!retval.contains(getContext().getMainXWiki())) {
-        retval.add(getContext().getMainXWiki());
-      }
-    } catch (Exception e) {
-      LOGGER.error("Error getting list of wiki servers!", e);
-    }
-    return retval;
-  }
-
-  public boolean isIndexed(DocumentReference docRef, Searcher searcher) throws IOException {
+  public boolean isIndexed(DocumentReference docRef, IndexSearcher searcher) throws IOException {
     return isIndexed(docRef, null, null, searcher);
   }
 
   public boolean isIndexed(DocumentReference docRef, String version, String language,
-      Searcher searcher) throws IOException {
+      IndexSearcher searcher) throws IOException {
     boolean exists = false;
     BooleanQuery query = new BooleanQuery();
     query.add(new TermQuery(new Term(IndexFields.DOCUMENT_NAME, docRef.getName().toLowerCase())),
@@ -451,6 +424,10 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
     searcher.search(query, collector);
     exists = collector.getTotalHits() > 0;
     return exists;
+  }
+
+  private QueryManager getQueryManager() {
+    return Utils.getComponent(QueryManager.class);
   }
 
   private IWebUtilsService getWebUtils() {

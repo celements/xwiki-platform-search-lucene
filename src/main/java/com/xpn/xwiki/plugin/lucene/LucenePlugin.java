@@ -23,7 +23,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 
@@ -57,6 +56,7 @@ import org.apache.lucene.util.Version;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.xwiki.context.Execution;
+import org.xwiki.model.reference.WikiReference;
 import org.xwiki.observation.ObservationManager;
 
 import com.xpn.xwiki.XWikiContext;
@@ -169,16 +169,20 @@ public class LucenePlugin extends XWikiDefaultPlugin {
    */
   @Deprecated
   public int rebuildIndex(XWikiContext context) {
-    return rebuildIndex();
+    return rebuildIndex() ? 0 : LucenePluginApi.REBUILD_IN_PROGRESS;
   }
 
-  public int rebuildIndex() {
-    return this.indexRebuilder.startRebuildIndex();
+  public boolean rebuildIndex() {
+    return indexRebuilder.startIndexRebuild();
   }
 
-  public int startIndex(Collection<String> wikis, String hqlFilter, boolean wipeIndex,
-      boolean onlyNew, XWikiContext context) {
-    return this.indexRebuilder.startIndex(wikis, hqlFilter, wipeIndex, onlyNew);
+  public boolean rebuildIndex(List<WikiReference> wikis, String hqlFilter, boolean onlyNew) {
+    return indexRebuilder.startIndexRebuild(wikis, hqlFilter, onlyNew);
+  }
+
+  public boolean rebuildIndexWithWipe(List<WikiReference> wikis, String hqlFilter,
+      boolean onlyNew) {
+    return indexRebuilder.startIndexRebuildWithWipe(wikis, hqlFilter, onlyNew);
   }
 
   /**
@@ -734,7 +738,7 @@ public class LucenePlugin extends XWikiDefaultPlugin {
 
   private void checkInitialRebuild() throws IOException {
     if (!IndexReader.indexExists(indexUpdater.getDirectory())) {
-      indexRebuilder.startRebuildIndex();
+      rebuildIndex();
       LOGGER.info("Launched initial lucene indexing");
     }
   }
@@ -832,10 +836,8 @@ public class LucenePlugin extends XWikiDefaultPlugin {
         this.searcherProvider = getSearcherProviderManager().createSearchProvider(createSearchers(
             this.indexDirs));
       } catch (Exception exp) {
-        LOGGER.error("Error opening searchers for index dirs [{}]", getContext().getWiki().Param(
-            PROP_INDEX_DIR), exp);
-        throw new RuntimeException("Error opening searchers for index dirs "
-            + getContext().getWiki().Param(PROP_INDEX_DIR), exp);
+        LOGGER.error("Error opening searchers for index dirs [{}]", this.indexDirs, exp);
+        throw new RuntimeException("Error opening searchers for index dirs " + this.indexDirs, exp);
       }
     }
     this.searcherProvider.connect();

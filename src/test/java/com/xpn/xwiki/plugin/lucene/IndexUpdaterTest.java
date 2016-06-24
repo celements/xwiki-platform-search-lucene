@@ -172,7 +172,7 @@ public class IndexUpdaterTest extends AbstractBridgedComponentTestCase {
     LucenePlugin plugin = new LucenePlugin("Monkey", "Monkey", getContext());
     IndexUpdater indexUpdater = new TestIndexUpdater(directory, plugin, getContext());
     IndexRebuilder indexRebuilder = new TestIndexRebuilder(indexUpdater, getContext());
-    indexRebuilder.startRebuildIndex();
+    indexRebuilder.startIndexRebuild();
 
     this.rebuildDone.acquireUninterruptibly();
 
@@ -199,7 +199,7 @@ public class IndexUpdaterTest extends AbstractBridgedComponentTestCase {
     plugin.indexUpdater = indexUpdater;
     plugin.indexRebuilder = indexRebuilder;
 
-    indexUpdater.wipeIndex();
+    // indexUpdater.wipeIndex();
 
     Thread indexUpdaterThread = new Thread(indexUpdater, "Lucene Index Updater");
     indexUpdaterThread.start();
@@ -267,7 +267,7 @@ public class IndexUpdaterTest extends AbstractBridgedComponentTestCase {
 
       @Override
       public void run() {
-        indexUpdater.wipeIndex();
+        // indexUpdater.wipeIndex();
 
         doneCleaningIndex[0] = true;
       }
