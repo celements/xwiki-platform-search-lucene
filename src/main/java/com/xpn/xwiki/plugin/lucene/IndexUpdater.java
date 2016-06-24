@@ -37,7 +37,6 @@ import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.IndexWriterConfig.OpenMode;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.LockObtainFailedException;
-import org.apache.lucene.util.Version;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.xwiki.bridge.event.DocumentCreatedEvent;
@@ -79,6 +78,8 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
   static final String PROP_INDEXING_INTERVAL = "xwiki.plugins.lucene.indexinterval";
 
   static final String PROP_COMMIT_INTERVAL = "xwiki.plugins.lucene.commitinterval";
+
+  static final String PROP_WRITER_BUFFER_SIZE = "xwiki.plugins.lucene.writerBufferSize";
 
   public static final String NAME = "lucene";
 
@@ -143,8 +144,9 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
     IndexWriter ret = null;
     while (ret == null) {
       try {
-        IndexWriterConfig cfg = new IndexWriterConfig(Version.LUCENE_34, plugin.getAnalyzer());
-        // cfg.setRAMBufferSizeMB(ramBufferSizeMB); TODO
+        IndexWriterConfig cfg = new IndexWriterConfig(LucenePlugin.VERSION, plugin.getAnalyzer());
+        cfg.setRAMBufferSizeMB(getContext().getWiki().ParamAsLong(PROP_WRITER_BUFFER_SIZE,
+            (long) IndexWriterConfig.DEFAULT_RAM_BUFFER_SIZE_MB));
         if (openMode != null) {
           cfg.setOpenMode(openMode);
         }

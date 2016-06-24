@@ -110,7 +110,7 @@ public class LucenePlugin extends XWikiDefaultPlugin {
    * The Lucene text analyzer, can be configured in <tt>xwiki.cfg</tt> using the key
    * {@link #PROP_ANALYZER} ( <tt>xwiki.plugins.lucene.analyzer</tt>).
    */
-  private Analyzer analyzer;
+  private volatile Analyzer analyzer;
 
   /**
    * Lucene index updater. Listens for changes and indexes wiki documents in a separate
@@ -578,7 +578,7 @@ public class LucenePlugin extends XWikiDefaultPlugin {
     if (query.startsWith("PROP ")) {
       String property = query.substring(0, query.indexOf(":"));
       query = query.substring(query.indexOf(":") + 1, query.length());
-      QueryParser qp = new QueryParser(VERSION, property, this.analyzer);
+      QueryParser qp = new QueryParser(VERSION, property, getAnalyzer());
       parsedQuery = qp.parse(query);
       bQuery.add(parsedQuery, BooleanClause.Occur.MUST);
     } else if (query.startsWith("MULTI ")) {
@@ -592,7 +592,7 @@ public class LucenePlugin extends XWikiDefaultPlugin {
       for (int i = 0; i < flags.length; i++) {
         flags[i] = BooleanClause.Occur.SHOULD;
       }
-      parsedQuery = MultiFieldQueryParser.parse(VERSION, query, fields, flags, this.analyzer);
+      parsedQuery = MultiFieldQueryParser.parse(VERSION, query, fields, flags, getAnalyzer());
       bQuery.add(parsedQuery, BooleanClause.Occur.MUST);
     } else {
       String[] fields = new String[] { IndexFields.FULLTEXT, IndexFields.DOCUMENT_TITLE,
@@ -602,8 +602,8 @@ public class LucenePlugin extends XWikiDefaultPlugin {
         flags[i] = BooleanClause.Occur.SHOULD;
       }
       LOGGER.debug("init MultiFieldQueryParser with [{}] and analyzer {}", Arrays.toString(fields),
-          analyzer.getClass());
-      QueryParser parser = new MultiFieldQueryParser(VERSION, fields, this.analyzer);
+          getAnalyzer().getClass());
+      QueryParser parser = new MultiFieldQueryParser(VERSION, fields, getAnalyzer());
       parsedQuery = parser.parse(query);
       // Since the sub-queries are OR-ed, each sub-query score is normally
       // divided by the number of sub-queries,
@@ -671,7 +671,6 @@ public class LucenePlugin extends XWikiDefaultPlugin {
     LOGGER.debug("Lucene plugin: in init");
     super.init(getContext());
     try {
-      this.analyzer = getConfiguredAnalyzer();
       this.indexDirs = getConfiguredIndexDirs();
       File file = new File(StringUtils.split(this.indexDirs, ",")[0]);
       if (!file.exists()) {
@@ -690,23 +689,6 @@ public class LucenePlugin extends XWikiDefaultPlugin {
       LOGGER.error("Failed to open the index directory: ", e);
       throw new RuntimeException(e);
     }
-  }
-
-  private Analyzer getConfiguredAnalyzer() {
-    Analyzer ret;
-    String analyzerClassName = getContext().getWiki().Param(PROP_ANALYZER, DEFAULT_ANALYZER);
-    try {
-      LOGGER.info("Instantiating analyzer '{}'", analyzerClassName);
-      ret = getAnalyzerInternal(analyzerClassName);
-    } catch (ReflectiveOperationException exc) {
-      LOGGER.warn("Unable to instantiate analyzer '{}', using default instead ", analyzerClassName);
-      try {
-        ret = getAnalyzerInternal(DEFAULT_ANALYZER);
-      } catch (ReflectiveOperationException exc2) {
-        throw new RuntimeException("Unable to instantiate default analyzer", exc2);
-      }
-    }
-    return ret;
   }
 
   @SuppressWarnings("unchecked")
@@ -797,7 +779,7 @@ public class LucenePlugin extends XWikiDefaultPlugin {
   public Searcher[] createSearchers(String indexDirs) throws IOException {
     String[] dirs = StringUtils.split(indexDirs, ",");
     List<IndexSearcher> searchersList = new ArrayList<IndexSearcher>();
-    IndexWriterConfig cfg = new IndexWriterConfig(VERSION, this.analyzer);
+    IndexWriterConfig cfg = new IndexWriterConfig(VERSION, getAnalyzer());
     for (String dir : dirs) {
       Directory d = FSDirectory.open(new File(dir));
       while (true) {
@@ -876,7 +858,27 @@ public class LucenePlugin extends XWikiDefaultPlugin {
   }
 
   public Analyzer getAnalyzer() {
+    if (analyzer == null) {
+      analyzer = getConfiguredAnalyzer();
+    }
     return analyzer;
+  }
+
+  private Analyzer getConfiguredAnalyzer() {
+    Analyzer ret;
+    String analyzerClassName = getContext().getWiki().Param(PROP_ANALYZER, DEFAULT_ANALYZER);
+    try {
+      LOGGER.info("Instantiating analyzer '{}'", analyzerClassName);
+      ret = getAnalyzerInternal(analyzerClassName);
+    } catch (ReflectiveOperationException exc) {
+      LOGGER.warn("Unable to instantiate analyzer '{}', using default instead ", analyzerClassName);
+      try {
+        ret = getAnalyzerInternal(DEFAULT_ANALYZER);
+      } catch (ReflectiveOperationException exc2) {
+        throw new RuntimeException("Unable to instantiate default analyzer", exc2);
+      }
+    }
+    return ret;
   }
 
   /**
