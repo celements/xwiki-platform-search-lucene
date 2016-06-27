@@ -200,11 +200,9 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
         long sleepInterval = Math.min(EXIT_INTERVAL, indexingTimer);
         indexingTimer -= sleepInterval;
         Thread.sleep(sleepInterval);
-      } catch (IOException ioExc) {
-        LOGGER.error("failed to update index", ioExc);
+      } catch (IOException | InterruptedException exc) {
+        LOGGER.error("failed to update index", exc);
         doExit();
-      } catch (InterruptedException exc) {
-        LOGGER.warn("Error while sleeping", exc);
       }
     }
   }

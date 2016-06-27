@@ -124,23 +124,23 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
   /**
    * Wikis where to search.
    */
-  private List<WikiReference> wikis = null;
+  private volatile List<WikiReference> wikis = null;
 
   /**
    * Hibernate filtering query to reindex with.
    */
-  private String hqlFilter = null;
+  private volatile String hqlFilter = null;
 
   /**
    * Indicate if document already in the Lucene index are updated.
    */
-  private boolean onlyNew = false;
+  private volatile boolean onlyNew = false;
 
   /**
    * Indicate if the Lucene index should be wiped, if false index will be cleaned from inexistent
    * documents.
    */
-  private boolean wipeIndex = false;
+  private volatile boolean wipeIndex = false;
 
   public IndexRebuilder(IndexUpdater indexUpdater, XWikiContext context) {
     super(XWikiContext.EXECUTIONCONTEXT_KEY, context.clone());

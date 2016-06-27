@@ -25,6 +25,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -107,21 +109,23 @@ public class LucenePlugin extends XWikiDefaultPlugin {
   private static final String DEFAULT_ANALYZER = "org.apache.lucene.analysis.standard.StandardAnalyzer";
 
   /**
+   * Lucene index updater. Listens for changes and indexes wiki documents in a separate
+   * thread.
+   */
+  volatile IndexUpdater indexUpdater;
+
+  volatile IndexRebuilder indexRebuilder;
+
+  /**
    * The Lucene text analyzer, can be configured in <tt>xwiki.cfg</tt> using the key
    * {@link #PROP_ANALYZER} ( <tt>xwiki.plugins.lucene.analyzer</tt>).
    */
   private volatile Analyzer analyzer;
 
   /**
-   * Lucene index updater. Listens for changes and indexes wiki documents in a separate
-   * thread.
+   * The Executor running the index updater.
    */
-  IndexUpdater indexUpdater;
-
-  /**
-   * The thread running the index updater.
-   */
-  private Thread indexUpdaterThread;
+  private final ExecutorService indexUpdaterExecutor;
 
   /**
    * The current searchers provider which is still set on keepAktiv.
@@ -137,10 +141,9 @@ public class LucenePlugin extends XWikiDefaultPlugin {
    */
   private String indexDirs;
 
-  IndexRebuilder indexRebuilder;
-
   public LucenePlugin(String name, String className, XWikiContext context) {
     super(name, className, context);
+    indexUpdaterExecutor = Executors.newSingleThreadExecutor();
   }
 
   @Override
@@ -160,7 +163,7 @@ public class LucenePlugin extends XWikiDefaultPlugin {
     if (this.indexUpdater != null) {
       this.indexUpdater.doExit();
     }
-
+    
     super.finalize();
   }
 
@@ -678,8 +681,7 @@ public class LucenePlugin extends XWikiDefaultPlugin {
       }
       Directory directory = FSDirectory.open(file);
       this.indexUpdater = new IndexUpdater(directory, this, context);
-      this.indexUpdaterThread = new Thread(indexUpdater, "Lucene Index Updater");
-      this.indexUpdaterThread.start();
+      indexUpdaterExecutor.submit(indexUpdater);
       this.indexRebuilder = new IndexRebuilder(indexUpdater, context);
       openSearchers();
       registerIndexUpdater();
@@ -727,44 +729,7 @@ public class LucenePlugin extends XWikiDefaultPlugin {
 
   @Override
   public void flushCache(XWikiContext context) {
-    LOGGER.info("Lucene plugin flushCache called!");
-    // take care of crappy code calling #flushCache with no context...
-    if (context == null) {
-      context = getContext();
-    }
-
-    if (this.indexUpdater != null) {
-      Utils.getComponent(ObservationManager.class).removeListener(this.indexUpdater.getName());
-
-      // set the thread to exit
-      this.indexUpdater.doExit();
-
-      try {
-        // wait for the thread to finish
-        this.indexUpdaterThread.join();
-      } catch (InterruptedException ex) {
-        LOGGER.warn("Error while waiting for indexUpdaterThread to die.", ex);
-      }
-
-      if (this.indexUpdater.getQueueSize() > 0) {
-        LOGGER.warn("Lucene plugin dropping index updater with NON-EMPTY queue ["
-            + this.indexUpdater.getQueueSize() + "].");
-      } else {
-        LOGGER.debug("Lucene plugin dropping index updater with empty queue ["
-            + this.indexUpdater.getQueueSize() + "].");
-      }
-
-      this.indexUpdater = null;
-      this.indexUpdaterThread = null;
-    }
-
-    this.indexRebuilder = null;
-
-    openSearchers();
-
-    this.analyzer = null;
-
-    init(context);
+    LOGGER.warn("flushing cache not supported");
   }
 
   /**
