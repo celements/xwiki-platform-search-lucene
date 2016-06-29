@@ -124,7 +124,7 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
     this.plugin = plugin;
     this.directory = directory;
     this.indexingInterval = 1000 * context.getWiki().ParamAsLong(PROP_INDEXING_INTERVAL, 30);
-    this.commitInterval = context.getWiki().ParamAsLong(PROP_COMMIT_INTERVAL, 1000);
+    this.commitInterval = context.getWiki().ParamAsLong(PROP_COMMIT_INTERVAL, 5000);
     this.writer = openWriter(OpenMode.CREATE_OR_APPEND);
   }
 
@@ -210,7 +210,9 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
 
   private void optimizeIndex() throws IOException {
     if (optimize.compareAndSet(true, false)) {
+      LOGGER.warn("started optimizing lucene index");
       writer.optimize();
+      LOGGER.warn("finished optimizing lucene index");
     }
   }
 
