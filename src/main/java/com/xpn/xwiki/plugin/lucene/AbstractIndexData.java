@@ -158,10 +158,10 @@ public abstract class AbstractIndexData {
         getEntityReference());
   }
 
-  // Object
-
   @Override
   public String toString() {
-    return getId();
+    return "AbstractIndexData [id=" + getId() + ", ref=" + entityReference + ", deleted=" + deleted
+        + ", type=" + type + "]";
   }
+
 }

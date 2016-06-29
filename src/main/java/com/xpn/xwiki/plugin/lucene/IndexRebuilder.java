@@ -268,7 +268,6 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
   private int rebuildIndex() {
     int retval = 0;
     for (WikiReference wikiRef : wikis) {
-      LOGGER.info("indexing wiki '{}'", wikiRef);
       String database = getContext().getDatabase();
       IndexSearcher searcher = null;
       try {
@@ -287,15 +286,15 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
 
   private int rebuildWiki(WikiReference wikiRef, IndexSearcher searcher) throws IOException,
       XWikiException, QueryException, InterruptedException {
+    LOGGER.info("rebuilding wiki '{}'", wikiRef);
     Set<String> remainingDocs = Collections.emptySet();
     if (wipeIndex) {
       wipeWikiIndex(wikiRef);
     } else if (StringUtils.isBlank(hqlFilter)) { // clean only possible if no hql filter set
       remainingDocs = getAllIndexedDocs(wikiRef, searcher);
     }
-    int retval = 0, count = 0;
-    List<Object[]> documentsToIndex = getAllDocsQuery(wikiRef).execute();
-    LOGGER.info("adding {} docs to index with filter '{}'", documentsToIndex.size(), hqlFilter);
+    int ret = 0, count = 0;
+    List<Object[]> documentsToIndex = getAllDocs(wikiRef);
     for (Object[] docData : documentsToIndex) {
       DocumentReference docRef = new DocumentReference((String) docData[0], new SpaceReference(
           (String) docData[1], wikiRef));
@@ -304,10 +303,10 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
       language = Strings.isNullOrEmpty(language) ? "default" : language;
       String docId = getWebUtils().serializeRef(docRef) + "." + language;
       if (!onlyNew || !isIndexed(docRef, version, language, searcher)) {
-        retval += queueDocument(docRef, language);
+        ret += queueDocument(docRef, language);
         LOGGER.trace("indexed {}", docId);
       } else {
-        LOGGER.trace("already indexed {}", docId);
+        LOGGER.trace("skipped '{}', already indexed", docId);
       }
       if (!remainingDocs.remove(docId)) {
         LOGGER.debug("couldn't reduce remaining docs for docId '{}'", docId);
@@ -318,10 +317,10 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
       }
     }
     cleanIndex(remainingDocs);
-    return retval;
+    return ret;
   }
 
-  private Query getAllDocsQuery(WikiReference wikiRef) throws QueryException {
+  private List<Object[]> getAllDocs(WikiReference wikiRef) throws QueryException {
     String hql = "select distinct doc.name, doc.space, doc.version, doc.language "
         + "from XWikiDocument as doc ";
     hqlFilter = hqlFilter.trim();
@@ -333,7 +332,9 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
     }
     Query query = getQueryManager().createQuery(hql, Query.HQL);
     query.setWiki(wikiRef.getName());
-    return query;
+    List<Object[]> ret = query.execute();
+    LOGGER.info("getAllDocs: {} to index with filter '{}'", ret.size(), hqlFilter);
+    return ret;
   }
 
   public Set<String> getAllIndexedDocs(WikiReference wikiRef, IndexSearcher searcher)
@@ -348,13 +349,13 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
     for (ScoreDoc scoreDoc : topDocs.scoreDocs) {
       ret.add(searcher.doc(scoreDoc.doc).get(IndexFields.DOCUMENT_ID));
     }
-    LOGGER.info("found {} docs in index", ret.size());
+    LOGGER.info("getAllIndexedDocs: found {} docs in index", ret.size());
     return ret;
   }
 
   private void wipeWikiIndex(WikiReference wikiRef) throws InterruptedException {
     waitForLowQueueSize();
-    LOGGER.info("wiping index for wiki '{}'", wikiRef);
+    LOGGER.info("wipeWikiIndex: for '{}'", wikiRef);
     indexUpdater.queueWiki(wikiRef, true);
   }
 
