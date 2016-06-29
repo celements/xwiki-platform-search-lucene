@@ -83,9 +83,8 @@ public class AttachmentData extends AbstractDocumentData {
 
   private String mimetype;
 
-  public AttachmentData(XWikiAttachment attachment, XWikiContext context, boolean deleted) {
-    super(LucenePlugin.DOCTYPE_ATTACHMENT, attachment.getDoc(), context, deleted);
-
+  public AttachmentData(XWikiAttachment attachment, boolean deleted, XWikiContext context) {
+    super(LucenePlugin.DOCTYPE_ATTACHMENT, attachment.getDoc(), deleted, context);
     setModificationDate(attachment.getDate());
     setAuthor(attachment.getAuthor());
     setSize(attachment.getFilesize());
@@ -93,10 +92,9 @@ public class AttachmentData extends AbstractDocumentData {
     setMimeType(attachment.getMimeType(context));
   }
 
-  public AttachmentData(XWikiDocument document, String filename, XWikiContext context,
-      boolean deleted) {
-    super(LucenePlugin.DOCTYPE_ATTACHMENT, document, context, deleted);
-
+  public AttachmentData(XWikiDocument document, String filename, boolean deleted,
+      XWikiContext context) {
+    super(LucenePlugin.DOCTYPE_ATTACHMENT, document, deleted, context);
     setFilename(filename);
   }
 

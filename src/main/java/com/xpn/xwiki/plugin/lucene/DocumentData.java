@@ -67,9 +67,8 @@ public class DocumentData extends AbstractDocumentData {
   private EntityReferenceSerializer<String> localEntityReferenceSerializer = Utils.getComponent(
       EntityReferenceSerializer.class, "local");
 
-  public DocumentData(final XWikiDocument doc, final XWikiContext context, final boolean deleted) {
-    super(LucenePlugin.DOCTYPE_WIKIPAGE, doc, context, deleted);
-
+  public DocumentData(XWikiDocument doc, boolean deleted, XWikiContext context) {
+    super(LucenePlugin.DOCTYPE_WIKIPAGE, doc, deleted, context);
     setAuthor(doc.getAuthor());
     setCreator(doc.getCreator());
     setModificationDate(doc.getDate());
@@ -150,8 +149,8 @@ public class DocumentData extends AbstractDocumentData {
               obj.getXClassReference()).toLowerCase(), Field.Store.YES, Field.Index.NOT_ANALYZED,
               CLASSNAME_BOOST, luceneDoc);
           Object[] propertyNames = obj.getPropertyNames();
-          for (int i = 0; i < propertyNames.length; i++) {
-            indexProperty(luceneDoc, obj, (String) propertyNames[i], context);
+          for (Object propertyName : propertyNames) {
+            indexProperty(luceneDoc, obj, (String) propertyName, context);
           }
         }
       }

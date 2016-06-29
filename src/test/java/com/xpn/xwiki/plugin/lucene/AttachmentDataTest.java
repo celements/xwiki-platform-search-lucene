@@ -136,7 +136,7 @@ public class AttachmentDataTest extends AbstractBridgedComponentTestCase {
     attachment.setContent(getClass().getResourceAsStream("/" + filename));
     expect(servletContext.getMimeType(eq(filename))).andReturn(mimetype).once();
     replayDefault();
-    this.attachmentData = new AttachmentData(this.attachment, getContext(), false);
+    this.attachmentData = new AttachmentData(this.attachment, false, getContext());
     this.attachmentData.setFilename(filename);
     assertEquals("Wrong attachment content indexed", content, attachmentData.getFullText(document,
         getContext()));

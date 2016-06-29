@@ -101,8 +101,8 @@ public abstract class AbstractDocumentData extends AbstractIndexData {
 
   private Date modificationDate;
 
-  public AbstractDocumentData(String type, XWikiDocument doc, XWikiContext context,
-      boolean deleted) {
+  public AbstractDocumentData(String type, XWikiDocument doc, boolean deleted,
+      XWikiContext context) {
     super(type, doc.getDocumentReference(), deleted);
 
     setVersion(doc.getVersion());

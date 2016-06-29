@@ -52,6 +52,7 @@ import org.xwiki.observation.event.Event;
 
 import com.celements.common.observation.event.AbstractEntityEvent;
 import com.celements.web.service.IWebUtilsService;
+import com.google.common.base.Preconditions;
 import com.xpn.xwiki.XWikiContext;
 import com.xpn.xwiki.XWikiException;
 import com.xpn.xwiki.doc.XWikiAttachment;
@@ -222,7 +223,6 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
     if (queue.isEmpty()) {
       LOGGER.debug("pollIndexQueue: queue empty, nothing to do");
     } else {
-      LOGGER.debug("pollIndexQueue: documents in queue, start indexing");
       String curDB = getContext().getDatabase();
       try {
         updateIndex();
@@ -297,73 +297,53 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
   }
 
   public void commitIndex() throws IOException {
+    LOGGER.debug("commitIndex");
     writer.commit();
     plugin.openSearchers();
   }
 
   public void queueDeletion(String docId) {
-    LOGGER.debug("IndexUpdater: adding '{}' to queue", docId);
+    LOGGER.debug("queueDeletion: '{}'", docId);
+    Preconditions.checkNotNull(docId);
     this.queue.add(new DeleteData(docId));
-    LOGGER.debug("IndexUpdater: queue has now size " + getQueueSize() + ", is empty: "
-        + queue.isEmpty());
   }
 
   public void queueDocument(XWikiDocument document, boolean deleted) {
-    LOGGER.debug("IndexUpdater: adding '{}' to queue ",
-        document.getDocumentReference().getLastSpaceReference().getName() + "."
-            + document.getDocumentReference().getName());
-    this.queue.add(new DocumentData(document, getContext(), deleted));
-    LOGGER.debug("IndexUpdater: queue has now size " + getQueueSize() + ", is empty: "
-        + queue.isEmpty());
+    LOGGER.debug("queueDocument: '{}'", document);
+    Preconditions.checkNotNull(document);
+    queue.add(new DocumentData(document, deleted, getContext()));
   }
 
   public void queueAttachment(XWikiAttachment attachment, boolean deleted) {
-    if (attachment != null) {
-      this.queue.add(new AttachmentData(attachment, getContext(), deleted));
-    } else {
-      LOGGER.error("Invalid parameters given to {} attachment '{}' of document '{}'", new Object[] {
-          deleted ? "deleted" : "added", attachment == null ? null : attachment.getFilename(),
-          (attachment == null) || (attachment.getDoc() == null) ? null
-              : attachment.getDoc().getDocumentReference() });
-    }
+    LOGGER.debug("queueAttachment: '{}'", attachment);
+    Preconditions.checkNotNull(attachment);
+    queue.add(new AttachmentData(attachment, deleted, getContext()));
   }
 
   public void queueAttachment(XWikiDocument document, String attachmentName, boolean deleted) {
-    if ((document != null) && (attachmentName != null)) {
-      this.queue.add(new AttachmentData(document, attachmentName, getContext(), deleted));
-    } else {
-      LOGGER.error("Invalid parameters given to {} attachment '{}' of document '{}'", new Object[] {
-          (deleted ? "deleted" : "added"), attachmentName, document });
-    }
-  }
-
-  public void queueWiki(WikiReference wikiRef, boolean deleted) {
-    if (wikiRef != null) {
-      this.queue.add(new WikiData(wikiRef, deleted));
-    } else {
-      LOGGER.error("Invalid parameters given to {} wiki '{}'", (deleted ? "deleted" : "added"),
-          wikiRef);
-    }
+    LOGGER.debug("queueAttachment: '{}', '{}'", document, attachmentName);
+    Preconditions.checkNotNull(document);
+    Preconditions.checkNotNull(attachmentName);
+    queue.add(new AttachmentData(document, attachmentName, deleted, getContext()));
   }
 
   public int queueAttachments(XWikiDocument document) {
-    int retval = 0;
-
-    final List<XWikiAttachment> attachmentList = document.getAttachmentList();
-    retval += attachmentList.size();
-    for (XWikiAttachment attachment : attachmentList) {
-      try {
-        queueAttachment(attachment, false);
-      } catch (Exception e) {
-        LOGGER.error("Failed to retrieve attachment '{}' of document '{}'", new Object[] {
-            attachment.getFilename(), document, e });
-      }
+    int ret = 0;
+    LOGGER.debug("queueAttachments: '{}'", document);
+    Preconditions.checkNotNull(document);
+    for (XWikiAttachment attachment : document.getAttachmentList()) {
+      queueAttachment(attachment, false);
+      ret++;
     }
-
-    return retval;
+    return ret;
   }
 
-  // @Override
+  public void queueWiki(WikiReference wikiRef, boolean deleted) {
+    LOGGER.debug("queueWiki: '{}'", wikiRef);
+    Preconditions.checkNotNull(wikiRef);
+    queue.add(new WikiData(wikiRef, deleted));
+  }
+
   @Override
   public String getName() {
     return NAME;
@@ -375,27 +355,23 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
     return EVENTS;
   }
 
-  // @Override
   @Override
   public void onEvent(Event event, Object source, Object data) {
-    LOGGER.debug("IndexUpdater: onEvent for [" + event.getClass() + "] on [" + source.toString()
-        + "].");
-    try {
-      if ((event instanceof DocumentUpdatedEvent) || (event instanceof DocumentCreatedEvent)) {
-        queueDocument((XWikiDocument) source, false);
-      } else if (event instanceof DocumentDeletedEvent) {
-        queueDocument((XWikiDocument) source, true);
-      } else if ((event instanceof AttachmentUpdatedEvent)
-          || (event instanceof AttachmentAddedEvent)) {
-        queueAttachment(((XWikiDocument) source).getAttachment(
-            ((AbstractAttachmentEvent) event).getName()), false);
-      } else if (event instanceof AttachmentDeletedEvent) {
-        queueAttachment((XWikiDocument) source, ((AbstractAttachmentEvent) event).getName(), true);
-      } else if (event instanceof WikiDeletedEvent) {
-        queueWiki(getWebUtils().resolveReference((String) source, WikiReference.class), true);
-      }
-    } catch (Exception e) {
-      LOGGER.error("error in notify", e);
+    LOGGER.debug("onEvent: for '{}' on '{}'", event.getClass(), source);
+    if (source == null) {
+      LOGGER.error("onEvent: received null source");
+    } else if ((event instanceof DocumentUpdatedEvent) || (event instanceof DocumentCreatedEvent)) {
+      queueDocument((XWikiDocument) source, false);
+    } else if (event instanceof DocumentDeletedEvent) {
+      queueDocument((XWikiDocument) source, true);
+    } else if ((event instanceof AttachmentUpdatedEvent)
+        || (event instanceof AttachmentAddedEvent)) {
+      queueAttachment(((XWikiDocument) source).getAttachment(
+          ((AbstractAttachmentEvent) event).getName()), false);
+    } else if (event instanceof AttachmentDeletedEvent) {
+      queueAttachment((XWikiDocument) source, ((AbstractAttachmentEvent) event).getName(), true);
+    } else if (event instanceof WikiDeletedEvent) {
+      queueWiki(getWebUtils().resolveReference((String) source, WikiReference.class), true);
     }
   }
 
