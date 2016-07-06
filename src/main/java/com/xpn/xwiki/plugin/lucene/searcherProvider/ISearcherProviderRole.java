@@ -19,13 +19,15 @@
  */
 package com.xpn.xwiki.plugin.lucene.searcherProvider;
 
-import org.apache.lucene.search.Searcher;
+import java.util.List;
+
+import org.apache.lucene.search.IndexSearcher;
 import org.xwiki.component.annotation.ComponentRole;
 
 @ComponentRole
 public interface ISearcherProviderRole {
 
-  public SearcherProvider createSearchProvider(Searcher[] createSearchers);
+  public SearcherProvider createSearchProvider(List<IndexSearcher> createSearchers);
 
   public void closeAllForCurrentThread();
 
