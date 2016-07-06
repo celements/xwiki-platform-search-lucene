@@ -22,17 +22,19 @@ package com.xpn.xwiki.plugin.lucene.searcherProvider;
 import static com.google.common.base.Preconditions.*;
 
 import java.io.IOException;
-import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
-import org.apache.lucene.search.Searcher;
+import org.apache.lucene.search.IndexSearcher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.xpn.xwiki.plugin.lucene.SearchResults;
+import com.xpn.xwiki.plugin.lucene.searcherProvider.SearcherProviderManager.DisconnectToken;
 
 public class SearcherProvider {
 
@@ -42,21 +44,22 @@ public class SearcherProvider {
    * List of Lucene indexes used for searching. By default there is only one such index
    * for all the wiki. One searches is created for each entry in {@link #indexDirs}.
    */
-  private final Searcher[] backedSearchers;
+  private final List<IndexSearcher> backedSearchers;
 
   private volatile boolean markToClose;
 
-  private volatile boolean isClosed;
+  private final DisconnectToken token;
 
-  private final Set<Long> connectedThreads;
+  private final Map<Long, Thread> connectedThreads;
 
   private final ConcurrentMap<Long, Set<SearchResults>> connectedSearchResultsMap;
 
-  SearcherProvider(Searcher[] searchers) {
+  SearcherProvider(List<IndexSearcher> searchers, DisconnectToken token) {
     this.backedSearchers = searchers;
     this.markToClose = false;
-    this.connectedThreads = Collections.newSetFromMap(new ConcurrentHashMap<Long, Boolean>());
+    this.connectedThreads = new ConcurrentHashMap<Long, Thread>();
     this.connectedSearchResultsMap = new ConcurrentHashMap<Long, Set<SearchResults>>();
+    this.token = token;
     LOGGER.debug("create searcherProvider: [" + System.identityHashCode(this) + "].");
   }
 
@@ -64,7 +67,7 @@ public class SearcherProvider {
     return connectedSearchResultsMap;
   }
 
-  Set<Long> internal_getConnectedThreads() {
+  Map<Long, Thread> internal_getConnectedThreads() {
     return connectedThreads;
   }
 
@@ -80,16 +83,16 @@ public class SearcherProvider {
         checkState(!isMarkedToClose(), "you connected to a SearchProvider marked to close.");
         LOGGER.debug("connect searcherProvider [{}] to [{}].", System.identityHashCode(this),
             getThreadKey());
-        connectedThreads.add(getThreadKey());
+        connectedThreads.put(getThreadKey(), Thread.currentThread());
       }
     }
   }
 
   public boolean isClosed() {
-    return this.isClosed;
+    return token.isUsed();
   }
 
-  public Searcher[] getSearchers() {
+  public List<IndexSearcher> getSearchers() {
     checkState(!isClosed(), "Getting searchers failed: provider is closed.");
     checkState(checkConnected(), "you must connect to the searcher provider before you can get"
         + " any searchers");
@@ -97,11 +100,11 @@ public class SearcherProvider {
   }
 
   private boolean checkConnected() {
-    return connectedThreads.contains(getThreadKey());
+    return connectedThreads.containsKey(getThreadKey());
   }
 
   public void disconnect() throws IOException {
-    if (connectedThreads.remove(getThreadKey())) {
+    if (connectedThreads.remove(getThreadKey()) != null) {
       LOGGER.debug("disconnect searcherProvider [{}] to [{}], markedToClose [{}].",
           System.identityHashCode(this), getThreadKey(), isMarkedToClose());
       closeIfIdle();
@@ -121,6 +124,12 @@ public class SearcherProvider {
   }
 
   private synchronized void closeIfIdle() throws IOException {
+    for (Thread thread : connectedThreads.values()) {
+      if (!thread.isAlive()) {
+        connectedThreads.remove(thread.getId());
+        connectedSearchResultsMap.remove(thread.getId());
+      }
+    }
     if (canBeClosed()) {
       closeSearchers();
     }
@@ -140,19 +149,13 @@ public class SearcherProvider {
   void closeSearchers() throws IOException {
     if (!isClosed()) {
       LOGGER.debug("closeSearchers: for [{}].", System.identityHashCode(this));
-      for (Searcher searcher : backedSearchers) {
+      for (IndexSearcher searcher : backedSearchers) {
         if (searcher != null) {
           searcher.close();
         }
       }
-      isClosed = true;
+      token.use(this);
     }
-  }
-
-  @Override
-  protected void finalize() throws Throwable {
-    super.finalize();
-    closeSearchers();
   }
 
   public void connectSearchResults(SearchResults searchResults) {
@@ -176,7 +179,7 @@ public class SearcherProvider {
     }
   }
 
-  public Long getThreadKey() {
+  private Long getThreadKey() {
     return Thread.currentThread().getId();
   }
 

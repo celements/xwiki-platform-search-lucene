@@ -25,10 +25,11 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.inject.Singleton;
 
-import org.apache.lucene.search.Searcher;
+import org.apache.lucene.search.IndexSearcher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.xwiki.component.annotation.Component;
@@ -74,17 +75,41 @@ public class SearcherProviderManager implements ISearcherProviderRole {
     return allSearcherProviderSet;
   }
 
+  private boolean removeSearchProvider(SearcherProvider searchProvider) {
+    boolean ret = getAllSearcherProviders().remove(searchProvider);
+    LOGGER.debug("removed searchProvider [{}] {}, {} remaining", System.identityHashCode(
+        searchProvider), ret, getAllSearcherProviders().size());
+    return ret;
+  }
+
   @Override
-  synchronized public SearcherProvider createSearchProvider(Searcher[] theSearchers) {
+  synchronized public SearcherProvider createSearchProvider(List<IndexSearcher> theSearchers) {
     /*
      * createSearchProvider must be synchronized to ensure that all threads will see a fully
      * initialized SearcherProvider object
      */
-    SearcherProvider newSearcherProvider = new SearcherProvider(theSearchers);
+    SearcherProvider newSearcherProvider = new SearcherProvider(theSearchers,
+        new DisconnectToken());
     getAllSearcherProviders().add(newSearcherProvider);
     LOGGER.debug("createSearchProvider in manager [{}]: returning new SearchProvider and added to"
         + " list [{}].", System.identityHashCode(this), getAllSearcherProviders().size());
     return newSearcherProvider;
+  }
+
+  class DisconnectToken {
+
+    private final AtomicBoolean used = new AtomicBoolean(false);
+
+    boolean isUsed() {
+      return used.get();
+    }
+
+    boolean use(SearcherProvider searchProvider) {
+      if (used.compareAndSet(false, true)) {
+        return removeSearchProvider(searchProvider);
+      }
+      return false;
+    }
   }
 
 }

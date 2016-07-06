@@ -280,6 +280,9 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
   }
 
   // collecting all the fields for using up in search
+  // FIXME (Marc Sladek) this doesn't work after restarts as long as there was no doc indexed with
+  // the required fields, move to database instead of ram? or is there another solution to the
+  // problem it tries to solve?
   private void collectFields(Document luceneDoc) {
     for (Fieldable field : luceneDoc.getFields()) {
       COLLECTED_FIELDS.add(field.name());

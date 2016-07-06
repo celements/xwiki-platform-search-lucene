@@ -4,9 +4,10 @@ import static com.celements.common.test.CelementsTestUtils.*;
 import static junit.framework.Assert.*;
 import static org.easymock.EasyMock.*;
 
+import java.util.Arrays;
 import java.util.Set;
 
-import org.apache.lucene.search.Searcher;
+import org.apache.lucene.search.IndexSearcher;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -40,11 +41,11 @@ public class SearcherProviderManagerTest extends AbstractComponentTest {
 
   @Test
   public void testCreateSearchProvider() {
-    Searcher theMockSearcher = createMockAndAddToDefault(Searcher.class);
+    IndexSearcher theMockSearcher = createMockAndAddToDefault(IndexSearcher.class);
     replayDefault();
     assertTrue(theSearchProvManager.getAllSearcherProviders().isEmpty());
-    SearcherProvider searcherProv = theSearchProvManager.createSearchProvider(new Searcher[] {
-        theMockSearcher });
+    SearcherProvider searcherProv = theSearchProvManager.createSearchProvider(Arrays.asList(
+        theMockSearcher));
     assertNotNull(searcherProv);
     assertEquals(1, theSearchProvManager.getAllSearcherProviders().size());
     verifyDefault();
@@ -60,11 +61,11 @@ public class SearcherProviderManagerTest extends AbstractComponentTest {
 
   @Test
   public void testOnEvent_notEmpty_notMarkedClosed() {
-    Searcher theMockSearcher = createMockAndAddToDefault(Searcher.class);
+    IndexSearcher theMockSearcher = createMockAndAddToDefault(IndexSearcher.class);
     SearchResults mockSearchResults = createMockAndAddToDefault(SearchResults.class);
     replayDefault();
-    SearcherProvider searcherProv = theSearchProvManager.createSearchProvider(new Searcher[] {
-        theMockSearcher });
+    SearcherProvider searcherProv = theSearchProvManager.createSearchProvider(Arrays.asList(
+        theMockSearcher));
     assertEquals(1, theSearchProvManager.getAllSearcherProviders().size());
     searcherProv.connect();
     searcherProv.connectSearchResults(mockSearchResults);
@@ -78,13 +79,13 @@ public class SearcherProviderManagerTest extends AbstractComponentTest {
 
   @Test
   public void testOnEvent_markedClosed_forgotenDisconnect() throws Exception {
-    Searcher theMockSearcher = createMockAndAddToDefault(Searcher.class);
+    IndexSearcher theMockSearcher = createMockAndAddToDefault(IndexSearcher.class);
     SearchResults mockSearchResults = createMockAndAddToDefault(SearchResults.class);
     theMockSearcher.close();
     expectLastCall().once();
     replayDefault();
-    SearcherProvider searcherProv = theSearchProvManager.createSearchProvider(new Searcher[] {
-        theMockSearcher });
+    SearcherProvider searcherProv = theSearchProvManager.createSearchProvider(Arrays.asList(
+        theMockSearcher));
     assertEquals(1, theSearchProvManager.getAllSearcherProviders().size());
     searcherProv.connect();
     searcherProv.markToClose();
@@ -97,13 +98,13 @@ public class SearcherProviderManagerTest extends AbstractComponentTest {
 
   @Test
   public void testOnEvent_empty_markedClosed() throws Exception {
-    Searcher theMockSearcher = createMockAndAddToDefault(Searcher.class);
+    IndexSearcher theMockSearcher = createMockAndAddToDefault(IndexSearcher.class);
     SearchResults mockSearchResults = createMockAndAddToDefault(SearchResults.class);
     theMockSearcher.close();
     expectLastCall().once();
     replayDefault();
-    SearcherProvider searcherProv = theSearchProvManager.createSearchProvider(new Searcher[] {
-        theMockSearcher });
+    SearcherProvider searcherProv = theSearchProvManager.createSearchProvider(Arrays.asList(
+        theMockSearcher));
     assertEquals(1, theSearchProvManager.getAllSearcherProviders().size());
     searcherProv.connect();
     searcherProv.markToClose();

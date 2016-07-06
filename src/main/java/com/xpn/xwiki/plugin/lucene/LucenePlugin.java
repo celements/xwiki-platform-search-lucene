@@ -44,7 +44,6 @@ import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.MultiSearcher;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.ScoreDoc;
-import org.apache.lucene.search.Searcher;
 import org.apache.lucene.search.Sort;
 import org.apache.lucene.search.SortField;
 import org.apache.lucene.search.TermQuery;
@@ -61,6 +60,7 @@ import org.xwiki.context.Execution;
 import org.xwiki.model.reference.WikiReference;
 import org.xwiki.observation.ObservationManager;
 
+import com.google.common.collect.Iterables;
 import com.xpn.xwiki.XWikiContext;
 import com.xpn.xwiki.api.Api;
 import com.xpn.xwiki.api.XWiki;
@@ -159,11 +159,9 @@ public class LucenePlugin extends XWikiDefaultPlugin {
   @Override
   protected void finalize() throws Throwable {
     LOGGER.error("Lucene plugin will exit!");
-
     if (this.indexUpdater != null) {
       this.indexUpdater.doExit();
     }
-    
     super.finalize();
   }
 
@@ -533,8 +531,8 @@ public class LucenePlugin extends XWikiDefaultPlugin {
       } else {
         theSearcherProvider.connect();
       }
-      MultiSearcher searcher = new MultiSearcher(theSearcherProvider.getSearchers());
-
+      MultiSearcher searcher = new MultiSearcher(Iterables.toArray(
+          theSearcherProvider.getSearchers(), IndexSearcher.class));
       // Enhance the base query with wiki names and languages.
       LOGGER.debug("build query for [{}]", query);
       Query q = buildQuery(query, virtualWikiNames, languages);
@@ -741,9 +739,9 @@ public class LucenePlugin extends XWikiDefaultPlugin {
    * @throws IOException
    * @throws LockObtainFailedException
    */
-  public Searcher[] createSearchers(String indexDirs) throws IOException {
+  private List<IndexSearcher> createSearchers(String indexDirs) throws IOException {
     String[] dirs = StringUtils.split(indexDirs, ",");
-    List<IndexSearcher> searchersList = new ArrayList<IndexSearcher>();
+    List<IndexSearcher> ret = new ArrayList<IndexSearcher>();
     IndexWriterConfig cfg = new IndexWriterConfig(VERSION, getAnalyzer());
     for (String dir : dirs) {
       Directory d = FSDirectory.open(new File(dir));
@@ -753,11 +751,11 @@ public class LucenePlugin extends XWikiDefaultPlugin {
           // constructor will throw an exception and fail to initialize
           new IndexWriter(d, cfg).close();
         }
-        searchersList.add(new IndexSearcher(d, true));
+        ret.add(new IndexSearcher(d, true));
         break;
       }
     }
-    return searchersList.toArray(new Searcher[searchersList.size()]);
+    return ret;
   }
 
   /**
