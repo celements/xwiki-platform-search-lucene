@@ -180,7 +180,12 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
   @Override
   protected void runInternal() {
     getContext().setDatabase(getContext().getMainXWiki());
-    runMainLoop();
+    try {
+      runMainLoop();
+    } catch (Throwable exc) {
+      LOGGER.error("Unexpected error occured", exc);
+      throw exc;
+    }
   }
 
   /**
