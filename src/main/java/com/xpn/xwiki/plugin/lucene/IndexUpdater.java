@@ -142,6 +142,7 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
    * processing the queue and then shut down gracefully
    */
   public void doExit() {
+    LOGGER.info("doExit called");
     exit.set(true);
   }
 
@@ -279,8 +280,8 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
    */
   private void checkForInterrupt() {
     if (Thread.currentThread().isInterrupted()) {
-      doExit();
       LOGGER.error("IndexUpdater was interrupted, shutting down");
+      doExit();
     }
   }
 
