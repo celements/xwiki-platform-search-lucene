@@ -250,13 +250,13 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
       try {
         indexData(data);
         hasUncommitedWrites = true;
-        if ((System.currentTimeMillis() - lastCommitTime) >= commitInterval) {
-          commitIndex();
-          lastCommitTime = System.currentTimeMillis();
-          hasUncommitedWrites = false;
-        }
-      } catch (IOException | XWikiException exc) {
+      } catch (Exception exc) {
         LOGGER.error("error indexing document '{}'", data, exc);
+      }
+      if ((System.currentTimeMillis() - lastCommitTime) >= commitInterval) {
+        commitIndex();
+        lastCommitTime = System.currentTimeMillis();
+        hasUncommitedWrites = false;
       }
     }
     if (hasUncommitedWrites) {
