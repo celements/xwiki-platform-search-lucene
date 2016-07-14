@@ -133,7 +133,16 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
         XWikiContext.EXECUTIONCONTEXT_KEY);
   }
 
+  public boolean isExit() {
+    return exit.get();
+  }
+
+  /**
+   * if exit is being set, the IndexUpdater will no longer accept new queue entries, finishes
+   * processing the queue and then shut down gracefully
+   */
   public void doExit() {
+    LOGGER.info("doExit called");
     exit.set(true);
   }
 
@@ -195,7 +204,7 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
    */
   private void runMainLoop() {
     long indexingTimer = 0;
-    while (!exit.get()) {
+    while (!isExit()) {
       try {
         // Check if the indexing interval elapsed.
         if (indexingTimer == 0) {
@@ -250,19 +259,30 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
       try {
         indexData(data);
         hasUncommitedWrites = true;
-        if ((System.currentTimeMillis() - lastCommitTime) >= commitInterval) {
-          commitIndex();
-          lastCommitTime = System.currentTimeMillis();
-          hasUncommitedWrites = false;
-        }
-      } catch (IOException | XWikiException exc) {
+      } catch (Exception exc) {
         LOGGER.error("error indexing document '{}'", data, exc);
       }
+      if ((System.currentTimeMillis() - lastCommitTime) >= commitInterval) {
+        commitIndex();
+        lastCommitTime = System.currentTimeMillis();
+        hasUncommitedWrites = false;
+      }
+      checkForInterrupt();
     }
     if (hasUncommitedWrites) {
       commitIndex();
     }
     LOGGER.info("updateIndex finished");
+  }
+
+  /**
+   * should be called regularly to check for interrupt flag and set exit
+   */
+  private void checkForInterrupt() {
+    if (Thread.currentThread().isInterrupted()) {
+      LOGGER.error("IndexUpdater was interrupted, shutting down");
+      doExit();
+    }
   }
 
   private void indexData(AbstractIndexData data) throws IOException, XWikiException {
@@ -317,26 +337,26 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
   public void queueDeletion(String docId) {
     LOGGER.debug("queueDeletion: '{}'", docId);
     Preconditions.checkNotNull(docId);
-    this.queue.add(new DeleteData(docId));
+    queue(new DeleteData(docId));
   }
 
   public void queueDocument(XWikiDocument document, boolean deleted) {
     LOGGER.debug("queueDocument: '{}'", document);
     Preconditions.checkNotNull(document);
-    queue.add(new DocumentData(document, deleted, getContext()));
+    queue(new DocumentData(document, deleted, getContext()));
   }
 
   public void queueAttachment(XWikiAttachment attachment, boolean deleted) {
     LOGGER.debug("queueAttachment: '{}'", attachment);
     Preconditions.checkNotNull(attachment);
-    queue.add(new AttachmentData(attachment, deleted, getContext()));
+    queue(new AttachmentData(attachment, deleted, getContext()));
   }
 
   public void queueAttachment(XWikiDocument document, String attachmentName, boolean deleted) {
     LOGGER.debug("queueAttachment: '{}', '{}'", document, attachmentName);
     Preconditions.checkNotNull(document);
     Preconditions.checkNotNull(attachmentName);
-    queue.add(new AttachmentData(document, attachmentName, deleted, getContext()));
+    queue(new AttachmentData(document, attachmentName, deleted, getContext()));
   }
 
   public int queueAttachments(XWikiDocument document) {
@@ -353,7 +373,15 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
   public void queueWiki(WikiReference wikiRef, boolean deleted) {
     LOGGER.debug("queueWiki: '{}'", wikiRef);
     Preconditions.checkNotNull(wikiRef);
-    queue.add(new WikiData(wikiRef, deleted));
+    queue(new WikiData(wikiRef, deleted));
+  }
+
+  private void queue(AbstractIndexData data) {
+    if (!isExit()) {
+      queue.add(data);
+    } else {
+      throw new IllegalStateException("IndexUpdater has been shut down");
+    }
   }
 
   @Override
@@ -370,6 +398,14 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
   @Override
   public void onEvent(Event event, Object source, Object data) {
     LOGGER.debug("onEvent: for '{}' on '{}'", event.getClass(), source);
+    try {
+      queueFromEvent(event, source);
+    } catch (IllegalStateException ise) {
+      LOGGER.error("failed to queue '{}': " + ise.getMessage(), source);
+    }
+  }
+
+  private void queueFromEvent(Event event, Object source) {
     if (source == null) {
       LOGGER.error("onEvent: received null source");
     } else if ((event instanceof DocumentUpdatedEvent) || (event instanceof DocumentCreatedEvent)) {
