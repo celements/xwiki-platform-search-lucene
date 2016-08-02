@@ -1,5 +1,7 @@
 package com.xpn.xwiki.plugin.lucene.indexExtension;
 
+import java.text.DecimalFormat;
+import java.text.Format;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
@@ -8,10 +10,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+import javax.inject.Singleton;
+
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.Field.Index;
-import org.apache.lucene.document.NumericField;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.xwiki.component.annotation.Component;
@@ -24,9 +27,12 @@ import com.xpn.xwiki.plugin.lucene.indexExtension.IndexExtensionField.ExtensionT
 import com.xpn.xwiki.web.Utils;
 
 @Component
+@Singleton
 public class LuceneIndexExtensionService implements ILuceneIndexExtensionServiceRole {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(LuceneIndexExtensionService.class);
+
+  private static final Format INT_FORMAT = new DecimalFormat("0000000000");
 
   // do not inject since an extender might use this service
   private List<ILuceneIndexExtender> extenders;
@@ -73,23 +79,6 @@ public class LuceneIndexExtensionService implements ILuceneIndexExtensionService
   }
 
   @Override
-  public IndexExtensionField createField(String name, Number value, ExtensionType extensionType) {
-    NumericField field = new NumericField(name, Field.Store.YES, true);
-    if ((value instanceof Integer) || (value instanceof Short) || (value instanceof Byte)) {
-      field.setIntValue(value.intValue());
-    } else if (value instanceof Long) {
-      field.setLongValue(value.longValue());
-    } else if (value instanceof Float) {
-      field.setFloatValue(value.floatValue());
-    } else if (value instanceof Double) {
-      field.setDoubleValue(value.doubleValue());
-    } else if (value != null) {
-      throw new IllegalArgumentException("Numer is of unsupported type '" + value.toString() + "'");
-    }
-    return new IndexExtensionField(extensionType, field);
-  }
-
-  @Override
   public IndexExtensionField createField(String name, String value, Index indexType,
       ExtensionType extensionType) {
     value = plainTextCmd.convertToPlainText(value).toLowerCase();
@@ -98,13 +87,24 @@ public class LuceneIndexExtensionService implements ILuceneIndexExtensionService
   }
 
   @Override
-  public IndexExtensionField createRemoveField(String name) {
-    return createField(name, "", Index.NOT_ANALYZED, ExtensionType.REMOVE);
+  public IndexExtensionField createField(String name, Number value, ExtensionType extensionType)
+      throws IllegalArgumentException {
+    String strVal = "";
+    if (((value instanceof Integer) || (value instanceof Short) || (value instanceof Byte))) {
+      if ((int) value >= 0) {
+        strVal = INT_FORMAT.format(value);
+      } else {
+        throw new IllegalArgumentException("out of allowed range");
+      }
+    } else if (value != null) {
+      throw new IllegalArgumentException("Numer is of unsupported type '" + value.getClass() + "'");
+    }
+    return createField(name, strVal, Index.NOT_ANALYZED, extensionType);
   }
 
   @Override
   public Collection<IndexExtensionField> createFields(String name, Object value,
-      ExtensionType defaultExtType) {
+      ExtensionType defaultExtType) throws IllegalArgumentException {
     Objects.requireNonNull(Strings.emptyToNull(name));
     value = (value != null ? value : "");
     Collection<IndexExtensionField> ret = new ArrayList<>();
@@ -129,7 +129,7 @@ public class LuceneIndexExtensionService implements ILuceneIndexExtensionService
 
   @Override
   public Collection<IndexExtensionField> createFields(Map<String, Object> fieldMap,
-      ExtensionType defaultExtType) {
+      ExtensionType defaultExtType) throws IllegalArgumentException {
     Collection<IndexExtensionField> ret = new ArrayList<>();
     for (String name : fieldMap.keySet()) {
       if (Strings.emptyToNull(name) != null) {
@@ -140,6 +140,11 @@ public class LuceneIndexExtensionService implements ILuceneIndexExtensionService
       }
     }
     return ret;
+  }
+
+  @Override
+  public IndexExtensionField createRemoveField(String name) {
+    return createField(name, "", Index.NOT_ANALYZED, ExtensionType.REMOVE);
   }
 
 }

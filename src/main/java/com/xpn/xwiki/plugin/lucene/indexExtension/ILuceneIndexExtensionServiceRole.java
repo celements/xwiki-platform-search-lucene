@@ -15,17 +15,18 @@ public interface ILuceneIndexExtensionServiceRole {
 
   public void extend(AbstractIndexData data, Document luceneDoc);
 
-  public IndexExtensionField createField(String name, Number value, ExtensionType extensionType);
-
   public IndexExtensionField createField(String name, String value, Index indexType,
       ExtensionType extensionType);
 
-  public IndexExtensionField createRemoveField(String name);
+  public IndexExtensionField createField(String name, Number value, ExtensionType extensionType)
+      throws IllegalArgumentException;
 
   public Collection<IndexExtensionField> createFields(String name, Object value,
-      ExtensionType defaultExtType);
+      ExtensionType defaultExtType) throws IllegalArgumentException;
 
   public Collection<IndexExtensionField> createFields(Map<String, Object> fieldMap,
-      ExtensionType defaultExtType);
+      ExtensionType defaultExtType) throws IllegalArgumentException;
+
+  public IndexExtensionField createRemoveField(String name);
 
 }
