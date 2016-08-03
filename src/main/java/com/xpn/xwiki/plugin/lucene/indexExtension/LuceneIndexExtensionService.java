@@ -1,7 +1,5 @@
 package com.xpn.xwiki.plugin.lucene.indexExtension;
 
-import java.text.DecimalFormat;
-import java.text.Format;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
@@ -31,8 +29,6 @@ import com.xpn.xwiki.web.Utils;
 public class LuceneIndexExtensionService implements ILuceneIndexExtensionServiceRole {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(LuceneIndexExtensionService.class);
-
-  private static final Format INT_FORMAT = new DecimalFormat("0000000000");
 
   // do not inject since an extender might use this service
   private List<ILuceneIndexExtender> extenders;
@@ -89,17 +85,7 @@ public class LuceneIndexExtensionService implements ILuceneIndexExtensionService
   @Override
   public IndexExtensionField createField(String name, Number value, ExtensionType extensionType)
       throws IllegalArgumentException {
-    String strVal = "";
-    if (((value instanceof Integer) || (value instanceof Short) || (value instanceof Byte))) {
-      if ((int) value >= 0) {
-        strVal = INT_FORMAT.format(value);
-      } else {
-        throw new IllegalArgumentException("out of allowed range");
-      }
-    } else if (value != null) {
-      throw new IllegalArgumentException("Numer is of unsupported type '" + value.getClass() + "'");
-    }
-    return createField(name, strVal, Index.NOT_ANALYZED, extensionType);
+    return createField(name, IndexFields.numberToString(value), Index.NOT_ANALYZED, extensionType);
   }
 
   @Override

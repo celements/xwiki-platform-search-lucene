@@ -19,6 +19,7 @@
  */
 package com.xpn.xwiki.plugin.lucene;
 
+import java.text.DecimalFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
@@ -30,7 +31,10 @@ import org.apache.commons.lang3.time.FastDateFormat;
  *
  * @version $Id: c5240610a807da9be47eebfeb002872449773cb6 $
  */
-public abstract class IndexFields {
+public class IndexFields {
+
+  private IndexFields() {
+  }
 
   /**
    * Keyword field, holds a string uniquely identifying a document across the index. this
@@ -138,7 +142,10 @@ public abstract class IndexFields {
    */
   public static final String DATE_FORMAT = "yyyyMMddHHmm";
 
-  private static final FastDateFormat DF = FastDateFormat.getInstance(IndexFields.DATE_FORMAT);
+  private static final FastDateFormat DF = FastDateFormat.getInstance(DATE_FORMAT);
+
+  public static final String DATE_LOW = "000101010000";
+  public static final String DATE_HIGH = "999912312359";
 
   public static final String dateToString(Date date) {
     return DF.format(date);
@@ -159,6 +166,21 @@ public abstract class IndexFields {
     return Boolean.parseBoolean(booleanValue);
   }
 
-  private IndexFields() {
+  public static final DecimalFormat INT_FORMAT = new DecimalFormat("0000000000");
+
+  public static String numberToString(Number number) {
+    String ret = "";
+    if (((number instanceof Integer) || (number instanceof Short) || (number instanceof Byte))) {
+      if ((int) number >= 0) {
+        ret = INT_FORMAT.format(number);
+      } else {
+        throw new IllegalArgumentException("out of allowed range");
+      }
+    } else if (number != null) {
+      throw new IllegalArgumentException("Numer is of unsupported type '" + number.getClass()
+          + "'");
+    }
+    return ret;
   }
+
 }
