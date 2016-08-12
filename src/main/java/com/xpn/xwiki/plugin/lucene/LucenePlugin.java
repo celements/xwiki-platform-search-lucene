@@ -145,6 +145,8 @@ public class LucenePlugin extends XWikiDefaultPlugin {
    */
   private volatile List<Directory> indexDirs;
 
+  private volatile boolean doRebuild = false;
+
   public LucenePlugin(String name, String className, XWikiContext context) {
     super(name, className, context);
     indexUpdaterExecutor = Executors.newSingleThreadExecutor();
@@ -683,11 +685,14 @@ public class LucenePlugin extends XWikiDefaultPlugin {
       this.indexRebuilder = new IndexRebuilder(indexUpdater, context);
       openSearchers();
       registerIndexUpdater();
-      checkInitialRebuild();
-      LOGGER.debug("Lucene plugin initialized.");
-    } catch (IOException e) {
-      LOGGER.error("Failed to open the index directory: ", e);
-      throw new RuntimeException(e);
+      if (doRebuild) {
+        rebuildIndex();
+        LOGGER.info("Launched initial lucene indexing");
+      }
+      LOGGER.info("Lucene plugin initialized.");
+    } catch (IOException exc) {
+      LOGGER.error("Failed to open the index directory: ", exc);
+      throw new RuntimeException(exc);
     }
   }
 
@@ -705,6 +710,10 @@ public class LucenePlugin extends XWikiDefaultPlugin {
       if (!IndexReader.indexExists(dir)) {
         // If there's no index create an empty one
         openWriter(dir, OpenMode.CREATE_OR_APPEND).close();
+        if (indexDirs.startsWith(path)) {
+          // writeIndex didn't exist, do a rebuild
+          doRebuild = true;
+        }
       }
       ret.add(FSDirectory.open(file));
     }
@@ -765,13 +774,6 @@ public class LucenePlugin extends XWikiDefaultPlugin {
     }
   }
 
-  private void checkInitialRebuild() throws IOException {
-    if (!IndexReader.indexExists(getWriteDirectory())) {
-      rebuildIndex();
-      LOGGER.info("Launched initial lucene indexing");
-    }
-  }
-
   @Override
   public void flushCache(XWikiContext context) {
     LOGGER.warn("flushing cache not supported");
@@ -813,8 +815,7 @@ public class LucenePlugin extends XWikiDefaultPlugin {
         }
         this.searcherProvider = getSearcherProviderManager().createSearchProvider(createSearchers(
             indexDirs));
-      } catch (Exception exp) {
-        LOGGER.error("Error opening searchers for index dirs [{}]", this.indexDirs, exp);
+      } catch (IOException exp) {
         throw new RuntimeException("Error opening searchers for index dirs " + this.indexDirs, exp);
       }
     }
