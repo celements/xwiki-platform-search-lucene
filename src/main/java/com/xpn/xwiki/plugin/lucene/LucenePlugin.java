@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -34,6 +35,7 @@ import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
+import org.apache.lucene.index.IndexWriterConfig.OpenMode;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.queryParser.MultiFieldQueryParser;
 import org.apache.lucene.queryParser.ParseException;
@@ -60,6 +62,7 @@ import org.xwiki.context.Execution;
 import org.xwiki.model.reference.WikiReference;
 import org.xwiki.observation.ObservationManager;
 
+import com.google.common.base.Strings;
 import com.google.common.collect.Iterables;
 import com.xpn.xwiki.XWikiContext;
 import com.xpn.xwiki.api.Api;
@@ -108,6 +111,8 @@ public class LucenePlugin extends XWikiDefaultPlugin {
 
   private static final String DEFAULT_ANALYZER = "org.apache.lucene.analysis.standard.StandardAnalyzer";
 
+  static final String PROP_WRITER_BUFFER_SIZE = "xwiki.plugins.lucene.writerBufferSize";
+
   /**
    * Lucene index updater. Listens for changes and indexes wiki documents in a separate
    * thread.
@@ -133,13 +138,12 @@ public class LucenePlugin extends XWikiDefaultPlugin {
   private SearcherProvider searcherProvider;
 
   /**
-   * Comma separated list of directories holding Lucene index data. The first such
-   * directory is used by the internal indexer. Can be configured in <tt>xwiki.cfg</tt>
-   * using the key {@link #PROP_INDEX_DIR} ( <tt>xwiki.plugins.lucene.indexdir</tt>). If
-   * no directory is configured, then a subdirectory <tt>lucene</tt> in the application's
-   * work directory is used.
+   * A list of directories holding Lucene index data. The first such directory is used by the
+   * internal indexer. Can be configured in <tt>xwiki.cfg</tt> using the key {@link #PROP_INDEX_DIR}
+   * ( <tt>xwiki.plugins.lucene.indexdir</tt>). If no directory is configured, then a subdirectory
+   * <tt>lucene</tt> in the application's work directory is used.
    */
-  private String indexDirs;
+  private volatile List<Directory> indexDirs;
 
   public LucenePlugin(String name, String className, XWikiContext context) {
     super(name, className, context);
@@ -209,7 +213,7 @@ public class LucenePlugin extends XWikiDefaultPlugin {
   public SearchResults getSearchResultsFromIndexes(String query, String myIndexDirs,
       String languages, XWikiContext context) throws IOException, ParseException {
     SearcherProvider mySearchers = getSearcherProviderManager().createSearchProvider(
-        createSearchers(myIndexDirs));
+        createSearchers(getIndexDirectories(myIndexDirs)));
     try {
       SearchResults retval = search(query, (String) null, null, languages, mySearchers, false,
           context);
@@ -247,7 +251,7 @@ public class LucenePlugin extends XWikiDefaultPlugin {
       String myIndexDirs, String languages, XWikiContext context) throws IOException,
       ParseException {
     SearcherProvider mySearchers = getSearcherProviderManager().createSearchProvider(
-        createSearchers(myIndexDirs));
+        createSearchers(getIndexDirectories(myIndexDirs)));
     try {
       SearchResults retval = search(query, sortFields, null, languages, mySearchers, false,
           context);
@@ -286,7 +290,7 @@ public class LucenePlugin extends XWikiDefaultPlugin {
       String myIndexDirs, String languages, XWikiContext context) throws IOException,
       ParseException {
     SearcherProvider mySearchers = getSearcherProviderManager().createSearchProvider(
-        createSearchers(myIndexDirs));
+        createSearchers(getIndexDirectories(myIndexDirs)));
     try {
       SearchResults retval = search(query, sortField, null, languages, mySearchers, false, context);
       return retval;
@@ -672,13 +676,9 @@ public class LucenePlugin extends XWikiDefaultPlugin {
     LOGGER.debug("Lucene plugin: in init");
     super.init(getContext());
     try {
-      this.indexDirs = getConfiguredIndexDirs();
-      File file = new File(StringUtils.split(this.indexDirs, ",")[0]);
-      if (!file.exists()) {
-        file.mkdirs();
-      }
-      Directory directory = FSDirectory.open(file);
-      this.indexUpdater = new IndexUpdater(directory, this, context);
+      indexDirs = getIndexDirectories("");
+      IndexWriter writer = openWriter(getWriteDirectory(), OpenMode.CREATE_OR_APPEND);
+      this.indexUpdater = new IndexUpdater(writer, this, context);
       indexUpdaterExecutor.submit(indexUpdater);
       this.indexRebuilder = new IndexRebuilder(indexUpdater, context);
       openSearchers();
@@ -691,6 +691,53 @@ public class LucenePlugin extends XWikiDefaultPlugin {
     }
   }
 
+  private List<Directory> getIndexDirectories(String indexDirs) throws IOException {
+    List<Directory> ret = new ArrayList<>();
+    if (Strings.isNullOrEmpty(indexDirs)) {
+      indexDirs = getConfiguredIndexDirs();
+    }
+    for (String path : indexDirs.split(",")) {
+      File file = new File(path);
+      if (!file.exists()) {
+        file.mkdirs();
+      }
+      Directory dir = FSDirectory.open(file);
+      if (!IndexReader.indexExists(dir)) {
+        // If there's no index create an empty one
+        openWriter(dir, OpenMode.CREATE_OR_APPEND).close();
+      }
+      ret.add(FSDirectory.open(file));
+    }
+    if (ret.isEmpty()) {
+      throw new IllegalArgumentException("no index directory defined");
+    }
+    return ret;
+  }
+
+  IndexWriter openWriter(Directory directory, OpenMode openMode) throws IOException {
+    IndexWriter ret = null;
+    while (ret == null) {
+      try {
+        IndexWriterConfig cfg = new IndexWriterConfig(LucenePlugin.VERSION, getAnalyzer());
+        cfg.setRAMBufferSizeMB(getContext().getWiki().ParamAsLong(PROP_WRITER_BUFFER_SIZE,
+            (long) IndexWriterConfig.DEFAULT_RAM_BUFFER_SIZE_MB));
+        if (openMode != null) {
+          cfg.setOpenMode(openMode);
+        }
+        ret = new IndexWriter(directory, cfg);
+      } catch (LockObtainFailedException exc) {
+        try {
+          int ms = new Random().nextInt(1000);
+          LOGGER.debug("failed to acquire lock, retrying in {}ms ...", ms);
+          Thread.sleep(ms);
+        } catch (InterruptedException ex) {
+          LOGGER.warn("Error while sleeping", ex);
+        }
+      }
+    }
+    return ret;
+  }
+
   @SuppressWarnings("unchecked")
   private Analyzer getAnalyzerInternal(String analyzerClassName)
       throws ReflectiveOperationException {
@@ -700,7 +747,7 @@ public class LucenePlugin extends XWikiDefaultPlugin {
 
   private String getConfiguredIndexDirs() {
     String ret = getContext().getWiki().Param(PROP_INDEX_DIR);
-    if (StringUtils.isEmpty(ret)) {
+    if (Strings.isNullOrEmpty(ret)) {
       ret = getContext().getWiki().getWorkSubdirectory("lucene", getContext()).getAbsolutePath();
     }
     return ret;
@@ -719,7 +766,7 @@ public class LucenePlugin extends XWikiDefaultPlugin {
   }
 
   private void checkInitialRebuild() throws IOException {
-    if (!IndexReader.indexExists(indexUpdater.getDirectory())) {
+    if (!IndexReader.indexExists(getWriteDirectory())) {
       rebuildIndex();
       LOGGER.info("Launched initial lucene indexing");
     }
@@ -733,27 +780,13 @@ public class LucenePlugin extends XWikiDefaultPlugin {
   /**
    * Creates an array of Searchers for a number of lucene indexes.
    *
-   * @param indexDirs
-   *          Comma separated list of Lucene index directories to create searchers for.
    * @return Array of searchers
    * @throws IOException
-   * @throws LockObtainFailedException
    */
-  private List<IndexSearcher> createSearchers(String indexDirs) throws IOException {
-    String[] dirs = StringUtils.split(indexDirs, ",");
-    List<IndexSearcher> ret = new ArrayList<IndexSearcher>();
-    IndexWriterConfig cfg = new IndexWriterConfig(VERSION, getAnalyzer());
-    for (String dir : dirs) {
-      Directory d = FSDirectory.open(new File(dir));
-      while (true) {
-        if (!IndexReader.indexExists(d)) {
-          // If there's no index there, create an empty one; otherwise the reader
-          // constructor will throw an exception and fail to initialize
-          new IndexWriter(d, cfg).close();
-        }
-        ret.add(new IndexSearcher(d, true));
-        break;
-      }
+  private List<IndexSearcher> createSearchers(List<Directory> indexDirs) throws IOException {
+    List<IndexSearcher> ret = new ArrayList<>();
+    for (Directory dir : indexDirs) {
+      ret.add(new IndexSearcher(dir, true));
     }
     return ret;
   }
@@ -779,7 +812,7 @@ public class LucenePlugin extends XWikiDefaultPlugin {
           this.searcherProvider = null;
         }
         this.searcherProvider = getSearcherProviderManager().createSearchProvider(createSearchers(
-            this.indexDirs));
+            indexDirs));
       } catch (Exception exp) {
         LOGGER.error("Error opening searchers for index dirs [{}]", this.indexDirs, exp);
         throw new RuntimeException("Error opening searchers for index dirs " + this.indexDirs, exp);
@@ -789,8 +822,8 @@ public class LucenePlugin extends XWikiDefaultPlugin {
     return this.searcherProvider;
   }
 
-  public String getIndexDirs() {
-    return this.indexDirs;
+  public Directory getWriteDirectory() {
+    return indexDirs.get(0);
   }
 
   public long getQueueSize() {

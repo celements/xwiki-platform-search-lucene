@@ -24,7 +24,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -33,10 +32,7 @@ import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Fieldable;
 import org.apache.lucene.index.CorruptIndexException;
 import org.apache.lucene.index.IndexWriter;
-import org.apache.lucene.index.IndexWriterConfig;
-import org.apache.lucene.index.IndexWriterConfig.OpenMode;
 import org.apache.lucene.store.Directory;
-import org.apache.lucene.store.LockObtainFailedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.xwiki.bridge.event.DocumentCreatedEvent;
@@ -80,8 +76,6 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
 
   static final String PROP_COMMIT_INTERVAL = "xwiki.plugins.lucene.commitinterval";
 
-  static final String PROP_WRITER_BUFFER_SIZE = "xwiki.plugins.lucene.writerBufferSize";
-
   public static final String NAME = "lucene";
 
   /**
@@ -100,11 +94,9 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
   private static final Set<String> COLLECTED_FIELDS = Collections.newSetFromMap(
       new ConcurrentHashMap<String, Boolean>());
 
-  private final LucenePlugin plugin;
+  final LucenePlugin plugin;
 
-  private final Directory directory;
-
-  private final IndexWriter writer;
+  final IndexWriter writer;
 
   /**
    * Milliseconds of sleep between checks for changed documents.
@@ -119,13 +111,12 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
 
   private final AtomicBoolean optimize = new AtomicBoolean(false);
 
-  IndexUpdater(Directory directory, LucenePlugin plugin, XWikiContext context) throws IOException {
+  IndexUpdater(IndexWriter writer, LucenePlugin plugin, XWikiContext context) throws IOException {
     super(XWikiContext.EXECUTIONCONTEXT_KEY, context.clone());
     this.plugin = plugin;
-    this.directory = directory;
     this.indexingInterval = 1000 * context.getWiki().ParamAsLong(PROP_INDEXING_INTERVAL, 30);
     this.commitInterval = context.getWiki().ParamAsLong(PROP_COMMIT_INTERVAL, 5000);
-    this.writer = openWriter(OpenMode.CREATE_OR_APPEND);
+    this.writer = writer;
   }
 
   private XWikiContext getContext() {
@@ -150,35 +141,11 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
     optimize.set(true);
   }
 
-  IndexWriter openWriter(OpenMode openMode) throws IOException {
-    IndexWriter ret = null;
-    while (ret == null) {
-      try {
-        IndexWriterConfig cfg = new IndexWriterConfig(LucenePlugin.VERSION, plugin.getAnalyzer());
-        cfg.setRAMBufferSizeMB(getContext().getWiki().ParamAsLong(PROP_WRITER_BUFFER_SIZE,
-            (long) IndexWriterConfig.DEFAULT_RAM_BUFFER_SIZE_MB));
-        if (openMode != null) {
-          cfg.setOpenMode(openMode);
-        }
-        ret = new IndexWriter(getDirectory(), cfg);
-      } catch (LockObtainFailedException exc) {
-        try {
-          int ms = new Random().nextInt(1000);
-          LOGGER.debug("failed to acquire lock, retrying in {}ms ...", ms);
-          Thread.sleep(ms);
-        } catch (InterruptedException ex) {
-          LOGGER.warn("Error while sleeping", ex);
-        }
-      }
-    }
-    return ret;
-  }
-
   /**
    * Return a reference to the directory that this updater is currently working with.
    */
   public Directory getDirectory() {
-    return this.directory;
+    return writer.getDirectory();
   }
 
   /**
