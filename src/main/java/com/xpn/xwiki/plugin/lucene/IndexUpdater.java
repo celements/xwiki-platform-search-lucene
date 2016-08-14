@@ -224,8 +224,10 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
     while (!queue.isEmpty()) {
       AbstractIndexData data = queue.remove();
       try {
+        LOGGER.debug("updateIndex start document '{}'", data.getEntityReference());
         indexData(data);
         hasUncommitedWrites = true;
+        LOGGER.debug("updateIndex successfully finished document '{}'", data.getEntityReference());
       } catch (Exception exc) {
         LOGGER.error("error indexing document '{}'", data.getEntityReference(), exc);
       }
