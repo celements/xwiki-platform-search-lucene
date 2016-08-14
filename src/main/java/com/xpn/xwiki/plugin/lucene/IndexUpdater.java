@@ -227,7 +227,7 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
         indexData(data);
         hasUncommitedWrites = true;
       } catch (Exception exc) {
-        LOGGER.error("error indexing document '{}'", data, exc);
+        LOGGER.error("error indexing document '{}'", data.getEntityReference(), exc);
       }
       if ((System.currentTimeMillis() - lastCommitTime) >= commitInterval) {
         commitIndex();
