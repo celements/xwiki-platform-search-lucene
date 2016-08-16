@@ -30,6 +30,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.xwiki.model.reference.EntityReferenceSerializer;
 
+import com.celements.web.plugin.cmd.ConvertToPlainTextException;
 import com.celements.web.plugin.cmd.PlainTextCommand;
 import com.xpn.xwiki.XWikiContext;
 import com.xpn.xwiki.doc.XWikiDocument;
@@ -85,11 +86,20 @@ public class DocumentData extends AbstractDocumentData {
 
     sb.append(" ");
     // TODO should it be rendered maybe by plainPageType view?
-    sb.append(StringUtils.lowerCase(plainTextCmd.convertToPlainText(doc.getContent())));
+    sb.append(StringUtils.lowerCase(convertHtmlToPlainText(doc.getContent())));
     sb.append(" ");
 
     // XXX removing xwiki adding all properties to fulltext. What should it be good for?
     // getObjectFullText(sb, doc, context);
+  }
+
+  private String convertHtmlToPlainText(String htmlContent) {
+    try {
+      return plainTextCmd.convertHtmlToPlainText(htmlContent);
+    } catch (ConvertToPlainTextException exp) {
+      LOGGER.error("Failed to convert html content to plain text.", exp);
+    }
+    return "";
   }
 
   /**
@@ -120,7 +130,7 @@ public class DocumentData extends AbstractDocumentData {
     // FIXME Can baseProperty really be null?
     if ((baseProperty != null) && (baseProperty.getValue() != null)) {
       if (!(baseObject.getXClass(context).getField(property) instanceof PasswordClass)) {
-        contentText.append(plainTextCmd.convertToPlainText(
+        contentText.append(convertHtmlToPlainText(
             baseProperty.getValue().toString()).toLowerCase());
       }
     }
