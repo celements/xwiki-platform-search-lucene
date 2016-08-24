@@ -39,16 +39,17 @@ import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.search.TotalHitCountCollector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.suigeneris.jrcs.rcs.Version;
 import org.xwiki.model.reference.DocumentReference;
 import org.xwiki.model.reference.WikiReference;
 import org.xwiki.query.QueryException;
 
 import com.celements.model.access.IModelAccessFacade;
 import com.celements.model.access.exception.DocumentNotExistsException;
+import com.celements.model.classes.metadata.DocumentMetaData;
 import com.celements.model.context.ModelContext;
 import com.celements.model.util.ModelUtils;
 import com.celements.store.DocumentCacheStore;
-import com.celements.store.DocumentMetaData;
 import com.celements.store.XWikiStoreMetaDataExtension;
 import com.google.common.base.Strings;
 import com.xpn.xwiki.XWikiContext;
@@ -293,14 +294,11 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
       remainingDocs = getAllIndexedDocs(wikiRef, searcher);
     }
     int ret = 0, count = 0;
-    List<DocumentMetaData> documentsToIndex = getAllDocMetaData(wikiRef);
+    Set<DocumentMetaData> documentsToIndex = getAllDocMetaData(wikiRef);
     for (DocumentMetaData metaData : documentsToIndex) {
-      String language = Strings.isNullOrEmpty(metaData.getLanguage()) ? "default"
-          : metaData.getLanguage();
-      String docId = getModelUtils().serializeRef(metaData.getDocRef()) + "." + language;
-      if (!onlyNew || !isIndexed(metaData.getDocRef(), metaData.getVersion().toString(), language,
-          searcher)) {
-        ret += queueDocument(metaData.getDocRef(), language);
+      String docId = getDocId(metaData);
+      if (!onlyNew || !isIndexed(metaData, searcher)) {
+        ret += queueDocument(metaData);
         LOGGER.trace("indexed {}", docId);
       } else {
         LOGGER.trace("skipped '{}', already indexed", docId);
@@ -317,7 +315,7 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
     return ret;
   }
 
-  private List<DocumentMetaData> getAllDocMetaData(WikiReference wikiRef) throws QueryException {
+  private Set<DocumentMetaData> getAllDocMetaData(WikiReference wikiRef) throws QueryException {
     XWikiStoreMetaDataExtension store;
     if (getContext().getXWikiContext().getWiki().getStore() instanceof XWikiStoreMetaDataExtension) {
       store = (XWikiStoreMetaDataExtension) getContext().getXWikiContext().getWiki().getStore();
@@ -325,7 +323,7 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
       store = (XWikiStoreMetaDataExtension) Utils.getComponent(XWikiCacheStoreInterface.class,
           DocumentCacheStore.COMPONENT_NAME);
     }
-    return store.listMetaData(hqlFilter);
+    return store.listDocumentMetaData(hqlFilter);
   }
 
   public Set<String> getAllIndexedDocs(WikiReference wikiRef, IndexSearcher searcher)
@@ -359,12 +357,13 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
     }
   }
 
-  protected int queueDocument(DocumentReference docRef, String lang) throws XWikiException,
+  protected int queueDocument(DocumentMetaData metaData) throws XWikiException,
       InterruptedException {
     int retval = 0;
     try {
-      XWikiDocument doc = getModelAccess().getDocument(docRef);
-      XWikiDocument tdoc = doc.getTranslatedDocument(lang, getContext().getXWikiContext());
+      XWikiDocument doc = getModelAccess().getDocument(metaData.getDocRef());
+      XWikiDocument tdoc = doc.getTranslatedDocument(metaData.getLanguage(),
+          getContext().getXWikiContext());
       waitForLowQueueSize();
       indexUpdater.queueDocument(tdoc, false);
       ++retval;
@@ -372,7 +371,7 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
         retval += indexUpdater.queueAttachments(doc);
       }
     } catch (DocumentNotExistsException exc) {
-      LOGGER.warn("failed to queue doc '{}' lang '{}'", docRef, lang);
+      LOGGER.warn("failed to queue doc '{}'", metaData);
     }
     return retval;
   }
@@ -398,7 +397,11 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
     return isIndexed(docRef, null, null, searcher);
   }
 
-  public boolean isIndexed(DocumentReference docRef, String version, String language,
+  public boolean isIndexed(DocumentMetaData metaData, IndexSearcher searcher) throws IOException {
+    return isIndexed(metaData.getDocRef(), metaData.getLanguage(), metaData.getVersion(), searcher);
+  }
+
+  public boolean isIndexed(DocumentReference docRef, String language, Version version,
       IndexSearcher searcher) throws IOException {
     boolean exists = false;
     BooleanQuery query = new BooleanQuery();
@@ -408,12 +411,10 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
         docRef.getLastSpaceReference().getName().toLowerCase())), BooleanClause.Occur.MUST);
     query.add(new TermQuery(new Term(IndexFields.DOCUMENT_WIKI,
         docRef.getWikiReference().getName().toLowerCase())), BooleanClause.Occur.MUST);
+    query.add(new TermQuery(new Term(IndexFields.DOCUMENT_LANGUAGE, Strings.isNullOrEmpty(language)
+        ? "default" : language)), BooleanClause.Occur.MUST);
     if (version != null) {
-      query.add(new TermQuery(new Term(IndexFields.DOCUMENT_VERSION, version)),
-          BooleanClause.Occur.MUST);
-    }
-    if (language != null) {
-      query.add(new TermQuery(new Term(IndexFields.DOCUMENT_LANGUAGE, language)),
+      query.add(new TermQuery(new Term(IndexFields.DOCUMENT_VERSION, version.toString())),
           BooleanClause.Occur.MUST);
     }
     TotalHitCountCollector collector = new TotalHitCountCollector();
@@ -422,15 +423,27 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
     return exists;
   }
 
-  private IModelAccessFacade getModelAccess() {
+  static String getDocId(DocumentMetaData metaData) {
+    StringBuilder sb = new StringBuilder();
+    sb.append(getModelUtils().serializeRef(metaData.getDocRef()));
+    sb.append(".");
+    if (!Strings.isNullOrEmpty(metaData.getLanguage())) {
+      sb.append(metaData.getLanguage());
+    } else {
+      sb.append("default");
+    }
+    return sb.toString();
+  }
+
+  private static IModelAccessFacade getModelAccess() {
     return Utils.getComponent(IModelAccessFacade.class);
   }
 
-  private ModelUtils getModelUtils() {
+  private static ModelUtils getModelUtils() {
     return Utils.getComponent(ModelUtils.class);
   }
 
-  private ModelContext getContext() {
+  private static ModelContext getContext() {
     return Utils.getComponent(ModelContext.class);
   }
 
