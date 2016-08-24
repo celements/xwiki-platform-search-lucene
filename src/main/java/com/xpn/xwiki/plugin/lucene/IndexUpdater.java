@@ -39,7 +39,6 @@ import org.xwiki.bridge.event.DocumentCreatedEvent;
 import org.xwiki.bridge.event.DocumentDeletedEvent;
 import org.xwiki.bridge.event.DocumentUpdatedEvent;
 import org.xwiki.bridge.event.WikiDeletedEvent;
-import org.xwiki.context.Execution;
 import org.xwiki.model.reference.EntityReference;
 import org.xwiki.model.reference.WikiReference;
 import org.xwiki.observation.EventListener;
@@ -47,7 +46,9 @@ import org.xwiki.observation.ObservationManager;
 import org.xwiki.observation.event.Event;
 
 import com.celements.common.observation.event.AbstractEntityEvent;
-import com.celements.web.service.IWebUtilsService;
+import com.celements.model.context.ModelContext;
+import com.celements.model.util.ModelUtils;
+import com.celements.model.util.References;
 import com.google.common.base.Preconditions;
 import com.xpn.xwiki.XWikiContext;
 import com.xpn.xwiki.XWikiException;
@@ -119,11 +120,6 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
     this.writer = writer;
   }
 
-  private XWikiContext getContext() {
-    return (XWikiContext) Utils.getComponent(Execution.class).getContext().getProperty(
-        XWikiContext.EXECUTIONCONTEXT_KEY);
-  }
-
   public boolean isExit() {
     return exit.get();
   }
@@ -156,7 +152,7 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
   @Override
   protected void runInternal() {
     LOGGER.info("IndexUpdater started");
-    getContext().setDatabase(getContext().getMainXWiki());
+    getContext().setWiki(getContext().getMainWiki());
     try {
       runMainLoop();
     } catch (Throwable exc) {
@@ -208,11 +204,10 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
     if (queue.isEmpty()) {
       LOGGER.debug("pollIndexQueue: queue empty, nothing to do");
     } else {
-      String curDB = getContext().getDatabase();
       try {
         updateIndex();
       } finally {
-        getContext().setDatabase(curDB);
+        getContext().setWiki(getContext().getMainWiki());
       }
     }
   }
@@ -255,7 +250,7 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
   }
 
   private void indexData(AbstractIndexData data) throws IOException, XWikiException {
-    getContext().setDatabase(getWebUtils().getWikiRef(data.getEntityReference()).getName());
+    getContext().setWiki(References.extractRef(data.getEntityReference(), WikiReference.class));
     if (data.isDeleted()) {
       removeFromIndex(data);
     } else {
@@ -268,7 +263,7 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
     EntityReference ref = data.getEntityReference();
     notify(new LuceneDocumentIndexingEvent(ref));
     Document luceneDoc = new Document();
-    data.addDataToLuceneDocument(luceneDoc, getContext());
+    data.addDataToLuceneDocument(luceneDoc, getContext().getXWikiContext());
     getLuceneExtensionService().extend(data, luceneDoc);
     collectFields(luceneDoc);
     writer.updateDocument(data.getTerm(), luceneDoc);
@@ -312,20 +307,20 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
   public void queueDocument(XWikiDocument document, boolean deleted) {
     LOGGER.debug("queueDocument: '{}'", document);
     Preconditions.checkNotNull(document);
-    queue(new DocumentData(document, deleted, getContext()));
+    queue(new DocumentData(document, deleted, getContext().getXWikiContext()));
   }
 
   public void queueAttachment(XWikiAttachment attachment, boolean deleted) {
     LOGGER.debug("queueAttachment: '{}'", attachment);
     Preconditions.checkNotNull(attachment);
-    queue(new AttachmentData(attachment, deleted, getContext()));
+    queue(new AttachmentData(attachment, deleted, getContext().getXWikiContext()));
   }
 
   public void queueAttachment(XWikiDocument document, String attachmentName, boolean deleted) {
     LOGGER.debug("queueAttachment: '{}', '{}'", document, attachmentName);
     Preconditions.checkNotNull(document);
     Preconditions.checkNotNull(attachmentName);
-    queue(new AttachmentData(document, attachmentName, deleted, getContext()));
+    queue(new AttachmentData(document, attachmentName, deleted, getContext().getXWikiContext()));
   }
 
   public int queueAttachments(XWikiDocument document) {
@@ -388,7 +383,7 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
     } else if (event instanceof AttachmentDeletedEvent) {
       queueAttachment((XWikiDocument) source, ((AbstractAttachmentEvent) event).getName(), true);
     } else if (event instanceof WikiDeletedEvent) {
-      queueWiki(getWebUtils().resolveReference((String) source, WikiReference.class), true);
+      queueWiki(getModelUtils().resolveRef((String) source, WikiReference.class), true);
     }
   }
 
@@ -421,12 +416,16 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
     Utils.getComponent(ObservationManager.class).notify(event, event.getReference(), getContext());
   }
 
-  public ILuceneIndexExtensionServiceRole getLuceneExtensionService() {
+  private ILuceneIndexExtensionServiceRole getLuceneExtensionService() {
     return Utils.getComponent(ILuceneIndexExtensionServiceRole.class);
   }
 
-  public IWebUtilsService getWebUtils() {
-    return Utils.getComponent(IWebUtilsService.class);
+  private ModelUtils getModelUtils() {
+    return Utils.getComponent(ModelUtils.class);
+  }
+
+  private ModelContext getContext() {
+    return Utils.getComponent(ModelContext.class);
   }
 
 }

@@ -39,19 +39,22 @@ import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.search.TotalHitCountCollector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.xwiki.context.Execution;
 import org.xwiki.model.reference.DocumentReference;
-import org.xwiki.model.reference.SpaceReference;
 import org.xwiki.model.reference.WikiReference;
-import org.xwiki.query.Query;
 import org.xwiki.query.QueryException;
-import org.xwiki.query.QueryManager;
 
-import com.celements.web.service.IWebUtilsService;
+import com.celements.model.access.IModelAccessFacade;
+import com.celements.model.access.exception.DocumentNotExistsException;
+import com.celements.model.context.ModelContext;
+import com.celements.model.util.ModelUtils;
+import com.celements.store.DocumentCacheStore;
+import com.celements.store.DocumentMetaData;
+import com.celements.store.XWikiStoreMetaDataExtension;
 import com.google.common.base.Strings;
 import com.xpn.xwiki.XWikiContext;
 import com.xpn.xwiki.XWikiException;
 import com.xpn.xwiki.doc.XWikiDocument;
+import com.xpn.xwiki.store.XWikiCacheStoreInterface;
 import com.xpn.xwiki.util.AbstractXWikiRunnable;
 import com.xpn.xwiki.web.Utils;
 
@@ -150,11 +153,6 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
     this.maxQueueSize = context.getWiki().ParamAsLong(PROP_MAX_QUEUE_SIZE, 1000);
   }
 
-  private XWikiContext getContext() {
-    return (XWikiContext) Utils.getComponent(Execution.class).getContext().getProperty(
-        XWikiContext.EXECUTIONCONTEXT_KEY);
-  }
-
   public boolean startIndexRebuild() {
     return startIndexRebuild(null, "", false);
   }
@@ -187,19 +185,20 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
       return wikis;
     } else {
       Set<WikiReference> ret = new HashSet<>();
-      if (getContext().getWiki().isVirtualMode()) {
+      if (getContext().getXWikiContext().getWiki().isVirtualMode()) {
         try {
-          for (String wiki : getContext().getWiki().getVirtualWikisDatabaseNames(getContext())) {
+          for (String wiki : getContext().getXWikiContext().getWiki().getVirtualWikisDatabaseNames(
+              getContext().getXWikiContext())) {
             ret.add(new WikiReference(wiki));
           }
-          ret.add(new WikiReference(getContext().getMainXWiki()));
+          ret.add(getContext().getMainWiki());
         } catch (XWikiException xwe) {
           LOGGER.error("failed to load virtual wiki names", xwe);
         }
         LOGGER.debug("found {} virtual wikis: '{}'", ret.size(), ret);
       } else {
         // No virtual wiki configuration, just index the wiki the context belongs to
-        ret.add(getWebUtils().getWikiRef());
+        ret.add(getContext().getWiki());
       }
       return new ArrayList<>(ret);
     }
@@ -231,7 +230,7 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
       // context.setDatabase(this.context.getDatabase());
       // context.put("org.xwiki.component.manager.ComponentManager", this.context
       // .get("org.xwiki.component.manager.ComponentManager"));
-      context = getContext();
+      context = getContext().getXWikiContext();
       // For example, we definitely don't want to use the same hibernate session...
       context.remove("hibsession");
       context.remove("hibtransaction");
@@ -267,17 +266,17 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
    */
   private int rebuildIndex() {
     int retval = 0;
+    WikiReference beforeWikiRef = getContext().getWiki();
     for (WikiReference wikiRef : wikis) {
-      String database = getContext().getDatabase();
       IndexSearcher searcher = null;
       try {
-        getContext().setDatabase(wikiRef.getName());
+        getContext().setWiki(wikiRef);
         searcher = new IndexSearcher(indexUpdater.getDirectory(), true);
         retval += rebuildWiki(wikiRef, searcher);
       } catch (IOException | XWikiException | QueryException | InterruptedException exc) {
         LOGGER.error("Failed rebulding wiki [{}]", wikiRef, exc);
       } finally {
-        getContext().setDatabase(database);
+        getContext().setWiki(beforeWikiRef);
         IOUtils.closeQuietly(searcher);
       }
     }
@@ -294,16 +293,14 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
       remainingDocs = getAllIndexedDocs(wikiRef, searcher);
     }
     int ret = 0, count = 0;
-    List<Object[]> documentsToIndex = getAllDocs(wikiRef);
-    for (Object[] docData : documentsToIndex) {
-      DocumentReference docRef = new DocumentReference((String) docData[0], new SpaceReference(
-          (String) docData[1], wikiRef));
-      String version = (String) docData[2];
-      String language = (String) docData[3];
-      language = Strings.isNullOrEmpty(language) ? "default" : language;
-      String docId = getWebUtils().serializeRef(docRef) + "." + language;
-      if (!onlyNew || !isIndexed(docRef, version, language, searcher)) {
-        ret += queueDocument(docRef, language);
+    List<DocumentMetaData> documentsToIndex = getAllDocMetaData(wikiRef);
+    for (DocumentMetaData metaData : documentsToIndex) {
+      String language = Strings.isNullOrEmpty(metaData.getLanguage()) ? "default"
+          : metaData.getLanguage();
+      String docId = getModelUtils().serializeRef(metaData.getDocRef()) + "." + language;
+      if (!onlyNew || !isIndexed(metaData.getDocRef(), metaData.getVersion().toString(), language,
+          searcher)) {
+        ret += queueDocument(metaData.getDocRef(), language);
         LOGGER.trace("indexed {}", docId);
       } else {
         LOGGER.trace("skipped '{}', already indexed", docId);
@@ -320,21 +317,15 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
     return ret;
   }
 
-  private List<Object[]> getAllDocs(WikiReference wikiRef) throws QueryException {
-    String hql = "select distinct doc.name, doc.space, doc.version, doc.language "
-        + "from XWikiDocument as doc ";
-    hqlFilter = hqlFilter.trim();
-    if (StringUtils.isNotBlank(hqlFilter)) {
-      if ((hqlFilter.charAt(0) != ',') && !hqlFilter.toLowerCase().contains("where")) {
-        hql += "where ";
-      }
-      hql += hqlFilter;
+  private List<DocumentMetaData> getAllDocMetaData(WikiReference wikiRef) throws QueryException {
+    XWikiStoreMetaDataExtension store;
+    if (getContext().getXWikiContext().getWiki().getStore() instanceof XWikiStoreMetaDataExtension) {
+      store = (XWikiStoreMetaDataExtension) getContext().getXWikiContext().getWiki().getStore();
+    } else {
+      store = (XWikiStoreMetaDataExtension) Utils.getComponent(XWikiCacheStoreInterface.class,
+          DocumentCacheStore.COMPONENT_NAME);
     }
-    Query query = getQueryManager().createQuery(hql, Query.HQL);
-    query.setWiki(wikiRef.getName());
-    List<Object[]> ret = query.execute();
-    LOGGER.info("getAllDocs: {} to index with filter '{}'", ret.size(), hqlFilter);
-    return ret;
+    return store.listMetaData(hqlFilter);
   }
 
   public Set<String> getAllIndexedDocs(WikiReference wikiRef, IndexSearcher searcher)
@@ -368,16 +359,20 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
     }
   }
 
-  protected int queueDocument(DocumentReference documentReference, String language)
-      throws XWikiException, InterruptedException {
+  protected int queueDocument(DocumentReference docRef, String lang) throws XWikiException,
+      InterruptedException {
     int retval = 0;
-    XWikiDocument document = getContext().getWiki().getDocument(documentReference, getContext());
-    XWikiDocument tdocument = document.getTranslatedDocument(language, getContext());
-    waitForLowQueueSize();
-    indexUpdater.queueDocument(tdocument, false);
-    ++retval;
-    if (document == tdocument) {
-      retval += indexUpdater.queueAttachments(document);
+    try {
+      XWikiDocument doc = getModelAccess().getDocument(docRef);
+      XWikiDocument tdoc = doc.getTranslatedDocument(lang, getContext().getXWikiContext());
+      waitForLowQueueSize();
+      indexUpdater.queueDocument(tdoc, false);
+      ++retval;
+      if (doc == tdoc) {
+        retval += indexUpdater.queueAttachments(doc);
+      }
+    } catch (DocumentNotExistsException exc) {
+      LOGGER.warn("failed to queue doc '{}' lang '{}'", docRef, lang);
     }
     return retval;
   }
@@ -393,7 +388,7 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
     while ((size = indexUpdater.getQueueSize()) > maxQueueSize) {
       // Don't leave any database connections open while sleeping
       // This shouldn't be needed, but we never know what bugs might be there
-      getContext().getWiki().getStore().cleanUp(getContext());
+      getContext().getXWikiContext().getWiki().getStore().cleanUp(getContext().getXWikiContext());
       LOGGER.debug("sleeping for {}ms since queue size {} too big", retryInterval, size);
       Thread.sleep(retryInterval);
     }
@@ -427,12 +422,16 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
     return exists;
   }
 
-  private QueryManager getQueryManager() {
-    return Utils.getComponent(QueryManager.class);
+  private IModelAccessFacade getModelAccess() {
+    return Utils.getComponent(IModelAccessFacade.class);
   }
 
-  private IWebUtilsService getWebUtils() {
-    return Utils.getComponent(IWebUtilsService.class);
+  private ModelUtils getModelUtils() {
+    return Utils.getComponent(ModelUtils.class);
+  }
+
+  private ModelContext getContext() {
+    return Utils.getComponent(ModelContext.class);
   }
 
 }
