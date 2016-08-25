@@ -19,39 +19,51 @@
  */
 package com.xpn.xwiki.plugin.lucene;
 
+import static com.google.common.base.Preconditions.*;
+
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import javax.validation.constraints.NotNull;
+
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.search.BooleanClause;
 import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.search.Query;
 import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.search.TotalHitCountCollector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.xwiki.context.Execution;
+import org.suigeneris.jrcs.rcs.Version;
 import org.xwiki.model.reference.DocumentReference;
+import org.xwiki.model.reference.EntityReference;
 import org.xwiki.model.reference.SpaceReference;
 import org.xwiki.model.reference.WikiReference;
-import org.xwiki.query.Query;
 import org.xwiki.query.QueryException;
-import org.xwiki.query.QueryManager;
 
-import com.celements.web.service.IWebUtilsService;
+import com.celements.model.access.IModelAccessFacade;
+import com.celements.model.access.exception.DocumentNotExistsException;
+import com.celements.model.classes.metadata.DocumentMetaData;
+import com.celements.model.context.ModelContext;
+import com.celements.model.util.ModelUtils;
+import com.celements.model.util.References;
+import com.celements.store.DocumentCacheStore;
+import com.celements.store.MetaDataStoreExtension;
+import com.google.common.base.Optional;
+import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.xpn.xwiki.XWikiContext;
 import com.xpn.xwiki.XWikiException;
 import com.xpn.xwiki.doc.XWikiDocument;
+import com.xpn.xwiki.store.XWikiCacheStoreInterface;
 import com.xpn.xwiki.util.AbstractXWikiRunnable;
 import com.xpn.xwiki.web.Utils;
 
@@ -127,9 +139,9 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
   private volatile List<WikiReference> wikis = null;
 
   /**
-   * Hibernate filtering query to reindex with.
+   * Reference to filter reindex data with.
    */
-  private volatile String hqlFilter = null;
+  private volatile Optional<EntityReference> filterRef = Optional.absent();
 
   /**
    * Indicate if document already in the Lucene index are updated.
@@ -150,25 +162,16 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
     this.maxQueueSize = context.getWiki().ParamAsLong(PROP_MAX_QUEUE_SIZE, 1000);
   }
 
-  private XWikiContext getContext() {
-    return (XWikiContext) Utils.getComponent(Execution.class).getContext().getProperty(
-        XWikiContext.EXECUTIONCONTEXT_KEY);
-  }
-
-  public boolean startIndexRebuild() {
-    return startIndexRebuild(null, "", false);
-  }
-
-  public boolean startIndexRebuildWithWipe(List<WikiReference> wikis, String hqlFilter,
-      boolean onlyNew) {
+  public boolean startIndexRebuildWithWipe(List<WikiReference> wikis, boolean onlyNew) {
     this.wipeIndex = true;
-    return startIndexRebuild(wikis, hqlFilter, onlyNew);
+    return startIndexRebuild(wikis, Optional.<EntityReference>absent(), onlyNew);
   }
 
-  public boolean startIndexRebuild(List<WikiReference> wikis, String hqlFilter, boolean onlyNew) {
+  public boolean startIndexRebuild(List<WikiReference> wikis, Optional<EntityReference> filterRef,
+      boolean onlyNew) {
     if (rebuildInProgress.compareAndSet(false, true)) {
       this.wikis = getWikis(wikis);
-      this.hqlFilter = hqlFilter;
+      this.filterRef = filterRef;
       this.onlyNew = onlyNew;
       Thread indexRebuilderThread = new Thread(this, "Lucene Index Rebuilder");
       indexRebuilderThread.setDaemon(true); // The JVM should be allowed to shutdown while this
@@ -187,19 +190,20 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
       return wikis;
     } else {
       Set<WikiReference> ret = new HashSet<>();
-      if (getContext().getWiki().isVirtualMode()) {
+      if (getContext().getXWikiContext().getWiki().isVirtualMode()) {
         try {
-          for (String wiki : getContext().getWiki().getVirtualWikisDatabaseNames(getContext())) {
+          for (String wiki : getContext().getXWikiContext().getWiki().getVirtualWikisDatabaseNames(
+              getContext().getXWikiContext())) {
             ret.add(new WikiReference(wiki));
           }
-          ret.add(new WikiReference(getContext().getMainXWiki()));
+          ret.add(getContext().getMainWikiRef());
         } catch (XWikiException xwe) {
           LOGGER.error("failed to load virtual wiki names", xwe);
         }
         LOGGER.debug("found {} virtual wikis: '{}'", ret.size(), ret);
       } else {
         // No virtual wiki configuration, just index the wiki the context belongs to
-        ret.add(getWebUtils().getWikiRef());
+        ret.add(getContext().getWikiRef());
       }
       return new ArrayList<>(ret);
     }
@@ -231,7 +235,7 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
       // context.setDatabase(this.context.getDatabase());
       // context.put("org.xwiki.component.manager.ComponentManager", this.context
       // .get("org.xwiki.component.manager.ComponentManager"));
-      context = getContext();
+      context = getContext().getXWikiContext();
       // For example, we definitely don't want to use the same hibernate session...
       context.remove("hibsession");
       context.remove("hibtransaction");
@@ -267,93 +271,84 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
    */
   private int rebuildIndex() {
     int retval = 0;
+    WikiReference beforeWikiRef = getContext().getWikiRef();
     for (WikiReference wikiRef : wikis) {
-      String database = getContext().getDatabase();
       IndexSearcher searcher = null;
       try {
-        getContext().setDatabase(wikiRef.getName());
+        getContext().setWikiRef(wikiRef);
         searcher = new IndexSearcher(indexUpdater.getDirectory(), true);
         retval += rebuildWiki(wikiRef, searcher);
       } catch (IOException | XWikiException | QueryException | InterruptedException exc) {
         LOGGER.error("Failed rebulding wiki [{}]", wikiRef, exc);
       } finally {
-        getContext().setDatabase(database);
+        getContext().setWikiRef(beforeWikiRef);
         IOUtils.closeQuietly(searcher);
       }
     }
     return retval;
   }
 
-  private int rebuildWiki(WikiReference wikiRef, IndexSearcher searcher) throws IOException,
-      XWikiException, QueryException, InterruptedException {
+  private int rebuildWiki(@NotNull WikiReference wikiRef, @NotNull IndexSearcher searcher)
+      throws IOException, XWikiException, QueryException, InterruptedException {
+    EntityReference filterRef = this.filterRef.or(checkNotNull(wikiRef));
+    Preconditions.checkArgument(!References.extractRef(filterRef, WikiReference.class).get().equals(
+        wikiRef), "unable to index wiki '" + wikiRef + "' for set filter '" + filterRef + "'");
     LOGGER.info("rebuilding wiki '{}'", wikiRef);
-    Set<String> remainingDocs = Collections.emptySet();
-    if (wipeIndex) {
-      wipeWikiIndex(wikiRef);
-    } else if (StringUtils.isBlank(hqlFilter)) { // clean only possible if no hql filter set
-      remainingDocs = getAllIndexedDocs(wikiRef, searcher);
-    }
     int ret = 0, count = 0;
-    List<Object[]> documentsToIndex = getAllDocs(wikiRef);
-    for (Object[] docData : documentsToIndex) {
-      DocumentReference docRef = new DocumentReference((String) docData[0], new SpaceReference(
-          (String) docData[1], wikiRef));
-      String version = (String) docData[2];
-      String language = (String) docData[3];
-      language = Strings.isNullOrEmpty(language) ? "default" : language;
-      String docId = getWebUtils().serializeRef(docRef) + "." + language;
-      if (!onlyNew || !isIndexed(docRef, version, language, searcher)) {
-        ret += queueDocument(docRef, language);
+    Set<String> docsInIndex = getAllIndexedDocs(filterRef, searcher);
+    Set<DocumentMetaData> docsToIndex = getAllDocMetaData(filterRef);
+    for (DocumentMetaData metaData : docsToIndex) {
+      String docId = getDocId(metaData);
+      if (!onlyNew || !isIndexed(metaData, searcher)) {
+        ret += queueDocument(metaData);
         LOGGER.trace("indexed {}", docId);
       } else {
         LOGGER.trace("skipped '{}', already indexed", docId);
       }
-      if (!remainingDocs.remove(docId)) {
+      if (!docsInIndex.remove(docId)) {
         LOGGER.debug("couldn't reduce remaining docs for docId '{}'", docId);
       }
       if ((++count % 500) == 0) {
-        LOGGER.info("indexed docs {}/{}, {} docs remaining", count, documentsToIndex.size(),
-            remainingDocs.size());
+        LOGGER.info("indexed docs {}/{}, {} docs remaining", count, docsToIndex.size(),
+            docsInIndex.size());
       }
     }
-    cleanIndex(remainingDocs);
+    cleanIndex(docsInIndex);
     return ret;
   }
 
-  private List<Object[]> getAllDocs(WikiReference wikiRef) throws QueryException {
-    String hql = "select distinct doc.name, doc.space, doc.version, doc.language "
-        + "from XWikiDocument as doc ";
-    hqlFilter = hqlFilter.trim();
-    if (StringUtils.isNotBlank(hqlFilter)) {
-      if ((hqlFilter.charAt(0) != ',') && !hqlFilter.toLowerCase().contains("where")) {
-        hql += "where ";
-      }
-      hql += hqlFilter;
+  private Set<DocumentMetaData> getAllDocMetaData(@NotNull EntityReference ref)
+      throws QueryException {
+    MetaDataStoreExtension store;
+    if (getContext().getXWikiContext().getWiki().getStore() instanceof MetaDataStoreExtension) {
+      store = (MetaDataStoreExtension) getContext().getXWikiContext().getWiki().getStore();
+    } else {
+      store = (MetaDataStoreExtension) Utils.getComponent(XWikiCacheStoreInterface.class,
+          DocumentCacheStore.COMPONENT_NAME);
     }
-    Query query = getQueryManager().createQuery(hql, Query.HQL);
-    query.setWiki(wikiRef.getName());
-    List<Object[]> ret = query.execute();
-    LOGGER.info("getAllDocs: {} to index with filter '{}'", ret.size(), hqlFilter);
-    return ret;
+    return store.listDocumentMetaData(ref);
   }
 
-  public Set<String> getAllIndexedDocs(WikiReference wikiRef, IndexSearcher searcher)
-      throws IOException {
+  public Set<String> getAllIndexedDocs(@NotNull EntityReference ref,
+      @NotNull IndexSearcher searcher) throws IOException, InterruptedException {
     Set<String> ret = new HashSet<>();
-    BooleanQuery query = new BooleanQuery();
-    query.add(new TermQuery(new Term(IndexFields.DOCUMENT_WIKI, wikiRef.getName().toLowerCase())),
-        BooleanClause.Occur.MUST);
-    TotalHitCountCollector collector = new TotalHitCountCollector();
-    searcher.search(query, collector);
-    TopDocs topDocs = searcher.search(query, Math.max(1, collector.getTotalHits()));
-    for (ScoreDoc scoreDoc : topDocs.scoreDocs) {
-      ret.add(searcher.doc(scoreDoc.doc).get(IndexFields.DOCUMENT_ID));
+    if (wipeIndex) {
+      wipeWikiIndex(ref);
+    } else {
+      Query query = getLuceneSearchRefQuery(ref);
+      TotalHitCountCollector collector = new TotalHitCountCollector();
+      searcher.search(query, collector);
+      TopDocs topDocs = searcher.search(query, Math.max(1, collector.getTotalHits()));
+      for (ScoreDoc scoreDoc : topDocs.scoreDocs) {
+        ret.add(searcher.doc(scoreDoc.doc).get(IndexFields.DOCUMENT_ID));
+      }
     }
-    LOGGER.info("getAllIndexedDocs: found {} docs in index", ret.size());
+    LOGGER.info("getAllIndexedDocs: found {} docs in index for ref '{}'", ret.size(), ref);
     return ret;
   }
 
-  private void wipeWikiIndex(WikiReference wikiRef) throws InterruptedException {
+  private void wipeWikiIndex(@NotNull EntityReference ref) throws InterruptedException {
+    WikiReference wikiRef = References.extractRef(ref, WikiReference.class).get();
     waitForLowQueueSize();
     LOGGER.info("wipeWikiIndex: for '{}'", wikiRef);
     indexUpdater.queueWiki(wikiRef, true);
@@ -368,16 +363,21 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
     }
   }
 
-  protected int queueDocument(DocumentReference documentReference, String language)
-      throws XWikiException, InterruptedException {
+  protected int queueDocument(DocumentMetaData metaData) throws XWikiException,
+      InterruptedException {
     int retval = 0;
-    XWikiDocument document = getContext().getWiki().getDocument(documentReference, getContext());
-    XWikiDocument tdocument = document.getTranslatedDocument(language, getContext());
-    waitForLowQueueSize();
-    indexUpdater.queueDocument(tdocument, false);
-    ++retval;
-    if (document == tdocument) {
-      retval += indexUpdater.queueAttachments(document);
+    try {
+      XWikiDocument doc = getModelAccess().getDocument(metaData.getDocRef());
+      XWikiDocument tdoc = doc.getTranslatedDocument(metaData.getLanguage(),
+          getContext().getXWikiContext());
+      waitForLowQueueSize();
+      indexUpdater.queueDocument(tdoc, false);
+      ++retval;
+      if (doc == tdoc) {
+        retval += indexUpdater.queueAttachments(doc);
+      }
+    } catch (DocumentNotExistsException exc) {
+      LOGGER.warn("failed to queue doc '{}'", metaData);
     }
     return retval;
   }
@@ -393,7 +393,7 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
     while ((size = indexUpdater.getQueueSize()) > maxQueueSize) {
       // Don't leave any database connections open while sleeping
       // This shouldn't be needed, but we never know what bugs might be there
-      getContext().getWiki().getStore().cleanUp(getContext());
+      getContext().getXWikiContext().getWiki().getStore().cleanUp(getContext().getXWikiContext());
       LOGGER.debug("sleeping for {}ms since queue size {} too big", retryInterval, size);
       Thread.sleep(retryInterval);
     }
@@ -403,22 +403,18 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
     return isIndexed(docRef, null, null, searcher);
   }
 
-  public boolean isIndexed(DocumentReference docRef, String version, String language,
+  public boolean isIndexed(DocumentMetaData metaData, IndexSearcher searcher) throws IOException {
+    return isIndexed(metaData.getDocRef(), metaData.getLanguage(), metaData.getVersion(), searcher);
+  }
+
+  public boolean isIndexed(DocumentReference docRef, String language, Version version,
       IndexSearcher searcher) throws IOException {
     boolean exists = false;
-    BooleanQuery query = new BooleanQuery();
-    query.add(new TermQuery(new Term(IndexFields.DOCUMENT_NAME, docRef.getName().toLowerCase())),
-        BooleanClause.Occur.MUST);
-    query.add(new TermQuery(new Term(IndexFields.DOCUMENT_SPACE,
-        docRef.getLastSpaceReference().getName().toLowerCase())), BooleanClause.Occur.MUST);
-    query.add(new TermQuery(new Term(IndexFields.DOCUMENT_WIKI,
-        docRef.getWikiReference().getName().toLowerCase())), BooleanClause.Occur.MUST);
+    BooleanQuery query = getLuceneSearchRefQuery(docRef);
+    query.add(new TermQuery(new Term(IndexFields.DOCUMENT_LANGUAGE, Strings.isNullOrEmpty(language)
+        ? "default" : language)), BooleanClause.Occur.MUST);
     if (version != null) {
-      query.add(new TermQuery(new Term(IndexFields.DOCUMENT_VERSION, version)),
-          BooleanClause.Occur.MUST);
-    }
-    if (language != null) {
-      query.add(new TermQuery(new Term(IndexFields.DOCUMENT_LANGUAGE, language)),
+      query.add(new TermQuery(new Term(IndexFields.DOCUMENT_VERSION, version.toString())),
           BooleanClause.Occur.MUST);
     }
     TotalHitCountCollector collector = new TotalHitCountCollector();
@@ -427,12 +423,46 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
     return exists;
   }
 
-  private QueryManager getQueryManager() {
-    return Utils.getComponent(QueryManager.class);
+  private BooleanQuery getLuceneSearchRefQuery(@NotNull EntityReference ref) {
+    BooleanQuery query = new BooleanQuery();
+    Optional<DocumentReference> docRef = References.extractRef(ref, DocumentReference.class);
+    if (docRef.isPresent()) {
+      query.add(new TermQuery(new Term(IndexFields.DOCUMENT_NAME,
+          docRef.get().getName().toLowerCase())), BooleanClause.Occur.MUST);
+    }
+    Optional<SpaceReference> spaceRef = References.extractRef(ref, SpaceReference.class);
+    if (docRef.isPresent()) {
+      query.add(new TermQuery(new Term(IndexFields.DOCUMENT_SPACE,
+          spaceRef.get().getName().toLowerCase())), BooleanClause.Occur.MUST);
+    }
+    WikiReference wikiRef = References.extractRef(ref, WikiReference.class).get();
+    query.add(new TermQuery(new Term(IndexFields.DOCUMENT_WIKI, wikiRef.getName().toLowerCase())),
+        BooleanClause.Occur.MUST);
+    return query;
   }
 
-  private IWebUtilsService getWebUtils() {
-    return Utils.getComponent(IWebUtilsService.class);
+  static String getDocId(DocumentMetaData metaData) {
+    StringBuilder sb = new StringBuilder();
+    sb.append(getModelUtils().serializeRef(metaData.getDocRef()));
+    sb.append(".");
+    if (!Strings.isNullOrEmpty(metaData.getLanguage())) {
+      sb.append(metaData.getLanguage());
+    } else {
+      sb.append("default");
+    }
+    return sb.toString();
+  }
+
+  private static IModelAccessFacade getModelAccess() {
+    return Utils.getComponent(IModelAccessFacade.class);
+  }
+
+  private static ModelUtils getModelUtils() {
+    return Utils.getComponent(ModelUtils.class);
+  }
+
+  private static ModelContext getContext() {
+    return Utils.getComponent(ModelContext.class);
   }
 
 }
