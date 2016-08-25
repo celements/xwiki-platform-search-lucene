@@ -58,6 +58,7 @@ import com.celements.model.util.References;
 import com.celements.store.DocumentCacheStore;
 import com.celements.store.MetaDataStoreExtension;
 import com.google.common.base.Optional;
+import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.xpn.xwiki.XWikiContext;
 import com.xpn.xwiki.XWikiException;
@@ -290,10 +291,8 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
   private int rebuildWiki(@NotNull WikiReference wikiRef, @NotNull IndexSearcher searcher)
       throws IOException, XWikiException, QueryException, InterruptedException {
     EntityReference filterRef = this.filterRef.or(checkNotNull(wikiRef));
-    if (!References.extractRef(filterRef, WikiReference.class).get().equals(wikiRef)) {
-      throw new IllegalStateException("unable to index wiki '" + wikiRef + "' for set filter '"
-          + filterRef + "'");
-    }
+    Preconditions.checkArgument(!References.extractRef(filterRef, WikiReference.class).get().equals(
+        wikiRef), "unable to index wiki '" + wikiRef + "' for set filter '" + filterRef + "'");
     LOGGER.info("rebuilding wiki '{}'", wikiRef);
     int ret = 0, count = 0;
     Set<String> docsInIndex = getAllIndexedDocs(filterRef, searcher);
