@@ -182,12 +182,12 @@ public class LucenePlugin extends XWikiDefaultPlugin {
   }
 
   public boolean rebuildIndex() {
-    return indexRebuilder.startIndexRebuild();
+    return rebuildIndex(null, Optional.<EntityReference>absent(), false);
   }
 
-  public boolean rebuildIndex(List<WikiReference> wikis, Optional<EntityReference> filterRef,
+  public boolean rebuildIndex(List<WikiReference> wikis, Optional<EntityReference> entityRef,
       boolean onlyNew) {
-    return indexRebuilder.startIndexRebuild(wikis, filterRef, onlyNew);
+    return indexRebuilder.startIndexRebuild(wikis, entityRef, onlyNew);
   }
 
   public boolean rebuildIndexWithWipe(List<WikiReference> wikis, boolean onlyNew) {

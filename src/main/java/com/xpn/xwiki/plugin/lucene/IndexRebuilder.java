@@ -162,10 +162,6 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
     this.maxQueueSize = context.getWiki().ParamAsLong(PROP_MAX_QUEUE_SIZE, 1000);
   }
 
-  public boolean startIndexRebuild() {
-    return startIndexRebuild(null, Optional.<EntityReference>absent(), false);
-  }
-
   public boolean startIndexRebuildWithWipe(List<WikiReference> wikis, boolean onlyNew) {
     this.wipeIndex = true;
     return startIndexRebuild(wikis, Optional.<EntityReference>absent(), onlyNew);
