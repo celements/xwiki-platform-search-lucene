@@ -152,7 +152,7 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
   @Override
   protected void runInternal() {
     LOGGER.info("IndexUpdater started");
-    getContext().setWiki(getContext().getMainWiki());
+    getContext().setWikiRef(getContext().getMainWikiRef());
     try {
       runMainLoop();
     } catch (Throwable exc) {
@@ -207,7 +207,7 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
       try {
         updateIndex();
       } finally {
-        getContext().setWiki(getContext().getMainWiki());
+        getContext().setWikiRef(getContext().getMainWikiRef());
       }
     }
   }
@@ -250,7 +250,8 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
   }
 
   private void indexData(AbstractIndexData data) throws IOException, XWikiException {
-    getContext().setWiki(References.extractRef(data.getEntityReference(), WikiReference.class));
+    getContext().setWikiRef(References.extractRef(data.getEntityReference(),
+        WikiReference.class).or(getContext().getWikiRef()));
     if (data.isDeleted()) {
       removeFromIndex(data);
     } else {

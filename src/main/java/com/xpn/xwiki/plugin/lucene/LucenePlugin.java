@@ -59,9 +59,11 @@ import org.apache.lucene.util.Version;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.xwiki.context.Execution;
+import org.xwiki.model.reference.EntityReference;
 import org.xwiki.model.reference.WikiReference;
 import org.xwiki.observation.ObservationManager;
 
+import com.google.common.base.Optional;
 import com.google.common.base.Strings;
 import com.google.common.collect.Iterables;
 import com.xpn.xwiki.XWikiContext;
@@ -183,13 +185,13 @@ public class LucenePlugin extends XWikiDefaultPlugin {
     return indexRebuilder.startIndexRebuild();
   }
 
-  public boolean rebuildIndex(List<WikiReference> wikis, String hqlFilter, boolean onlyNew) {
-    return indexRebuilder.startIndexRebuild(wikis, hqlFilter, onlyNew);
+  public boolean rebuildIndex(List<WikiReference> wikis, Optional<EntityReference> filterRef,
+      boolean onlyNew) {
+    return indexRebuilder.startIndexRebuild(wikis, filterRef, onlyNew);
   }
 
-  public boolean rebuildIndexWithWipe(List<WikiReference> wikis, String hqlFilter,
-      boolean onlyNew) {
-    return indexRebuilder.startIndexRebuildWithWipe(wikis, hqlFilter, onlyNew);
+  public boolean rebuildIndexWithWipe(List<WikiReference> wikis, boolean onlyNew) {
+    return indexRebuilder.startIndexRebuildWithWipe(wikis, onlyNew);
   }
 
   /**
