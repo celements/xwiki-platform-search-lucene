@@ -23,7 +23,6 @@ import static com.google.common.base.Preconditions.*;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -290,15 +289,15 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
 
   private int rebuildWiki(@NotNull WikiReference wikiRef, @NotNull IndexSearcher searcher)
       throws IOException, XWikiException, QueryException, InterruptedException {
+    EntityReference filterRef = this.filterRef.or(checkNotNull(wikiRef));
+    if (!References.extractRef(filterRef, WikiReference.class).get().equals(wikiRef)) {
+      throw new IllegalStateException("unable to index wiki '" + wikiRef + "' for set filter '"
+          + filterRef + "'");
+    }
     LOGGER.info("rebuilding wiki '{}'", wikiRef);
     int ret = 0, count = 0;
-    Set<String> docsInIndex = Collections.emptySet();
-    Set<DocumentMetaData> docsToIndex = Collections.emptySet();
-    EntityReference filterRef = this.filterRef.or(checkNotNull(wikiRef));
-    if (References.extractRef(filterRef, WikiReference.class).get().equals(wikiRef)) {
-      docsInIndex = getAllIndexedDocs(filterRef, searcher);
-      docsToIndex = getAllDocMetaData(filterRef);
-    }
+    Set<String> docsInIndex = getAllIndexedDocs(filterRef, searcher);
+    Set<DocumentMetaData> docsToIndex = getAllDocMetaData(filterRef);
     for (DocumentMetaData metaData : docsToIndex) {
       String docId = getDocId(metaData);
       if (!onlyNew || !isIndexed(metaData, searcher)) {
@@ -337,7 +336,7 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
     if (wipeIndex) {
       wipeWikiIndex(ref);
     } else {
-      Query query = getLuceneSearchQuery(ref);
+      Query query = getLuceneSearchRefQuery(ref);
       TotalHitCountCollector collector = new TotalHitCountCollector();
       searcher.search(query, collector);
       TopDocs topDocs = searcher.search(query, Math.max(1, collector.getTotalHits()));
@@ -354,24 +353,6 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
     waitForLowQueueSize();
     LOGGER.info("wipeWikiIndex: for '{}'", wikiRef);
     indexUpdater.queueWiki(wikiRef, true);
-  }
-
-  private Query getLuceneSearchQuery(EntityReference ref) {
-    BooleanQuery query = new BooleanQuery();
-    Optional<DocumentReference> docRef = References.extractRef(ref, DocumentReference.class);
-    if (docRef.isPresent()) {
-      query.add(new TermQuery(new Term(IndexFields.DOCUMENT_NAME,
-          docRef.get().getName().toLowerCase())), BooleanClause.Occur.MUST);
-    }
-    Optional<SpaceReference> spaceRef = References.extractRef(ref, SpaceReference.class);
-    if (docRef.isPresent()) {
-      query.add(new TermQuery(new Term(IndexFields.DOCUMENT_SPACE,
-          spaceRef.get().getName().toLowerCase())), BooleanClause.Occur.MUST);
-    }
-    WikiReference wikiRef = References.extractRef(ref, WikiReference.class).get();
-    query.add(new TermQuery(new Term(IndexFields.DOCUMENT_WIKI, wikiRef.getName().toLowerCase())),
-        BooleanClause.Occur.MUST);
-    return query;
   }
 
   private void cleanIndex(Set<String> danglingDocs) throws InterruptedException {
@@ -430,13 +411,7 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
   public boolean isIndexed(DocumentReference docRef, String language, Version version,
       IndexSearcher searcher) throws IOException {
     boolean exists = false;
-    BooleanQuery query = new BooleanQuery();
-    query.add(new TermQuery(new Term(IndexFields.DOCUMENT_NAME, docRef.getName().toLowerCase())),
-        BooleanClause.Occur.MUST);
-    query.add(new TermQuery(new Term(IndexFields.DOCUMENT_SPACE,
-        docRef.getLastSpaceReference().getName().toLowerCase())), BooleanClause.Occur.MUST);
-    query.add(new TermQuery(new Term(IndexFields.DOCUMENT_WIKI,
-        docRef.getWikiReference().getName().toLowerCase())), BooleanClause.Occur.MUST);
+    BooleanQuery query = getLuceneSearchRefQuery(docRef);
     query.add(new TermQuery(new Term(IndexFields.DOCUMENT_LANGUAGE, Strings.isNullOrEmpty(language)
         ? "default" : language)), BooleanClause.Occur.MUST);
     if (version != null) {
@@ -447,6 +422,24 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
     searcher.search(query, collector);
     exists = collector.getTotalHits() > 0;
     return exists;
+  }
+
+  private BooleanQuery getLuceneSearchRefQuery(@NotNull EntityReference ref) {
+    BooleanQuery query = new BooleanQuery();
+    Optional<DocumentReference> docRef = References.extractRef(ref, DocumentReference.class);
+    if (docRef.isPresent()) {
+      query.add(new TermQuery(new Term(IndexFields.DOCUMENT_NAME,
+          docRef.get().getName().toLowerCase())), BooleanClause.Occur.MUST);
+    }
+    Optional<SpaceReference> spaceRef = References.extractRef(ref, SpaceReference.class);
+    if (docRef.isPresent()) {
+      query.add(new TermQuery(new Term(IndexFields.DOCUMENT_SPACE,
+          spaceRef.get().getName().toLowerCase())), BooleanClause.Occur.MUST);
+    }
+    WikiReference wikiRef = References.extractRef(ref, WikiReference.class).get();
+    query.add(new TermQuery(new Term(IndexFields.DOCUMENT_WIKI, wikiRef.getName().toLowerCase())),
+        BooleanClause.Occur.MUST);
+    return query;
   }
 
   static String getDocId(DocumentMetaData metaData) {

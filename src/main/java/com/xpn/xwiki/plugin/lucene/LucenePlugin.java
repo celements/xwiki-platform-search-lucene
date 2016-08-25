@@ -63,6 +63,7 @@ import org.xwiki.model.reference.EntityReference;
 import org.xwiki.model.reference.WikiReference;
 import org.xwiki.observation.ObservationManager;
 
+import com.celements.model.util.References;
 import com.google.common.base.Optional;
 import com.google.common.base.Strings;
 import com.google.common.collect.Iterables;
@@ -182,12 +183,17 @@ public class LucenePlugin extends XWikiDefaultPlugin {
   }
 
   public boolean rebuildIndex() {
-    return rebuildIndex(null, Optional.<EntityReference>absent(), false);
+    return indexRebuilder.startIndexRebuild(null, Optional.<EntityReference>absent(), false);
   }
 
-  public boolean rebuildIndex(List<WikiReference> wikis, Optional<EntityReference> entityRef,
-      boolean onlyNew) {
-    return indexRebuilder.startIndexRebuild(wikis, entityRef, onlyNew);
+  public boolean rebuildIndex(EntityReference entityRef, boolean onlyNew) {
+    Optional<WikiReference> wikiRef = References.extractRef(entityRef, WikiReference.class);
+    List<WikiReference> wikis = wikiRef.isPresent() ? Arrays.asList(wikiRef.get()) : null;
+    return indexRebuilder.startIndexRebuild(wikis, Optional.fromNullable(entityRef), onlyNew);
+  }
+
+  public boolean rebuildIndex(List<WikiReference> wikis, boolean onlyNew) {
+    return indexRebuilder.startIndexRebuild(wikis, Optional.<EntityReference>absent(), onlyNew);
   }
 
   public boolean rebuildIndexWithWipe(List<WikiReference> wikis, boolean onlyNew) {
