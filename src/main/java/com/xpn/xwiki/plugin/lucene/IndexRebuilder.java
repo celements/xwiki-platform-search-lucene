@@ -291,7 +291,7 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
   private int rebuildWiki(@NotNull WikiReference wikiRef, @NotNull IndexSearcher searcher)
       throws IOException, XWikiException, QueryException, InterruptedException {
     EntityReference filterRef = this.filterRef.or(checkNotNull(wikiRef));
-    Preconditions.checkArgument(!References.extractRef(filterRef, WikiReference.class).get().equals(
+    Preconditions.checkArgument(References.extractRef(filterRef, WikiReference.class).get().equals(
         wikiRef), "unable to index wiki '" + wikiRef + "' for set filter '" + filterRef + "'");
     LOGGER.info("rebuilding wiki '{}'", wikiRef);
     int ret = 0, count = 0;
