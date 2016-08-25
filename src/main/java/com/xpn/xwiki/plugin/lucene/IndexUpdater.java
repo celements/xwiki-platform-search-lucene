@@ -414,7 +414,8 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
   }
 
   private void notify(AbstractEntityEvent event) {
-    Utils.getComponent(ObservationManager.class).notify(event, event.getReference(), getContext());
+    Utils.getComponent(ObservationManager.class).notify(event, event.getReference(),
+        getContext().getXWikiContext());
   }
 
   private ILuceneIndexExtensionServiceRole getLuceneExtensionService() {
