@@ -29,9 +29,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.xwiki.model.EntityType;
 import org.xwiki.model.reference.DocumentReference;
-import org.xwiki.model.reference.EntityReferenceSerializer;
 import org.xwiki.rendering.syntax.Syntax;
 
+import com.celements.model.access.IModelAccessFacade;
+import com.celements.model.access.exception.DocumentNotExistsException;
+import com.celements.model.util.ModelUtils;
 import com.xpn.xwiki.XWikiContext;
 import com.xpn.xwiki.XWikiException;
 import com.xpn.xwiki.doc.XWikiDocument;
@@ -141,17 +143,15 @@ public abstract class AbstractDocumentData extends AbstractIndexData {
   @Override
   public void addDataToLuceneDocument(Document luceneDoc, XWikiContext context)
       throws XWikiException {
-    // FIXME Is it not possible to obtain the right translation directly?
-    XWikiDocument doc = context.getWiki().getDocument(getDocumentReference(), context);
-
-    if ((getLanguage() != null) && !getLanguage().equals("")) {
-      doc = doc.getTranslatedDocument(getLanguage(), context);
+    try {
+      XWikiDocument doc = getModelAccess().getDocument(getDocumentReference(), getLanguage());
+      addDocumentDataToLuceneDocument(luceneDoc, doc, context);
+    } catch (DocumentNotExistsException exc) {
+      throw new XWikiException(0, 0, "failed to load doc", exc);
     }
-
-    addDocumentDataToLuceneDocument(luceneDoc, doc, context);
   }
 
-  public void addDocumentDataToLuceneDocument(Document luceneDoc, XWikiDocument doc,
+  protected void addDocumentDataToLuceneDocument(Document luceneDoc, XWikiDocument doc,
       XWikiContext context) {
     LOGGER.trace("addDocumentDataToLuceneDocument: id [" + getId() + "], lang [" + getLanguage()
         + "], wiki [" + getWiki() + "], author [" + this.author + "], creator [" + this.creator
@@ -321,8 +321,7 @@ public abstract class AbstractDocumentData extends AbstractIndexData {
 
   @Override
   public String getDocumentFullName() {
-    return (String) Utils.getComponent(EntityReferenceSerializer.class, "local").serialize(
-        getEntityReference());
+    return getModelUtils().serializeRefLocal(getEntityReference());
   }
 
   public String getVersion() {
@@ -347,8 +346,7 @@ public abstract class AbstractDocumentData extends AbstractIndexData {
 
   @Override
   public String getFullName() {
-    return (String) Utils.getComponent(EntityReferenceSerializer.class).serialize(
-        getEntityReference());
+    return getModelUtils().serializeRef(getEntityReference());
   }
 
   public String getLanguage() {
@@ -392,4 +390,13 @@ public abstract class AbstractDocumentData extends AbstractIndexData {
     f.setBoost(boost);
     luceneDoc.add(f);
   }
+
+  private IModelAccessFacade getModelAccess() {
+    return Utils.getComponent(IModelAccessFacade.class);
+  }
+
+  private ModelUtils getModelUtils() {
+    return Utils.getComponent(ModelUtils.class);
+  }
+
 }
