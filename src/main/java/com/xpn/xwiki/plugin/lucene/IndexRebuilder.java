@@ -51,8 +51,8 @@ import org.xwiki.query.QueryException;
 
 import com.celements.model.access.IModelAccessFacade;
 import com.celements.model.access.exception.DocumentNotExistsException;
-import com.celements.model.classes.metadata.DocumentMetaData;
 import com.celements.model.context.ModelContext;
+import com.celements.model.metadata.DocumentMetaData;
 import com.celements.model.util.ModelUtils;
 import com.celements.model.util.References;
 import com.celements.store.DocumentCacheStore;
