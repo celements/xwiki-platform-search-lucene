@@ -197,7 +197,7 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
             ret.add(new WikiReference(wiki));
           }
           ret.add(getContext().getMainWikiRef());
-        } catch (XWikiException xwe) {
+        } catch (XWikiException xwe) {d
           LOGGER.error("failed to load virtual wiki names", xwe);
         }
         LOGGER.debug("found {} virtual wikis: '{}'", ret.size(), ret);
@@ -278,7 +278,7 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
         getContext().setWikiRef(wikiRef);
         searcher = new IndexSearcher(indexUpdater.getDirectory(), true);
         retval += rebuildWiki(wikiRef, searcher);
-      } catch (IOException | XWikiException | QueryException | InterruptedException exc) {
+      } catch (IOException | QueryException | InterruptedException exc) {
         LOGGER.error("Failed rebulding wiki [{}]", wikiRef, exc);
       } finally {
         getContext().setWikiRef(beforeWikiRef);
@@ -289,7 +289,7 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
   }
 
   private int rebuildWiki(@NotNull WikiReference wikiRef, @NotNull IndexSearcher searcher)
-      throws IOException, XWikiException, QueryException, InterruptedException {
+      throws IOException, QueryException, InterruptedException {
     EntityReference filterRef = this.filterRef.or(checkNotNull(wikiRef));
     Preconditions.checkArgument(References.extractRef(filterRef, WikiReference.class).get().equals(
         wikiRef), "unable to index wiki '" + wikiRef + "' for set filter '" + filterRef + "'");
@@ -363,17 +363,16 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
     }
   }
 
-  protected int queueDocument(DocumentMetaData metaData) throws XWikiException,
-      InterruptedException {
+  protected int queueDocument(DocumentMetaData metaData) throws InterruptedException {
     int retval = 0;
     try {
-      XWikiDocument doc = getModelAccess().getDocument(metaData.getDocRef());
-      XWikiDocument tdoc = doc.getTranslatedDocument(metaData.getLanguage(),
-          getContext().getXWikiContext());
+
+      XWikiDocument doc = getModelAccess().getDocument(metaData.getDocRef(),
+          metaData.getLanguage());
       waitForLowQueueSize();
-      indexUpdater.queueDocument(tdoc, false);
+      indexUpdater.queueDocument(doc, false);
       ++retval;
-      if (doc == tdoc) {
+      if (!getModelAccess().isTranslation(doc)) {
         retval += indexUpdater.queueAttachments(doc);
       }
     } catch (DocumentNotExistsException exc) {
