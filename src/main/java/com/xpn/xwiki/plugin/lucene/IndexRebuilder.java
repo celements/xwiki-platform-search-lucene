@@ -197,7 +197,7 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
             ret.add(new WikiReference(wiki));
           }
           ret.add(getContext().getMainWikiRef());
-        } catch (XWikiException xwe) {d
+        } catch (XWikiException xwe) {
           LOGGER.error("failed to load virtual wiki names", xwe);
         }
         LOGGER.debug("found {} virtual wikis: '{}'", ret.size(), ret);
