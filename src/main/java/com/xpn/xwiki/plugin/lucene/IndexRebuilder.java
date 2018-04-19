@@ -62,6 +62,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.xpn.xwiki.XWikiContext;
 import com.xpn.xwiki.XWikiException;
+import com.xpn.xwiki.doc.XWikiAttachment;
 import com.xpn.xwiki.doc.XWikiDocument;
 import com.xpn.xwiki.store.XWikiCacheStoreInterface;
 import com.xpn.xwiki.util.AbstractXWikiRunnable;
@@ -351,14 +352,14 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
     WikiReference wikiRef = References.extractRef(ref, WikiReference.class).get();
     waitForLowQueueSize();
     LOGGER.info("wipeWikiIndex: for '{}'", wikiRef);
-    indexUpdater.queueWiki(wikiRef, true);
+    queue(new WikiData(wikiRef, true));
   }
 
   private void cleanIndex(Set<String> danglingDocs) throws InterruptedException {
     LOGGER.info("cleanIndex: {} for {} dangling docs", !wipeIndex, danglingDocs.size());
     for (String docId : danglingDocs) {
       waitForLowQueueSize();
-      indexUpdater.queueDeletion(docId);
+      queue(new DeleteData(docId));
       LOGGER.trace("cleanIndex: deleted doc: {}", docId);
     }
   }
@@ -370,15 +371,23 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
       XWikiDocument doc = getModelAccess().getDocument(metaData.getDocRef(),
           metaData.getLanguage());
       waitForLowQueueSize();
-      indexUpdater.queueDocument(doc, false);
+      queue(new DocumentData(doc, false));
       ++retval;
       if (!getModelAccess().isTranslation(doc)) {
-        retval += indexUpdater.queueAttachments(doc);
+        for (XWikiAttachment att : doc.getAttachmentList()) {
+          queue(new AttachmentData(att, false));
+          ++retval;
+        }
       }
     } catch (DocumentNotExistsException exc) {
       LOGGER.warn("failed to queue doc '{}'", metaData);
     }
     return retval;
+  }
+
+  private void queue(AbstractIndexData data) {
+    data.disableObservationEventNotification();
+    indexUpdater.queue(data);
   }
 
   // In order not to load the whole database in memory, we're limiting the number
@@ -411,7 +420,8 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
     boolean exists = false;
     BooleanQuery query = getLuceneSearchRefQuery(docRef);
     query.add(new TermQuery(new Term(IndexFields.DOCUMENT_LANGUAGE, Strings.isNullOrEmpty(language)
-        ? "default" : language)), BooleanClause.Occur.MUST);
+        ? "default"
+        : language)), BooleanClause.Occur.MUST);
     if (version != null) {
       query.add(new TermQuery(new Term(IndexFields.DOCUMENT_VERSION, version.toString())),
           BooleanClause.Occur.MUST);

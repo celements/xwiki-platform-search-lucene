@@ -19,6 +19,8 @@
  */
 package com.xpn.xwiki.plugin.lucene;
 
+import static com.google.common.base.Preconditions.*;
+
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
@@ -49,7 +51,6 @@ import com.celements.common.observation.event.AbstractEntityEvent;
 import com.celements.model.context.ModelContext;
 import com.celements.model.util.ModelUtils;
 import com.celements.model.util.References;
-import com.google.common.base.Preconditions;
 import com.xpn.xwiki.XWikiContext;
 import com.xpn.xwiki.XWikiException;
 import com.xpn.xwiki.doc.XWikiAttachment;
@@ -262,13 +263,13 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
   private void addToIndex(AbstractIndexData data) throws IOException, XWikiException {
     LOGGER.debug("addToIndex: '{}'", data);
     EntityReference ref = data.getEntityReference();
-    notify(new LuceneDocumentIndexingEvent(ref));
+    notify(data, new LuceneDocumentIndexingEvent(ref));
     Document luceneDoc = new Document();
-    data.addDataToLuceneDocument(luceneDoc, getContext().getXWikiContext());
+    data.addDataToLuceneDocument(luceneDoc);
     getLuceneExtensionService().extend(data, luceneDoc);
     collectFields(luceneDoc);
     writer.updateDocument(data.getTerm(), luceneDoc);
-    notify(new LuceneDocumentIndexedEvent(ref));
+    notify(data, new LuceneDocumentIndexedEvent(ref));
   }
 
   // collecting all the fields for using up in search
@@ -285,11 +286,11 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
     LOGGER.debug("removeFromIndex: '{}'", data);
     EntityReference ref = data.getEntityReference();
     if (ref != null) {
-      notify(new LuceneDocumentDeletingEvent(ref));
+      notify(data, new LuceneDocumentDeletingEvent(ref));
     }
     writer.deleteDocuments(data.getTerm());
     if (ref != null) {
-      notify(new LuceneDocumentDeletedEvent(ref));
+      notify(data, new LuceneDocumentDeletedEvent(ref));
     }
   }
 
@@ -300,34 +301,24 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
   }
 
   public void queueDeletion(String docId) {
-    LOGGER.debug("queueDeletion: '{}'", docId);
-    Preconditions.checkNotNull(docId);
     queue(new DeleteData(docId));
   }
 
   public void queueDocument(XWikiDocument document, boolean deleted) {
-    LOGGER.debug("queueDocument: '{}'", document);
-    Preconditions.checkNotNull(document);
-    queue(new DocumentData(document, deleted, getContext().getXWikiContext()));
+    queue(new DocumentData(document, deleted));
   }
 
   public void queueAttachment(XWikiAttachment attachment, boolean deleted) {
-    LOGGER.debug("queueAttachment: '{}'", attachment);
-    Preconditions.checkNotNull(attachment);
-    queue(new AttachmentData(attachment, deleted, getContext().getXWikiContext()));
+    queue(new AttachmentData(attachment, deleted));
   }
 
   public void queueAttachment(XWikiDocument document, String attachmentName, boolean deleted) {
-    LOGGER.debug("queueAttachment: '{}', '{}'", document, attachmentName);
-    Preconditions.checkNotNull(document);
-    Preconditions.checkNotNull(attachmentName);
-    queue(new AttachmentData(document, attachmentName, deleted, getContext().getXWikiContext()));
+    queue(new AttachmentData(document, attachmentName, deleted));
   }
 
   public int queueAttachments(XWikiDocument document) {
     int ret = 0;
-    LOGGER.debug("queueAttachments: '{}'", document);
-    Preconditions.checkNotNull(document);
+    checkNotNull(document);
     for (XWikiAttachment attachment : document.getAttachmentList()) {
       queueAttachment(attachment, false);
       ret++;
@@ -336,13 +327,12 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
   }
 
   public void queueWiki(WikiReference wikiRef, boolean deleted) {
-    LOGGER.debug("queueWiki: '{}'", wikiRef);
-    Preconditions.checkNotNull(wikiRef);
     queue(new WikiData(wikiRef, deleted));
   }
 
-  private void queue(AbstractIndexData data) {
+  public void queue(AbstractIndexData data) {
     if (!isExit()) {
+      LOGGER.debug("queue{}: '{}'", (data.isDeleted() ? " delete" : ""), data.getId());
       queue.add(data);
     } else {
       throw new IllegalStateException("IndexUpdater has been shut down");
@@ -413,9 +403,11 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
     return new HashSet<>(COLLECTED_FIELDS);
   }
 
-  private void notify(AbstractEntityEvent event) {
-    Utils.getComponent(ObservationManager.class).notify(event, event.getReference(),
-        getContext().getXWikiContext());
+  private void notify(AbstractIndexData data, AbstractEntityEvent event) {
+    if (data.notifyObservationEvents()) {
+      Utils.getComponent(ObservationManager.class).notify(event, event.getReference(),
+          getContext().getXWikiContext());
+    }
   }
 
   private ILuceneIndexExtensionServiceRole getLuceneExtensionService() {

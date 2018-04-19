@@ -19,10 +19,13 @@
  */
 package com.xpn.xwiki.plugin.lucene;
 
+import static com.google.common.base.Preconditions.*;
+
+import org.apache.lucene.document.Document;
 import org.apache.lucene.index.Term;
 import org.xwiki.model.reference.WikiReference;
 
-import com.xpn.xwiki.XWikiContext;
+import com.xpn.xwiki.XWikiException;
 import com.xpn.xwiki.doc.XWikiDocument;
 
 /**
@@ -35,7 +38,12 @@ import com.xpn.xwiki.doc.XWikiDocument;
 public class WikiData extends AbstractIndexData {
 
   public WikiData(WikiReference wikiReference, boolean deleted) {
-    super(null, wikiReference, deleted);
+    super(null, checkNotNull(wikiReference), deleted);
+  }
+
+  @Override
+  public String getId() {
+    return getWiki();
   }
 
   @Override
@@ -44,13 +52,12 @@ public class WikiData extends AbstractIndexData {
   }
 
   @Override
-  protected void getFullText(StringBuilder sb, XWikiDocument doc, XWikiContext context) {
-    // nothing to do
+  public void addDataToLuceneDocument(Document luceneDoc) throws XWikiException {
   }
 
   @Override
-  public String getId() {
-    // TODO Auto-generated method stub
-    return null;
+  public String getFullText(XWikiDocument doc) {
+    return "";
   }
+
 }
