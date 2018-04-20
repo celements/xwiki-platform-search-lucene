@@ -1,5 +1,6 @@
 package com.xpn.xwiki.plugin.lucene.indexExtension;
 
+import static com.celements.common.test.CelementsTestUtils.*;
 import static junit.framework.Assert.*;
 
 import org.junit.Before;
