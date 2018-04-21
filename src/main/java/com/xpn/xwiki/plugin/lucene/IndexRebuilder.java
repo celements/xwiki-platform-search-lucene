@@ -367,7 +367,6 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
   protected int queueDocument(DocumentMetaData metaData) throws InterruptedException {
     int retval = 0;
     try {
-
       XWikiDocument doc = getModelAccess().getDocument(metaData.getDocRef(),
           metaData.getLanguage());
       waitForLowQueueSize();
@@ -419,9 +418,9 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
       IndexSearcher searcher) throws IOException {
     boolean exists = false;
     BooleanQuery query = getLuceneSearchRefQuery(docRef);
-    query.add(new TermQuery(new Term(IndexFields.DOCUMENT_LANGUAGE, Strings.isNullOrEmpty(language)
-        ? "default"
-        : language)), BooleanClause.Occur.MUST);
+    language = Strings.isNullOrEmpty(language) ? "default" : language;
+    query.add(new TermQuery(new Term(IndexFields.DOCUMENT_LANGUAGE, language)),
+        BooleanClause.Occur.MUST);
     if (version != null) {
       query.add(new TermQuery(new Term(IndexFields.DOCUMENT_VERSION, version.toString())),
           BooleanClause.Occur.MUST);
