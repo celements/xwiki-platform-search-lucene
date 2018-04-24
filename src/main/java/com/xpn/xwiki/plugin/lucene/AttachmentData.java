@@ -19,6 +19,8 @@
  */
 package com.xpn.xwiki.plugin.lucene;
 
+import static com.google.common.base.Preconditions.*;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -32,7 +34,7 @@ import org.apache.tika.metadata.TikaMetadataKeys;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.xpn.xwiki.XWikiContext;
+import com.google.common.base.Strings;
 import com.xpn.xwiki.XWikiException;
 import com.xpn.xwiki.doc.XWikiAttachment;
 import com.xpn.xwiki.doc.XWikiDocument;
@@ -68,7 +70,7 @@ public class AttachmentData extends AbstractDocumentData {
    * Which fields are relevant for attachments as well and should be kept at their
    * original importance.
    */
-  private static final List<String> RELEVANT_DOCUMENT_FIELDS = new ArrayList<String>();
+  private static final List<String> RELEVANT_DOCUMENT_FIELDS = new ArrayList<>();
 
   static {
     RELEVANT_DOCUMENT_FIELDS.add(IndexFields.DOCUMENT_ID);
@@ -83,26 +85,22 @@ public class AttachmentData extends AbstractDocumentData {
 
   private String mimetype;
 
-  public AttachmentData(XWikiAttachment attachment, boolean deleted, XWikiContext context) {
-    super(LucenePlugin.DOCTYPE_ATTACHMENT, attachment.getDoc(), deleted, context);
+  public AttachmentData(XWikiAttachment attachment, boolean deleted) {
+    super(LucenePlugin.DOCTYPE_ATTACHMENT, checkNotNull(attachment).getDoc(), deleted);
     setModificationDate(attachment.getDate());
     setAuthor(attachment.getAuthor());
     setSize(attachment.getFilesize());
     setFilename(attachment.getFilename());
-    setMimeType(attachment.getMimeType(context));
+    setMimeType(attachment.getMimeType(getContext().getXWikiContext()));
   }
 
-  public AttachmentData(XWikiDocument document, String filename, boolean deleted,
-      XWikiContext context) {
-    super(LucenePlugin.DOCTYPE_ATTACHMENT, document, deleted, context);
+  public AttachmentData(XWikiDocument document, String filename, boolean deleted) {
+    super(LucenePlugin.DOCTYPE_ATTACHMENT, document, deleted);
     setFilename(filename);
   }
 
   @Override
-  public void addDataToLuceneDocument(Document luceneDoc, XWikiContext context)
-      throws XWikiException {
-    super.addDataToLuceneDocument(luceneDoc, context);
-
+  public void addDataToLuceneDocument(Document luceneDoc) throws XWikiException {
     // Lower the importance of the fields inherited from the document
     List<Fieldable> existingFields = luceneDoc.getFields();
     for (Fieldable f : existingFields) {
@@ -147,7 +145,7 @@ public class AttachmentData extends AbstractDocumentData {
    *          The filename to set.
    */
   public void setFilename(String filename) {
-    this.filename = filename;
+    this.filename = checkNotNull(Strings.emptyToNull(filename));
   }
 
   /**
@@ -166,40 +164,17 @@ public class AttachmentData extends AbstractDocumentData {
     this.mimetype = mimetype;
   }
 
-  /**
-   * overridden to append the filename
-   *
-   * @see AbstractIndexData#getId()
-   */
   @Override
   public String getId() {
     return new StringBuffer(super.getId()).append(".file.").append(this.filename).toString();
   }
 
-  /**
-   * {@inheritDoc}
-   * <p>
-   * Return a string containing the result of {@link AbstractIndexData#getFullText} plus
-   * the full text content of this attachment, as far as it could be extracted.
-   *
-   * @see com.xpn.xwiki.plugin.lucene.AbstractIndexData#getFullText(java.lang.StringBuilder,
-   *      com.xpn.xwiki.doc.XWikiDocument, com.xpn.xwiki.XWikiContext)
-   */
   @Override
-  protected void getFullText(StringBuilder sb, XWikiDocument doc, XWikiContext context) {
-    super.getFullText(sb, doc, context);
-
-    String contentText = getContentAsText(doc, context);
-
-    if (contentText != null) {
-      if (sb.length() > 0) {
-        sb.append(" ");
-      }
-      sb.append(contentText);
-    }
+  public String getFullText(XWikiDocument doc) {
+    return getContentAsText(doc);
   }
 
-  private String getContentAsText(XWikiDocument doc, XWikiContext context) {
+  private String getContentAsText(XWikiDocument doc) {
     String contentText = null;
 
     try {
@@ -213,8 +188,8 @@ public class AttachmentData extends AbstractDocumentData {
       Metadata metadata = new Metadata();
       metadata.set(TikaMetadataKeys.RESOURCE_NAME_KEY, this.filename);
 
-      contentText = StringUtils.lowerCase(tika.parseToString(att.getContentInputStream(context),
-          metadata));
+      contentText = StringUtils.lowerCase(tika.parseToString(att.getContentInputStream(
+          getContext().getXWikiContext()), metadata));
     } catch (Throwable ex) {
       LOGGER.error("error getting content of attachment [{}] for document [{}]", this.filename,
           doc.getDocumentReference(), ex);

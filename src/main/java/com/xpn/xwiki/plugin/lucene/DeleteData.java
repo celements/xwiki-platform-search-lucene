@@ -19,8 +19,12 @@
  */
 package com.xpn.xwiki.plugin.lucene;
 
-import com.google.common.base.Preconditions;
-import com.xpn.xwiki.XWikiContext;
+import static com.google.common.base.Preconditions.*;
+
+import org.apache.lucene.document.Document;
+
+import com.google.common.base.Strings;
+import com.xpn.xwiki.XWikiException;
 import com.xpn.xwiki.doc.XWikiDocument;
 
 public class DeleteData extends AbstractIndexData {
@@ -29,7 +33,7 @@ public class DeleteData extends AbstractIndexData {
 
   public DeleteData(String docId) {
     super("", null, true);
-    this.docId = Preconditions.checkNotNull(docId);
+    this.docId = checkNotNull(Strings.emptyToNull(docId));
   }
 
   @Override
@@ -38,8 +42,12 @@ public class DeleteData extends AbstractIndexData {
   }
 
   @Override
-  protected void getFullText(StringBuilder sb, XWikiDocument doc, XWikiContext context) {
-    // nothing to do
+  public void addDataToLuceneDocument(Document luceneDoc) throws XWikiException {
+  }
+
+  @Override
+  public String getFullText(XWikiDocument doc) {
+    return "";
   }
 
 }

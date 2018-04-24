@@ -30,6 +30,7 @@ import javax.servlet.ServletContext;
 import org.junit.Before;
 import org.junit.Test;
 import org.xwiki.model.reference.DocumentReference;
+import org.xwiki.rendering.syntax.Syntax;
 
 import com.celements.common.test.AbstractBridgedComponentTestCase;
 import com.xpn.xwiki.XWikiException;
@@ -57,6 +58,7 @@ public class AttachmentDataTest extends AbstractBridgedComponentTestCase {
   public void setUp_AttachmentDataTest() throws Exception {
     DocumentReference docRef = new DocumentReference("wiki", "space", "page");
     this.document = new XWikiDocument(docRef);
+    this.document.setSyntax(Syntax.XWIKI_1_0);
     this.document.setTitle(docRef.getName());
     this.attachment = new XWikiAttachment(this.document, "filename");
     this.document.getAttachmentList().add(this.attachment);
@@ -136,10 +138,9 @@ public class AttachmentDataTest extends AbstractBridgedComponentTestCase {
     attachment.setContent(getClass().getResourceAsStream("/" + filename));
     expect(servletContext.getMimeType(eq(filename))).andReturn(mimetype).once();
     replayDefault();
-    this.attachmentData = new AttachmentData(this.attachment, false, getContext());
+    this.attachmentData = new AttachmentData(this.attachment, false);
     this.attachmentData.setFilename(filename);
-    assertEquals("Wrong attachment content indexed", content, attachmentData.getFullText(document,
-        getContext()));
+    assertEquals("Wrong attachment content indexed", content, attachmentData.getFullText(document));
     assertEquals("Wrong mimetype content indexed", mimetype, attachmentData.getMimeType());
     verifyDefault();
   }

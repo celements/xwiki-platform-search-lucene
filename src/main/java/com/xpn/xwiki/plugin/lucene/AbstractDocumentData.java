@@ -19,6 +19,8 @@
  */
 package com.xpn.xwiki.plugin.lucene;
 
+import static com.google.common.base.Preconditions.*;
+
 import java.util.Date;
 
 import org.apache.commons.lang3.StringUtils;
@@ -33,8 +35,6 @@ import org.xwiki.rendering.syntax.Syntax;
 
 import com.celements.model.access.IModelAccessFacade;
 import com.celements.model.access.exception.DocumentNotExistsException;
-import com.celements.model.util.ModelUtils;
-import com.xpn.xwiki.XWikiContext;
 import com.xpn.xwiki.XWikiException;
 import com.xpn.xwiki.doc.XWikiDocument;
 import com.xpn.xwiki.web.Utils;
@@ -103,56 +103,25 @@ public abstract class AbstractDocumentData extends AbstractIndexData {
 
   private Date modificationDate;
 
-  public AbstractDocumentData(String type, XWikiDocument doc, boolean deleted,
-      XWikiContext context) {
-    super(type, doc.getDocumentReference(), deleted);
+  public AbstractDocumentData(String type, XWikiDocument doc, boolean deleted) {
+    super(type, checkNotNull(doc).getDocumentReference(), deleted);
 
     setVersion(doc.getVersion());
-    setDocumentTitle(doc.getRenderedTitle(Syntax.PLAIN_1_0, context));
+    setDocumentTitle(doc.getRenderedTitle(Syntax.PLAIN_1_0, getContext().getXWikiContext()));
     setLanguage(doc.getLanguage());
   }
 
-  /**
-   * Adds this documents data to a lucene Document instance for indexing.
-   * <p>
-   * <strong>Short introduction to Lucene field types </strong>
-   * </p>
-   * <p>
-   * Which type of Lucene field is used determines what Lucene does with data and how we
-   * can use it for searching and showing search results:
-   * </p>
-   * <ul>
-   * <li>Keyword fields don't get tokenized, but are searchable and stored in the index.
-   * This is perfect for fields you want to search in programmatically (like ids and
-   * such), and date fields. Since all user-entered queries are tokenized, letting the
-   * user search these fields makes almost no sense, except of queries for date fields,
-   * where tokenization is useless.</li>
-   * <li>the stored text fields are used for short texts which should be searchable by the
-   * user, and stored in the index for reconstruction. Perfect for document names, titles,
-   * abstracts.</li>
-   * <li>the unstored field takes the biggest part of the content - the full text. It is
-   * tokenized and indexed, but not stored in the index. This makes sense, since when the
-   * user wants to see the full content, he clicks the link to vie the full version of a
-   * document, which is then delivered by xwiki.</li>
-   * </ul>
-   *
-   * @param luceneDoc
-   *          if not null, this controls which translated version of the content will be
-   *          indexed. If null, the content in the default language will be used.
-   */
   @Override
-  public void addDataToLuceneDocument(Document luceneDoc, XWikiContext context)
-      throws XWikiException {
+  public void addDataToLuceneDocument(Document luceneDoc) throws XWikiException {
     try {
       XWikiDocument doc = getModelAccess().getDocument(getDocumentReference(), getLanguage());
-      addDocumentDataToLuceneDocument(luceneDoc, doc, context);
+      addDocumentDataToLuceneDocument(luceneDoc, doc);
     } catch (DocumentNotExistsException exc) {
       throw new XWikiException(0, 0, "failed to load doc", exc);
     }
   }
 
-  protected void addDocumentDataToLuceneDocument(Document luceneDoc, XWikiDocument doc,
-      XWikiContext context) {
+  protected void addDocumentDataToLuceneDocument(Document luceneDoc, XWikiDocument doc) {
     LOGGER.trace("addDocumentDataToLuceneDocument: id [" + getId() + "], lang [" + getLanguage()
         + "], wiki [" + getWiki() + "], author [" + this.author + "], creator [" + this.creator
         + "], type [" + getType() + "], date [" + this.modificationDate + "], creationDate ["
@@ -219,7 +188,7 @@ public abstract class AbstractDocumentData extends AbstractIndexData {
     // No reconstruction of the original content will be possible from the
     // search result
     try {
-      final String ft = getFullText(doc, context);
+      final String ft = getFullText(doc);
       if (ft != null) {
         addFieldToDocument(IndexFields.FULLTEXT, ft, Field.Store.NO, Field.Index.ANALYZED,
             CONTENT_BOOST, luceneDoc);
@@ -229,9 +198,6 @@ public abstract class AbstractDocumentData extends AbstractIndexData {
     }
   }
 
-  /**
-   * @return string unique to this document across all languages and virtual wikis
-   */
   @Override
   public String getId() {
     StringBuilder retval = new StringBuilder();
@@ -246,22 +212,6 @@ public abstract class AbstractDocumentData extends AbstractIndexData {
   @Override
   public Term getTerm() {
     return new Term(IndexFields.DOCUMENT_ID, getId());
-  }
-
-  /**
-   * @return String of documentName, documentWeb, author and creator
-   */
-  @Override
-  public String getFullText(XWikiDocument doc, XWikiContext context) {
-    StringBuilder sb = new StringBuilder();
-
-    getFullText(sb, doc, context);
-
-    return sb.toString();
-  }
-
-  @Override
-  protected void getFullText(StringBuilder sb, XWikiDocument doc, XWikiContext context) {
   }
 
   /**
@@ -361,13 +311,6 @@ public abstract class AbstractDocumentData extends AbstractIndexData {
     }
   }
 
-  // Object
-
-  @Override
-  public String toString() {
-    return getId();
-  }
-
   /**
    * Indexes data into a Lucene field and adds it to the specified Lucene document.
    *
@@ -393,10 +336,6 @@ public abstract class AbstractDocumentData extends AbstractIndexData {
 
   private IModelAccessFacade getModelAccess() {
     return Utils.getComponent(IModelAccessFacade.class);
-  }
-
-  private ModelUtils getModelUtils() {
-    return Utils.getComponent(ModelUtils.class);
   }
 
 }

@@ -19,13 +19,17 @@
  */
 package com.xpn.xwiki.plugin.lucene;
 
+import static com.google.common.base.Preconditions.*;
+
 import org.apache.lucene.document.Document;
 import org.apache.lucene.index.Term;
 import org.xwiki.model.EntityType;
 import org.xwiki.model.reference.EntityReference;
 import org.xwiki.model.reference.EntityReferenceSerializer;
 
-import com.xpn.xwiki.XWikiContext;
+import com.celements.model.context.ModelContext;
+import com.celements.model.util.ModelUtils;
+import com.google.common.base.Strings;
 import com.xpn.xwiki.XWikiException;
 import com.xpn.xwiki.doc.XWikiDocument;
 import com.xpn.xwiki.web.Utils;
@@ -42,9 +46,10 @@ public abstract class AbstractIndexData {
 
   private EntityReference entityReference;
 
-  public AbstractIndexData(String type, EntityReference entityReference, boolean deleted) {
-    this.type = type;
+  private boolean notifyObservationEvents = true;
 
+  public AbstractIndexData(String type, EntityReference entityReference, boolean deleted) {
+    this.type = checkNotNull(Strings.emptyToNull(type));
     setEntityReference(entityReference);
     setDeleted(deleted);
   }
@@ -77,10 +82,7 @@ public abstract class AbstractIndexData {
    *          if not null, this controls which translated version of the content will be
    *          indexed. If null, the content in the default language will be used.
    */
-  public void addDataToLuceneDocument(Document luceneDoc, XWikiContext context)
-      throws XWikiException {
-
-  }
+  public abstract void addDataToLuceneDocument(Document luceneDoc) throws XWikiException;
 
   /**
    * @return string unique to this document across all languages and virtual wikis
@@ -94,15 +96,7 @@ public abstract class AbstractIndexData {
   /**
    * @return String of documentName, documentWeb, author and creator
    */
-  public String getFullText(XWikiDocument doc, XWikiContext context) {
-    StringBuilder sb = new StringBuilder();
-
-    getFullText(sb, doc, context);
-
-    return sb.toString();
-  }
-
-  protected abstract void getFullText(StringBuilder sb, XWikiDocument doc, XWikiContext context);
+  public abstract String getFullText(XWikiDocument doc);
 
   public String getType() {
     return this.type;
@@ -128,6 +122,14 @@ public abstract class AbstractIndexData {
 
   public void setEntityReference(EntityReference entityReference) {
     this.entityReference = entityReference;
+  }
+
+  public boolean notifyObservationEvents() {
+    return notifyObservationEvents;
+  }
+
+  public void disableObservationEventNotification() {
+    this.notifyObservationEvents = false;
   }
 
   protected String getEntityName(EntityType type) {
@@ -160,8 +162,16 @@ public abstract class AbstractIndexData {
 
   @Override
   public String toString() {
-    return "AbstractIndexData [id=" + getId() + ", ref=" + entityReference + ", deleted=" + deleted
-        + ", type=" + type + "]";
+    return this.getClass().getSimpleName() + " [id=" + getId() + ", deleted=" + deleted + ", type="
+        + type + "]";
+  }
+
+  protected ModelContext getContext() {
+    return Utils.getComponent(ModelContext.class);
+  }
+
+  protected ModelUtils getModelUtils() {
+    return Utils.getComponent(ModelUtils.class);
   }
 
 }
