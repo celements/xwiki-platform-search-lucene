@@ -408,7 +408,7 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
       Utils.getComponent(ObservationManager.class).notify(event, event.getReference(),
           getContext().getXWikiContext());
     } else {
-      LOGGER.debug("skip notify '{}'", data);
+      LOGGER.debug("skip notify '{}' for '{}'", event, data);
     }
   }
 
