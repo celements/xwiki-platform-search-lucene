@@ -115,13 +115,16 @@ public abstract class AbstractDocumentData extends AbstractIndexData {
   public void addDataToLuceneDocument(Document luceneDoc) throws XWikiException {
     try {
       XWikiDocument doc = getModelAccess().getDocument(getDocumentReference(), getLanguage());
-      addDocumentDataToLuceneDocument(luceneDoc, doc);
+      addDocumentData(luceneDoc, doc);
+      addAdditionalData(luceneDoc, doc);
     } catch (DocumentNotExistsException exc) {
       throw new XWikiException(0, 0, "failed to load doc", exc);
     }
   }
 
-  protected void addDocumentDataToLuceneDocument(Document luceneDoc, XWikiDocument doc) {
+  protected abstract void addAdditionalData(Document luceneDoc, XWikiDocument doc);
+
+  private void addDocumentData(Document luceneDoc, XWikiDocument doc) {
     LOGGER.trace("addDocumentDataToLuceneDocument: id [" + getId() + "], lang [" + getLanguage()
         + "], wiki [" + getWiki() + "], author [" + this.author + "], creator [" + this.creator
         + "], type [" + getType() + "], date [" + this.modificationDate + "], creationDate ["
@@ -197,6 +200,11 @@ public abstract class AbstractDocumentData extends AbstractIndexData {
       LOGGER.error("Error extracting fulltext for document [{}]", this.toString(), e);
     }
   }
+
+  /**
+   * @return String of documentName, documentWeb, author and creator
+   */
+  public abstract String getFullText(XWikiDocument doc);
 
   @Override
   public String getId() {

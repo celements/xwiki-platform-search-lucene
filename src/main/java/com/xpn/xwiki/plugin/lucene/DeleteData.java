@@ -25,7 +25,6 @@ import org.apache.lucene.document.Document;
 
 import com.google.common.base.Strings;
 import com.xpn.xwiki.XWikiException;
-import com.xpn.xwiki.doc.XWikiDocument;
 
 public class DeleteData extends AbstractIndexData {
 
@@ -43,11 +42,6 @@ public class DeleteData extends AbstractIndexData {
 
   @Override
   public void addDataToLuceneDocument(Document luceneDoc) throws XWikiException {
-  }
-
-  @Override
-  public String getFullText(XWikiDocument doc) {
-    return "";
   }
 
 }

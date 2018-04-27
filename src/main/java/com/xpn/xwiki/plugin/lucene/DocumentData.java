@@ -133,7 +133,7 @@ public class DocumentData extends AbstractDocumentData {
   }
 
   @Override
-  protected void addDocumentDataToLuceneDocument(Document luceneDoc, XWikiDocument doc) {
+  protected void addAdditionalData(Document luceneDoc, XWikiDocument doc) {
     for (List<BaseObject> objects : doc.getXObjects().values()) {
       for (BaseObject obj : objects) {
         if (obj != null) {

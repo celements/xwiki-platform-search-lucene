@@ -35,7 +35,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Strings;
-import com.xpn.xwiki.XWikiException;
 import com.xpn.xwiki.doc.XWikiAttachment;
 import com.xpn.xwiki.doc.XWikiDocument;
 
@@ -100,7 +99,7 @@ public class AttachmentData extends AbstractDocumentData {
   }
 
   @Override
-  public void addDataToLuceneDocument(Document luceneDoc) throws XWikiException {
+  protected void addAdditionalData(Document luceneDoc, XWikiDocument doc) {
     // Lower the importance of the fields inherited from the document
     List<Fieldable> existingFields = luceneDoc.getFields();
     for (Fieldable f : existingFields) {
