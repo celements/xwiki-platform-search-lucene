@@ -31,7 +31,6 @@ import com.celements.model.context.ModelContext;
 import com.celements.model.util.ModelUtils;
 import com.google.common.base.Strings;
 import com.xpn.xwiki.XWikiException;
-import com.xpn.xwiki.doc.XWikiDocument;
 import com.xpn.xwiki.web.Utils;
 
 /**
@@ -92,11 +91,6 @@ public abstract class AbstractIndexData {
   public Term getTerm() {
     return new Term(IndexFields.DOCUMENT_ID, getId());
   }
-
-  /**
-   * @return String of documentName, documentWeb, author and creator
-   */
-  public abstract String getFullText(XWikiDocument doc);
 
   public String getType() {
     return this.type;
