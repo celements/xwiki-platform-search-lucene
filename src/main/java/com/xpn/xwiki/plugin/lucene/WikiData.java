@@ -26,7 +26,6 @@ import org.apache.lucene.index.Term;
 import org.xwiki.model.reference.WikiReference;
 
 import com.xpn.xwiki.XWikiException;
-import com.xpn.xwiki.doc.XWikiDocument;
 
 /**
  * Holds all data but the content of a wiki page to be indexed. The content is retrieved
@@ -53,11 +52,6 @@ public class WikiData extends AbstractIndexData {
 
   @Override
   public void addDataToLuceneDocument(Document luceneDoc) throws XWikiException {
-  }
-
-  @Override
-  public String getFullText(XWikiDocument doc) {
-    return "";
   }
 
 }
