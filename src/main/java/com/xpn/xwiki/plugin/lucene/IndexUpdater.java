@@ -83,12 +83,6 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
 
   public static final String NAME = "lucene";
 
-  /**
-   * The maximum number of milliseconds we have to wait before this thread is safely
-   * closed.
-   */
-  private static final long EXIT_INTERVAL = 3000;
-
   private static final List<Event> EVENTS = Arrays.<Event>asList(new DocumentUpdatedEvent(),
       new DocumentCreatedEvent(), new DocumentDeletedEvent(), new AttachmentAddedEvent(),
       new AttachmentDeletedEvent(), new AttachmentUpdatedEvent());
@@ -103,11 +97,6 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
 
   final IndexWriter writer;
 
-  /**
-   * Milliseconds of sleep between checks for changed documents.
-   */
-  private final long indexingInterval;
-
   private final long commitInterval;
 
   private final LuceneIndexingQueue queue;
@@ -119,7 +108,6 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
   IndexUpdater(IndexWriter writer, LucenePlugin plugin, XWikiContext context) throws IOException {
     super(XWikiContext.EXECUTIONCONTEXT_KEY, context.clone());
     this.plugin = plugin;
-    this.indexingInterval = 1000 * context.getWiki().ParamAsLong(PROP_INDEXING_INTERVAL, 30);
     this.commitInterval = context.getWiki().ParamAsLong(PROP_COMMIT_INTERVAL, 5000);
     this.writer = writer;
     this.queue = Utils.getComponent(LuceneIndexingQueue.class,
@@ -163,86 +151,42 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
       runMainLoop();
     } catch (Throwable exc) {
       LOGGER.error("Unexpected error occured", exc);
-      throw exc;
+      throw new RuntimeException(exc);
     }
     LOGGER.info("IndexUpdater finished");
   }
 
   /**
    * Main loop. Polls the queue for documents to be indexed.
-   */
-  private void runMainLoop() {
-    long indexingTimer = 0;
-    while (!isExit()) {
-      try {
-        // Check if the indexing interval elapsed.
-        if (indexingTimer == 0) {
-          // Reset the indexing timer.
-          indexingTimer = this.indexingInterval;
-          pollIndexQueue(); // Poll the queue for documents to be indexed
-          optimizeIndex(); // optimize index if requested
-        }
-        // Remove the exit interval from the indexing timer.
-        long sleepInterval = Math.min(EXIT_INTERVAL, indexingTimer);
-        indexingTimer -= sleepInterval;
-        Thread.sleep(sleepInterval);
-      } catch (IOException | InterruptedException exc) {
-        LOGGER.error("failed to update index", exc);
-        doExit();
-      }
-    }
-  }
-
-  private void optimizeIndex() throws IOException {
-    if (optimize.compareAndSet(true, false)) {
-      LOGGER.warn("started optimizing lucene index");
-      writer.optimize();
-      LOGGER.warn("finished optimizing lucene index");
-    }
-  }
-
-  /**
-   * Polls the queue for documents to be indexed.
    *
    * @throws IOException
    */
-  private void pollIndexQueue() throws IOException {
-    if (queue.isEmpty()) {
-      LOGGER.debug("pollIndexQueue: queue empty, nothing to do");
-    } else {
+  private void runMainLoop() throws IOException {
+    long lastCommitTime = System.currentTimeMillis();
+    do {
       try {
-        updateIndex();
+        AbstractIndexData data = (AbstractIndexData) queue.take();
+        try {
+          indexData(data);
+        } catch (Exception exc) {
+          LOGGER.error("error indexing document '{}'", data.getEntityReference(), exc);
+        }
+      } catch (InterruptedException exc) {
+        LOGGER.error("IndexUpdater interrupted", exc);
+        doExit();
       } finally {
         getContext().setWikiRef(getContext().getMainWikiRef());
+        if (queue.isEmpty() || isCommitTime(lastCommitTime)) {
+          commitIndex();
+          lastCommitTime = System.currentTimeMillis();
+        }
+        checkForInterrupt();
       }
-    }
+    } while (!isExit());
   }
 
-  private void updateIndex() throws IOException {
-    LOGGER.info("updateIndex started");
-    boolean hasUncommitedWrites = false;
-    long lastCommitTime = System.currentTimeMillis();
-    while (!queue.isEmpty()) {
-      AbstractIndexData data = (AbstractIndexData) queue.remove();
-      try {
-        LOGGER.debug("updateIndex start document '{}'", data.getEntityReference());
-        indexData(data);
-        hasUncommitedWrites = true;
-        LOGGER.debug("updateIndex successfully finished document '{}'", data.getEntityReference());
-      } catch (Exception exc) {
-        LOGGER.error("error indexing document '{}'", data.getEntityReference(), exc);
-      }
-      if ((System.currentTimeMillis() - lastCommitTime) >= commitInterval) {
-        commitIndex();
-        lastCommitTime = System.currentTimeMillis();
-        hasUncommitedWrites = false;
-      }
-      checkForInterrupt();
-    }
-    if (hasUncommitedWrites) {
-      commitIndex();
-    }
-    LOGGER.info("updateIndex finished");
+  private boolean isCommitTime(long lastCommitTime) {
+    return (System.currentTimeMillis() - lastCommitTime) >= commitInterval;
   }
 
   /**
@@ -302,6 +246,12 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
   public void commitIndex() throws IOException {
     LOGGER.debug("commitIndex");
     writer.commit();
+    // optimize index if requested
+    if (optimize.compareAndSet(true, false)) {
+      LOGGER.warn("started optimizing lucene index");
+      writer.optimize();
+      LOGGER.warn("finished optimizing lucene index");
+    }
     plugin.openSearchers();
   }
 
