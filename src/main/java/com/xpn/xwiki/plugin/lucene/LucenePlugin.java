@@ -116,6 +116,8 @@ public class LucenePlugin extends XWikiDefaultPlugin {
 
   static final String PROP_WRITER_BUFFER_SIZE = "xwiki.plugins.lucene.writerBufferSize";
 
+  static final String PROP_OPEN_WRITER_TRY_COUNT = "xwiki.plugins.lucene.openWriterTryCount";
+
   /**
    * Lucene index updater. Listens for changes and indexes wiki documents in a separate
    * thread.
@@ -699,7 +701,7 @@ public class LucenePlugin extends XWikiDefaultPlugin {
       }
       LOGGER.info("Lucene plugin initialized.");
     } catch (IOException exc) {
-      LOGGER.error("Failed to open the index directory: ", exc);
+      LOGGER.error("Failed to open the index directory '{}'", getWriteDirectory(), exc);
       throw new RuntimeException(exc);
     }
   }
@@ -714,6 +716,7 @@ public class LucenePlugin extends XWikiDefaultPlugin {
       if (!file.exists()) {
         file.mkdirs();
       }
+      LOGGER.warn("getIndexDirectories - file {} exists {}", file, file.exists());
       Directory dir = FSDirectory.open(file);
       if (!IndexReader.indexExists(dir)) {
         // If there's no index create an empty one
@@ -732,6 +735,7 @@ public class LucenePlugin extends XWikiDefaultPlugin {
   }
 
   IndexWriter openWriter(Directory directory, OpenMode openMode) throws IOException {
+    long tryCount = getContext().getWiki().ParamAsLong(PROP_OPEN_WRITER_TRY_COUNT, 10);
     IndexWriter ret = null;
     while (ret == null) {
       try {
@@ -743,12 +747,16 @@ public class LucenePlugin extends XWikiDefaultPlugin {
         }
         ret = new IndexWriter(directory, cfg);
       } catch (LockObtainFailedException exc) {
-        try {
-          int ms = new Random().nextInt(1000);
-          LOGGER.debug("failed to acquire lock, retrying in {}ms ...", ms);
-          Thread.sleep(ms);
-        } catch (InterruptedException ex) {
-          LOGGER.warn("Error while sleeping", ex);
+        if (tryCount-- > 0) {
+          try {
+            int ms = new Random().nextInt(1000);
+            LOGGER.debug("failed to acquire lock on '{}', retrying in {}ms ...", directory, ms);
+            Thread.sleep(ms);
+          } catch (InterruptedException ex) {
+            LOGGER.warn("Error while sleeping", ex);
+          }
+        } else {
+          throw exc;
         }
       }
     }
@@ -832,7 +840,7 @@ public class LucenePlugin extends XWikiDefaultPlugin {
   }
 
   public Directory getWriteDirectory() {
-    return indexDirs.get(0);
+    return Iterables.getFirst(indexDirs, null);
   }
 
   public long getQueueSize() {

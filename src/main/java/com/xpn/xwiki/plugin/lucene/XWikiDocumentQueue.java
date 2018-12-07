@@ -22,11 +22,17 @@ package com.xpn.xwiki.plugin.lucene;
 import java.util.HashMap;
 import java.util.Map;
 
+import javax.annotation.concurrent.ThreadSafe;
+
 import org.apache.commons.collections.Buffer;
 import org.apache.commons.collections.BufferUnderflowException;
 import org.apache.commons.collections.buffer.UnboundedFifoBuffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.xwiki.component.annotation.Component;
+
+import com.xpn.xwiki.plugin.lucene.index.IndexData;
+import com.xpn.xwiki.plugin.lucene.index.queue.LuceneIndexingQueue;
 
 /**
  * This class represents a Queue (FirstInFirstOut) for XWikiDocument objects. It is used
@@ -36,7 +42,9 @@ import org.slf4j.LoggerFactory;
  *
  * @version $Id: 04187bfc92c5273f46dd5d519cfd1835df839dd6 $
  */
-public class XWikiDocumentQueue {
+@ThreadSafe
+@Component("xwiki")
+public class XWikiDocumentQueue implements LuceneIndexingQueue {
 
   /** Logging helper object. */
   private static final Logger LOGGER = LoggerFactory.getLogger(XWikiDocumentQueue.class);
@@ -44,12 +52,12 @@ public class XWikiDocumentQueue {
   /**
    * Maps names of documents to the document instances.
    */
-  private Map<String, AbstractIndexData> documentsByName = new HashMap<String, AbstractIndexData>();
+  private final Map<String, IndexData> documentsByName = new HashMap<>();
 
   /**
    * Maintains FIFO order.
    */
-  private Buffer namesQueue = new UnboundedFifoBuffer();
+  private final Buffer namesQueue = new UnboundedFifoBuffer();
 
   /**
    * Remove an item from the queue and return it. Since this is a FIFO, the element
@@ -59,9 +67,15 @@ public class XWikiDocumentQueue {
    * @throws BufferUnderflowException
    *           If the queue is empty.
    */
-  public synchronized AbstractIndexData remove() throws BufferUnderflowException {
+  @Override
+  public synchronized IndexData remove() throws BufferUnderflowException {
     LOGGER.debug("removing element from queue.");
     return this.documentsByName.remove(this.namesQueue.remove());
+  }
+
+  @Override
+  public synchronized boolean contains(String id) {
+    return this.documentsByName.containsKey(id);
   }
 
   /**
@@ -74,8 +88,9 @@ public class XWikiDocumentQueue {
    * @param data
    *          IndexData object to add to the queue.
    */
+  @Override
   @SuppressWarnings("unchecked")
-  public synchronized void add(AbstractIndexData data) {
+  public synchronized void add(IndexData data) {
     String key = data.getId();
 
     LOGGER.debug("adding element to queue. Key: " + key);

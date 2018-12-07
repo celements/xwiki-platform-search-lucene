@@ -64,6 +64,7 @@ import com.xpn.xwiki.XWikiContext;
 import com.xpn.xwiki.XWikiException;
 import com.xpn.xwiki.doc.XWikiAttachment;
 import com.xpn.xwiki.doc.XWikiDocument;
+import com.xpn.xwiki.plugin.lucene.index.queue.IndexQueuePriority;
 import com.xpn.xwiki.store.XWikiCacheStoreInterface;
 import com.xpn.xwiki.util.AbstractXWikiRunnable;
 import com.xpn.xwiki.web.Utils;
@@ -250,6 +251,8 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
       // processing thread, as they will be cleaned later by the container.
       context.setRequest(null);
       context.setResponse(null);
+
+      IndexQueuePriority.LOW.putToExecutionContext();
 
       rebuildIndex();
     } catch (Exception e) {

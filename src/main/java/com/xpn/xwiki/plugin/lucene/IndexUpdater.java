@@ -59,6 +59,7 @@ import com.xpn.xwiki.internal.event.AbstractAttachmentEvent;
 import com.xpn.xwiki.internal.event.AttachmentAddedEvent;
 import com.xpn.xwiki.internal.event.AttachmentDeletedEvent;
 import com.xpn.xwiki.internal.event.AttachmentUpdatedEvent;
+import com.xpn.xwiki.plugin.lucene.index.queue.LuceneIndexingQueue;
 import com.xpn.xwiki.plugin.lucene.indexExtension.ILuceneIndexExtensionServiceRole;
 import com.xpn.xwiki.plugin.lucene.observation.event.LuceneDocumentDeletedEvent;
 import com.xpn.xwiki.plugin.lucene.observation.event.LuceneDocumentDeletingEvent;
@@ -77,6 +78,8 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
   static final String PROP_INDEXING_INTERVAL = "xwiki.plugins.lucene.indexinterval";
 
   static final String PROP_COMMIT_INTERVAL = "xwiki.plugins.lucene.commitinterval";
+
+  static final String PROP_QUEUE_IMPL = "xwiki.plugins.lucene.queue.impl";
 
   public static final String NAME = "lucene";
 
@@ -107,7 +110,7 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
 
   private final long commitInterval;
 
-  private final XWikiDocumentQueue queue = new XWikiDocumentQueue();
+  private final LuceneIndexingQueue queue;
 
   private final AtomicBoolean exit = new AtomicBoolean(false);
 
@@ -119,6 +122,8 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
     this.indexingInterval = 1000 * context.getWiki().ParamAsLong(PROP_INDEXING_INTERVAL, 30);
     this.commitInterval = context.getWiki().ParamAsLong(PROP_COMMIT_INTERVAL, 5000);
     this.writer = writer;
+    this.queue = Utils.getComponent(LuceneIndexingQueue.class,
+        getContext().getXWikiContext().getWiki().Param(PROP_QUEUE_IMPL, "default"));
   }
 
   public boolean isExit() {
@@ -218,7 +223,7 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
     boolean hasUncommitedWrites = false;
     long lastCommitTime = System.currentTimeMillis();
     while (!queue.isEmpty()) {
-      AbstractIndexData data = queue.remove();
+      AbstractIndexData data = (AbstractIndexData) queue.remove();
       try {
         LOGGER.debug("updateIndex start document '{}'", data.getEntityReference());
         indexData(data);
