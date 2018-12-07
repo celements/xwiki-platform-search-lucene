@@ -1,5 +1,7 @@
 package com.xpn.xwiki.plugin.lucene.index.queue;
 
+import java.util.NoSuchElementException;
+
 import org.xwiki.component.annotation.ComponentRole;
 
 import com.xpn.xwiki.plugin.lucene.index.IndexData;
@@ -11,7 +13,9 @@ public interface LuceneIndexingQueue {
 
   void add(IndexData data);
 
-  IndexData remove();
+  IndexData remove() throws NoSuchElementException;
+
+  IndexData take() throws InterruptedException;
 
   boolean isEmpty();
 

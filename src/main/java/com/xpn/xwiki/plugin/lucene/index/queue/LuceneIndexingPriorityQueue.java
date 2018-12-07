@@ -7,7 +7,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
-import java.util.PriorityQueue;
+import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.atomic.AtomicLong;
 
 import javax.annotation.concurrent.ThreadSafe;
@@ -31,16 +31,16 @@ public class LuceneIndexingPriorityQueue implements LuceneIndexingQueue {
 
   private final AtomicLong SEQUENCE_COUNTER = new AtomicLong();
 
-  private final PriorityQueue<IndexQueueElement> queue = new PriorityQueue<>();
+  private final PriorityBlockingQueue<IndexQueueElement> queue = new PriorityBlockingQueue<>();
   private final Map<String, IndexData> dataMap = new HashMap<>();
 
   @Override
-  public synchronized int getSize() {
+  public int getSize() {
     return queue.size();
   }
 
   @Override
-  public synchronized boolean isEmpty() {
+  public boolean isEmpty() {
     return queue.isEmpty();
   }
 
@@ -80,6 +80,11 @@ public class LuceneIndexingPriorityQueue implements LuceneIndexingQueue {
   @Override
   public synchronized IndexData remove() throws NoSuchElementException {
     return dataMap.remove(queue.remove().id);
+  }
+
+  @Override
+  public synchronized IndexData take() throws InterruptedException {
+    return dataMap.remove(queue.take().id);
   }
 
   private class IndexQueueElement implements Comparable<IndexQueueElement> {

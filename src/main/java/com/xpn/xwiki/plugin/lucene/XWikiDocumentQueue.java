@@ -21,6 +21,7 @@ package com.xpn.xwiki.plugin.lucene;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.NoSuchElementException;
 
 import javax.annotation.concurrent.ThreadSafe;
 
@@ -68,9 +69,13 @@ public class XWikiDocumentQueue implements LuceneIndexingQueue {
    *           If the queue is empty.
    */
   @Override
-  public synchronized IndexData remove() throws BufferUnderflowException {
+  public synchronized IndexData remove() throws NoSuchElementException {
     LOGGER.debug("removing element from queue.");
-    return this.documentsByName.remove(this.namesQueue.remove());
+    try {
+      return this.documentsByName.remove(this.namesQueue.remove());
+    } catch (BufferUnderflowException exc) {
+      throw new NoSuchElementException(exc.getMessage());
+    }
   }
 
   @Override
@@ -109,6 +114,7 @@ public class XWikiDocumentQueue implements LuceneIndexingQueue {
    *
    * @return <code>true</code> if the queue is empty, <code>false</code> otherwise.
    */
+  @Override
   public synchronized boolean isEmpty() {
     return this.namesQueue.isEmpty();
   }
@@ -118,7 +124,13 @@ public class XWikiDocumentQueue implements LuceneIndexingQueue {
    *
    * @return Number of elements in the queue.
    */
+  @Override
   public synchronized int getSize() {
     return this.namesQueue.size();
+  }
+
+  @Override
+  public IndexData take() throws InterruptedException {
+    throw new UnsupportedOperationException("non blocking queue");
   }
 }
