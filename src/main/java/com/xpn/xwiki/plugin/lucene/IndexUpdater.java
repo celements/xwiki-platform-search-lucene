@@ -51,6 +51,7 @@ import com.celements.common.observation.event.AbstractEntityEvent;
 import com.celements.model.context.ModelContext;
 import com.celements.model.util.ModelUtils;
 import com.celements.model.util.References;
+import com.celements.search.lucene.index.IndexData;
 import com.celements.search.lucene.index.queue.LuceneIndexingQueue;
 import com.xpn.xwiki.XWikiContext;
 import com.xpn.xwiki.XWikiException;
@@ -79,9 +80,15 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
 
   static final String PROP_COMMIT_INTERVAL = "xwiki.plugins.lucene.commitinterval";
 
-  static final String PROP_QUEUE_IMPL = "xwiki.plugins.lucene.queue.impl";
+  static final String PROP_QUEUE_IMPL = "celements.lucene.index.queue";
 
   public static final String NAME = "lucene";
+
+  /**
+   * The maximum number of milliseconds we have to wait before this thread is safely
+   * closed.
+   */
+  private static final long EXIT_INTERVAL = 3000;
 
   private static final List<Event> EVENTS = Arrays.<Event>asList(new DocumentUpdatedEvent(),
       new DocumentCreatedEvent(), new DocumentDeletedEvent(), new AttachmentAddedEvent(),
@@ -97,6 +104,11 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
 
   final IndexWriter writer;
 
+  /**
+   * Milliseconds of sleep between checks for changed documents.
+   */
+  private final long indexingInterval;
+
   private final long commitInterval;
 
   private final LuceneIndexingQueue queue;
@@ -108,10 +120,11 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
   IndexUpdater(IndexWriter writer, LucenePlugin plugin, XWikiContext context) throws IOException {
     super(XWikiContext.EXECUTIONCONTEXT_KEY, context.clone());
     this.plugin = plugin;
+    this.indexingInterval = 1000 * context.getWiki().ParamAsLong(PROP_INDEXING_INTERVAL, 30);
     this.commitInterval = context.getWiki().ParamAsLong(PROP_COMMIT_INTERVAL, 5000);
     this.writer = writer;
     this.queue = Utils.getComponent(LuceneIndexingQueue.class,
-        getContext().getXWikiContext().getWiki().Param(PROP_QUEUE_IMPL, "default"));
+        getContext().getXWikiContext().getWiki().Param(PROP_QUEUE_IMPL, XWikiDocumentQueue.NAME));
   }
 
   public boolean isExit() {
@@ -146,9 +159,15 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
   @Override
   protected void runInternal() {
     LOGGER.info("IndexUpdater started");
-    getContext().setWikiRef(getContext().getMainWikiRef());
+    getContext().setWikiRef(getModelUtils().getMainWikiRef());
     try {
-      runMainLoop();
+      try {
+        runBlocking();
+      } catch (UnsupportedOperationException exc) {
+        LOGGER.info("running as blocking unsupported by '{}', running as waiting instead",
+            queue.getClass().getSimpleName());
+        runWaiting();
+      }
     } catch (Throwable exc) {
       LOGGER.error("Unexpected error occured", exc);
       throw new RuntimeException(exc);
@@ -157,32 +176,74 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
   }
 
   /**
-   * Main loop. Polls the queue for documents to be indexed.
-   *
-   * @throws IOException
+   * runs the index updater in blocking mode:
+   * loop over queue#take
    */
-  private void runMainLoop() throws IOException {
+  private void runBlocking() throws IOException {
+    LOGGER.info("runBlocking");
     long lastCommitTime = System.currentTimeMillis();
-    do {
+    while (!isExit()) {
       try {
-        AbstractIndexData data = (AbstractIndexData) queue.take();
-        try {
-          indexData(data);
-        } catch (Exception exc) {
-          LOGGER.error("error indexing document '{}'", data.getEntityReference(), exc);
-        }
+        indexData(queue.take());
       } catch (InterruptedException exc) {
         LOGGER.error("IndexUpdater interrupted", exc);
         doExit();
       } finally {
-        getContext().setWikiRef(getContext().getMainWikiRef());
         if (queue.isEmpty() || isCommitTime(lastCommitTime)) {
           commitIndex();
           lastCommitTime = System.currentTimeMillis();
         }
         checkForInterrupt();
       }
-    } while (!isExit());
+    }
+  }
+
+  /**
+   * runs the index updater in waiting mode:
+   * queue#remove until empty, wait set interval until next empty check
+   */
+  private void runWaiting() throws IOException {
+    LOGGER.info("runWaiting");
+    long indexingTimer = 0;
+    while (!isExit()) {
+      try {
+        // Check if the indexing interval elapsed.
+        if (indexingTimer == 0) {
+          // Reset the indexing timer.
+          indexingTimer = this.indexingInterval;
+          reduceQueue();
+        }
+        // Remove the exit interval from the indexing timer.
+        long sleepInterval = Math.min(EXIT_INTERVAL, indexingTimer);
+        indexingTimer -= sleepInterval;
+        Thread.sleep(sleepInterval);
+      } catch (InterruptedException exc) {
+        LOGGER.error("IndexUpdater interrupted", exc);
+        doExit();
+      } finally {
+        checkForInterrupt();
+      }
+    }
+  }
+
+  private void reduceQueue() throws IOException {
+    LOGGER.info("reduceQueue - started");
+    boolean hasUncommitedWrites = false;
+    long lastCommitTime = System.currentTimeMillis();
+    while (!queue.isEmpty()) {
+      indexData(queue.remove());
+      hasUncommitedWrites = true;
+      if (isCommitTime(lastCommitTime)) {
+        commitIndex();
+        lastCommitTime = System.currentTimeMillis();
+        hasUncommitedWrites = false;
+      }
+      checkForInterrupt();
+    }
+    if (hasUncommitedWrites) {
+      commitIndex();
+    }
+    LOGGER.info("reduceQueue - finished");
   }
 
   private boolean isCommitTime(long lastCommitTime) {
@@ -193,29 +254,36 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
    * should be called regularly to check for interrupt flag and set exit
    */
   private void checkForInterrupt() {
-    if (Thread.currentThread().isInterrupted()) {
+    if (!exit.get() && Thread.currentThread().isInterrupted()) {
       LOGGER.error("IndexUpdater was interrupted, shutting down");
       doExit();
     }
   }
 
-  private void indexData(AbstractIndexData data) throws IOException, XWikiException {
-    getContext().setWikiRef(References.extractRef(data.getEntityReference(),
-        WikiReference.class).or(getContext().getWikiRef()));
-    if (data.isDeleted()) {
-      removeFromIndex(data);
-    } else {
-      addToIndex(data);
+  private void indexData(IndexData data) {
+    LOGGER.debug("indexData - '{}'", data.getEntityReference());
+    try {
+      getContext().setWikiRef(References.extractRef(data.getEntityReference(),
+          WikiReference.class).or(getContext().getWikiRef()));
+      if (data.isDeleted()) {
+        removeFromIndex(data);
+      } else {
+        addToIndex(data);
+      }
+    } catch (Exception exc) {
+      LOGGER.error("error indexing document '{}'", data.getEntityReference(), exc);
+    } finally {
+      getContext().setWikiRef(getModelUtils().getMainWikiRef());
     }
   }
 
-  private void addToIndex(AbstractIndexData data) throws IOException, XWikiException {
+  private void addToIndex(IndexData data) throws IOException, XWikiException {
     LOGGER.debug("addToIndex: '{}'", data);
     EntityReference ref = data.getEntityReference();
     notify(data, new LuceneDocumentIndexingEvent(ref));
     Document luceneDoc = new Document();
     data.addDataToLuceneDocument(luceneDoc);
-    getLuceneExtensionService().extend(data, luceneDoc);
+    getLuceneExtensionService().extend((AbstractIndexData) data, luceneDoc);
     collectFields(luceneDoc);
     writer.updateDocument(data.getTerm(), luceneDoc);
     notify(data, new LuceneDocumentIndexedEvent(ref));
@@ -231,7 +299,7 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
     }
   }
 
-  private void removeFromIndex(AbstractIndexData data) throws CorruptIndexException, IOException {
+  private void removeFromIndex(IndexData data) throws CorruptIndexException, IOException {
     LOGGER.debug("removeFromIndex: '{}'", data);
     EntityReference ref = data.getEntityReference();
     if (ref != null) {
@@ -358,7 +426,7 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
     return new HashSet<>(COLLECTED_FIELDS);
   }
 
-  private void notify(AbstractIndexData data, AbstractEntityEvent event) {
+  private void notify(IndexData data, AbstractEntityEvent event) {
     if (data.notifyObservationEvents()) {
       Utils.getComponent(ObservationManager.class).notify(event, event.getReference(),
           getContext().getXWikiContext());

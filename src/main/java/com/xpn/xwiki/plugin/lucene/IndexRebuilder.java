@@ -253,7 +253,7 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
       context.setRequest(null);
       context.setResponse(null);
 
-      getIndexQueuePriorityManager().put(IndexQueuePriority.LOW);
+      getIndexQueuePriorityManager().putPriority(IndexQueuePriority.LOW);
 
       rebuildIndex();
     } catch (Exception e) {

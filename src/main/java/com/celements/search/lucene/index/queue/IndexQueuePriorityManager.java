@@ -11,8 +11,8 @@ import com.google.common.base.Optional;
 public interface IndexQueuePriorityManager {
 
   @NotNull
-  Optional<IndexQueuePriority> get();
+  Optional<IndexQueuePriority> getPriority();
 
-  void put(@Nullable IndexQueuePriority priority);
+  void putPriority(@Nullable IndexQueuePriority priority);
 
 }

@@ -55,7 +55,9 @@ public abstract class AbstractIndexData implements IndexData {
     this.type = checkNotNull(Strings.emptyToNull(type));
     setEntityReference(entityReference);
     setDeleted(deleted);
-    setPriority(getIndexQueuePriorityManager().get().orNull());
+    if (getIndexQueuePriorityManager().isPresent()) {
+      setPriority(getIndexQueuePriorityManager().get().getPriority().orNull());
+    }
   }
 
   @Override
@@ -153,8 +155,12 @@ public abstract class AbstractIndexData implements IndexData {
     return Utils.getComponent(ModelUtils.class);
   }
 
-  protected IndexQueuePriorityManager getIndexQueuePriorityManager() {
-    return Utils.getComponent(IndexQueuePriorityManager.class);
+  protected Optional<IndexQueuePriorityManager> getIndexQueuePriorityManager() {
+    IndexQueuePriorityManager ret = null;
+    if (Utils.getComponentManager().hasComponent(IndexQueuePriorityManager.class)) {
+      ret = Utils.getComponent(IndexQueuePriorityManager.class);
+    }
+    return Optional.fromNullable(ret);
   }
 
 }
