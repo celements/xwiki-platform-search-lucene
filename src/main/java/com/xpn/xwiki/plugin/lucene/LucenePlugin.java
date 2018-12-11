@@ -64,6 +64,7 @@ import org.xwiki.model.reference.WikiReference;
 import org.xwiki.observation.ObservationManager;
 
 import com.celements.model.util.References;
+import com.celements.search.lucene.index.queue.IndexQueuePriority;
 import com.google.common.base.Optional;
 import com.google.common.base.Strings;
 import com.google.common.collect.Iterables;
@@ -847,16 +848,44 @@ public class LucenePlugin extends XWikiDefaultPlugin {
     return this.indexUpdater.getQueueSize();
   }
 
+  @Deprecated
   public void queueDocument(XWikiDocument doc, XWikiContext context) {
-    this.indexUpdater.queueDocument(doc, false);
+    queueDocument(doc);
   }
 
+  public void queueDocument(XWikiDocument doc) {
+    queueDocument(doc, (IndexQueuePriority) null);
+  }
+
+  public void queueDocument(XWikiDocument doc, IndexQueuePriority priorty) {
+    indexUpdater.queueDocument(doc, false, priorty);
+  }
+
+  @Deprecated
   public void queueAttachment(XWikiDocument doc, XWikiAttachment attach, XWikiContext context) {
-    this.indexUpdater.queueAttachment(attach, false);
+    queueAttachment(doc, attach);
   }
 
+  public void queueAttachment(XWikiDocument doc, XWikiAttachment attach) {
+    queueAttachment(doc, attach, (IndexQueuePriority) null);
+  }
+
+  public void queueAttachment(XWikiDocument doc, XWikiAttachment attach,
+      IndexQueuePriority priorty) {
+    indexUpdater.queueAttachment(attach, false, priorty);
+  }
+
+  @Deprecated
   public void queueAttachment(XWikiDocument doc, XWikiContext context) {
-    this.indexUpdater.queueAttachments(doc);
+    queueAttachments(doc);
+  }
+
+  public void queueAttachments(XWikiDocument doc) {
+    queueAttachments(doc, (IndexQueuePriority) null);
+  }
+
+  public void queueAttachments(XWikiDocument doc, IndexQueuePriority priorty) {
+    this.indexUpdater.queueAttachments(doc, priorty);
   }
 
   /**
