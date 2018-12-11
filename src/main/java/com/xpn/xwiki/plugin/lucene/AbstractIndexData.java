@@ -30,7 +30,6 @@ import com.celements.model.context.ModelContext;
 import com.celements.model.util.ModelUtils;
 import com.celements.search.lucene.index.IndexData;
 import com.celements.search.lucene.index.queue.IndexQueuePriority;
-import com.celements.search.lucene.index.queue.IndexQueuePriorityManager;
 import com.google.common.base.Optional;
 import com.google.common.base.Strings;
 import com.xpn.xwiki.web.Utils;
@@ -55,18 +54,15 @@ public abstract class AbstractIndexData implements IndexData {
     this.type = checkNotNull(Strings.emptyToNull(type));
     setEntityReference(entityReference);
     setDeleted(deleted);
-    if (getIndexQueuePriorityManager().isPresent()) {
-      setPriority(getIndexQueuePriorityManager().get().getPriority().orNull());
-    }
   }
 
   @Override
   public IndexQueuePriority getPriority() {
-    return priority;
+    return Optional.fromNullable(priority).or(IndexQueuePriority.DEFAULT);
   }
 
   public AbstractIndexData setPriority(IndexQueuePriority priority) {
-    this.priority = Optional.fromNullable(priority).or(IndexQueuePriority.DEFAULT);
+    this.priority = priority;
     return this;
   }
 
@@ -153,14 +149,6 @@ public abstract class AbstractIndexData implements IndexData {
 
   protected ModelUtils getModelUtils() {
     return Utils.getComponent(ModelUtils.class);
-  }
-
-  protected Optional<IndexQueuePriorityManager> getIndexQueuePriorityManager() {
-    IndexQueuePriorityManager ret = null;
-    if (Utils.getComponentManager().hasComponent(IndexQueuePriorityManager.class)) {
-      ret = Utils.getComponent(IndexQueuePriorityManager.class);
-    }
-    return Optional.fromNullable(ret);
   }
 
 }

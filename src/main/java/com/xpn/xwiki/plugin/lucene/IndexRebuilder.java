@@ -253,7 +253,7 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
       context.setRequest(null);
       context.setResponse(null);
 
-      getIndexQueuePriorityManager().putPriority(IndexQueuePriority.LOW);
+      getIndexQueuePriorityManager().putPriority(getRebuldingPriority());
 
       rebuildIndex();
     } catch (Exception e) {
@@ -390,7 +390,12 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
 
   private void queue(AbstractIndexData data) {
     data.disableObservationEventNotification();
+    data.setPriority(getRebuldingPriority());
     indexUpdater.queue(data);
+  }
+
+  private IndexQueuePriority getRebuldingPriority() {
+    return IndexQueuePriority.LOW;
   }
 
   // In order not to load the whole database in memory, we're limiting the number

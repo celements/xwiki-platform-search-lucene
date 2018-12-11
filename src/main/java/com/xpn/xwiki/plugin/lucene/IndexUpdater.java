@@ -52,6 +52,8 @@ import com.celements.model.context.ModelContext;
 import com.celements.model.util.ModelUtils;
 import com.celements.model.util.References;
 import com.celements.search.lucene.index.IndexData;
+import com.celements.search.lucene.index.queue.IndexQueuePriority;
+import com.celements.search.lucene.index.queue.IndexQueuePriorityManager;
 import com.celements.search.lucene.index.queue.LuceneIndexingQueue;
 import com.xpn.xwiki.XWikiContext;
 import com.xpn.xwiki.XWikiException;
@@ -323,34 +325,36 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
     plugin.openSearchers();
   }
 
-  public void queueDeletion(String docId) {
-    queue(new DeleteData(docId));
+  public void queueDeletion(String docId, IndexQueuePriority priority) {
+    queue(new DeleteData(docId).setPriority(priority));
   }
 
-  public void queueDocument(XWikiDocument document, boolean deleted) {
-    queue(new DocumentData(document, deleted));
+  public void queueDocument(XWikiDocument document, boolean deleted, IndexQueuePriority priority) {
+    queue(new DocumentData(document, deleted).setPriority(priority));
   }
 
-  public void queueAttachment(XWikiAttachment attachment, boolean deleted) {
-    queue(new AttachmentData(attachment, deleted));
+  public void queueAttachment(XWikiAttachment attachment, boolean deleted,
+      IndexQueuePriority priority) {
+    queue(new AttachmentData(attachment, deleted).setPriority(priority));
   }
 
-  public void queueAttachment(XWikiDocument document, String attachmentName, boolean deleted) {
-    queue(new AttachmentData(document, attachmentName, deleted));
+  public void queueAttachment(XWikiDocument document, String attachmentName, boolean deleted,
+      IndexQueuePriority priority) {
+    queue(new AttachmentData(document, attachmentName, deleted).setPriority(priority));
   }
 
-  public int queueAttachments(XWikiDocument document) {
+  public int queueAttachments(XWikiDocument document, IndexQueuePriority priority) {
     int ret = 0;
     checkNotNull(document);
     for (XWikiAttachment attachment : document.getAttachmentList()) {
-      queueAttachment(attachment, false);
+      queueAttachment(attachment, false, priority);
       ret++;
     }
     return ret;
   }
 
-  public void queueWiki(WikiReference wikiRef, boolean deleted) {
-    queue(new WikiData(wikiRef, deleted));
+  public void queueWiki(WikiReference wikiRef, boolean deleted, IndexQueuePriority priority) {
+    queue(new WikiData(wikiRef, deleted).setPriority(priority));
   }
 
   public void queue(AbstractIndexData data) {
@@ -384,20 +388,22 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
   }
 
   private void queueFromEvent(Event event, Object source) {
+    IndexQueuePriority priority = getIndexQueuePriorityManager().getPriority().orNull();
     if (source == null) {
       LOGGER.error("onEvent: received null source");
     } else if ((event instanceof DocumentUpdatedEvent) || (event instanceof DocumentCreatedEvent)) {
-      queueDocument((XWikiDocument) source, false);
+      queueDocument((XWikiDocument) source, false, priority);
     } else if (event instanceof DocumentDeletedEvent) {
-      queueDocument((XWikiDocument) source, true);
+      queueDocument((XWikiDocument) source, true, priority);
     } else if ((event instanceof AttachmentUpdatedEvent)
         || (event instanceof AttachmentAddedEvent)) {
       queueAttachment(((XWikiDocument) source).getAttachment(
-          ((AbstractAttachmentEvent) event).getName()), false);
+          ((AbstractAttachmentEvent) event).getName()), false, priority);
     } else if (event instanceof AttachmentDeletedEvent) {
-      queueAttachment((XWikiDocument) source, ((AbstractAttachmentEvent) event).getName(), true);
+      queueAttachment((XWikiDocument) source, ((AbstractAttachmentEvent) event).getName(), true,
+          priority);
     } else if (event instanceof WikiDeletedEvent) {
-      queueWiki(getModelUtils().resolveRef((String) source, WikiReference.class), true);
+      queueWiki(getModelUtils().resolveRef((String) source, WikiReference.class), true, priority);
     }
   }
 
@@ -445,6 +451,10 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
 
   private ModelContext getContext() {
     return Utils.getComponent(ModelContext.class);
+  }
+
+  private IndexQueuePriorityManager getIndexQueuePriorityManager() {
+    return Utils.getComponent(IndexQueuePriorityManager.class);
   }
 
 }
