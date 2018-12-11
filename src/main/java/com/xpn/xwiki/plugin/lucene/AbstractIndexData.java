@@ -28,10 +28,10 @@ import org.xwiki.model.reference.EntityReferenceSerializer;
 
 import com.celements.model.context.ModelContext;
 import com.celements.model.util.ModelUtils;
+import com.celements.search.lucene.index.IndexData;
+import com.celements.search.lucene.index.queue.IndexQueuePriority;
 import com.google.common.base.Optional;
 import com.google.common.base.Strings;
-import com.xpn.xwiki.plugin.lucene.index.IndexData;
-import com.xpn.xwiki.plugin.lucene.index.queue.IndexQueuePriority;
 import com.xpn.xwiki.web.Utils;
 
 /**

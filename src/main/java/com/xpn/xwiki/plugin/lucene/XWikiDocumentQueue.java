@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 
 import javax.annotation.concurrent.ThreadSafe;
+import javax.inject.Singleton;
 
 import org.apache.commons.collections.Buffer;
 import org.apache.commons.collections.BufferUnderflowException;
@@ -32,8 +33,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.xwiki.component.annotation.Component;
 
-import com.xpn.xwiki.plugin.lucene.index.IndexData;
-import com.xpn.xwiki.plugin.lucene.index.queue.LuceneIndexingQueue;
+import com.celements.search.lucene.index.IndexData;
+import com.celements.search.lucene.index.queue.LuceneIndexingQueue;
 
 /**
  * This class represents a Queue (FirstInFirstOut) for XWikiDocument objects. It is used
@@ -43,9 +44,12 @@ import com.xpn.xwiki.plugin.lucene.index.queue.LuceneIndexingQueue;
  *
  * @version $Id: 04187bfc92c5273f46dd5d519cfd1835df839dd6 $
  */
+@Singleton
 @ThreadSafe
-@Component("xwiki")
+@Component(XWikiDocumentQueue.NAME)
 public class XWikiDocumentQueue implements LuceneIndexingQueue {
+
+  public static final String NAME = "xwiki";
 
   /** Logging helper object. */
   private static final Logger LOGGER = LoggerFactory.getLogger(XWikiDocumentQueue.class);

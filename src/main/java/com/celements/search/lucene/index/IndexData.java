@@ -17,14 +17,14 @@
  * Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
  * 02110-1301 USA, or see the FSF site: http://www.fsf.org.
  */
-package com.xpn.xwiki.plugin.lucene.index;
+package com.celements.search.lucene.index;
 
 import org.apache.lucene.document.Document;
 import org.apache.lucene.index.Term;
 import org.xwiki.model.reference.EntityReference;
 
+import com.celements.search.lucene.index.queue.IndexQueuePriority;
 import com.xpn.xwiki.XWikiException;
-import com.xpn.xwiki.plugin.lucene.index.queue.IndexQueuePriority;
 
 public interface IndexData {
 

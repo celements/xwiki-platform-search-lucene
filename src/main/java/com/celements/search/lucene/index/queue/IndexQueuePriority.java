@@ -1,4 +1,4 @@
-package com.xpn.xwiki.plugin.lucene.index.queue;
+package com.celements.search.lucene.index.queue;
 
 import org.xwiki.context.Execution;
 import org.xwiki.context.ExecutionContext;
