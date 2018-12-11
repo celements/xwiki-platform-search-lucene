@@ -30,6 +30,7 @@ import com.celements.model.context.ModelContext;
 import com.celements.model.util.ModelUtils;
 import com.celements.search.lucene.index.IndexData;
 import com.celements.search.lucene.index.queue.IndexQueuePriority;
+import com.celements.search.lucene.index.queue.IndexQueuePriorityManager;
 import com.google.common.base.Optional;
 import com.google.common.base.Strings;
 import com.xpn.xwiki.web.Utils;
@@ -54,7 +55,7 @@ public abstract class AbstractIndexData implements IndexData {
     this.type = checkNotNull(Strings.emptyToNull(type));
     setEntityReference(entityReference);
     setDeleted(deleted);
-    setPriority(IndexQueuePriority.fromExecutionContext().orNull());
+    setPriority(getIndexQueuePriorityManager().get().orNull());
   }
 
   @Override
@@ -150,6 +151,10 @@ public abstract class AbstractIndexData implements IndexData {
 
   protected ModelUtils getModelUtils() {
     return Utils.getComponent(ModelUtils.class);
+  }
+
+  protected IndexQueuePriorityManager getIndexQueuePriorityManager() {
+    return Utils.getComponent(IndexQueuePriorityManager.class);
   }
 
 }

@@ -56,6 +56,7 @@ import com.celements.model.metadata.DocumentMetaData;
 import com.celements.model.util.ModelUtils;
 import com.celements.model.util.References;
 import com.celements.search.lucene.index.queue.IndexQueuePriority;
+import com.celements.search.lucene.index.queue.IndexQueuePriorityManager;
 import com.celements.store.DocumentCacheStore;
 import com.celements.store.MetaDataStoreExtension;
 import com.google.common.base.Optional;
@@ -252,7 +253,7 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
       context.setRequest(null);
       context.setResponse(null);
 
-      IndexQueuePriority.LOW.putToExecutionContext();
+      getIndexQueuePriorityManager().put(IndexQueuePriority.LOW);
 
       rebuildIndex();
     } catch (Exception e) {
@@ -474,6 +475,10 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
 
   private static ModelContext getContext() {
     return Utils.getComponent(ModelContext.class);
+  }
+
+  private static IndexQueuePriorityManager getIndexQueuePriorityManager() {
+    return Utils.getComponent(IndexQueuePriorityManager.class);
   }
 
 }
