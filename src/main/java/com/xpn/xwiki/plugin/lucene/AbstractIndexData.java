@@ -19,8 +19,6 @@
  */
 package com.xpn.xwiki.plugin.lucene;
 
-import static com.google.common.base.Preconditions.*;
-
 import org.apache.lucene.index.Term;
 import org.xwiki.model.EntityType;
 import org.xwiki.model.reference.EntityReference;
@@ -51,7 +49,7 @@ public abstract class AbstractIndexData implements IndexData {
   private boolean notifyObservationEvents = true;
 
   public AbstractIndexData(String type, EntityReference entityReference, boolean deleted) {
-    this.type = checkNotNull(Strings.emptyToNull(type));
+    this.type = Strings.emptyToNull(type);
     setEntityReference(entityReference);
     setDeleted(deleted);
   }
