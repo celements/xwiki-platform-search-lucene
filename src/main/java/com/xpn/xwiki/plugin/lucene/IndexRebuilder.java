@@ -53,8 +53,8 @@ import com.celements.model.access.IModelAccessFacade;
 import com.celements.model.access.exception.DocumentNotExistsException;
 import com.celements.model.context.ModelContext;
 import com.celements.model.metadata.DocumentMetaData;
-import com.celements.model.util.ModelUtils;
 import com.celements.model.util.References;
+import com.celements.search.lucene.index.LuceneDocId;
 import com.celements.search.lucene.index.queue.IndexQueuePriority;
 import com.celements.search.lucene.index.queue.IndexQueuePriorityManager;
 import com.celements.store.DocumentCacheStore;
@@ -300,10 +300,10 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
         wikiRef), "unable to index wiki '" + wikiRef + "' for set filter '" + filterRef + "'");
     LOGGER.info("rebuilding wiki '{}'", wikiRef);
     int ret = 0, count = 0;
-    Set<String> docsInIndex = getAllIndexedDocs(filterRef, searcher);
+    Set<LuceneDocId> docsInIndex = getAllIndexedDocs(filterRef, searcher);
     Set<DocumentMetaData> docsToIndex = getAllDocMetaData(filterRef);
     for (DocumentMetaData metaData : docsToIndex) {
-      String docId = getDocId(metaData);
+      LuceneDocId docId = getDocId(metaData);
       if (!onlyNew || !isIndexed(metaData, searcher)) {
         ret += queueDocument(metaData);
         LOGGER.trace("indexed {}", docId);
@@ -334,9 +334,9 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
     return store.listDocumentMetaData(ref);
   }
 
-  public Set<String> getAllIndexedDocs(@NotNull EntityReference ref,
+  public Set<LuceneDocId> getAllIndexedDocs(@NotNull EntityReference ref,
       @NotNull IndexSearcher searcher) throws IOException, InterruptedException {
-    Set<String> ret = new HashSet<>();
+    Set<LuceneDocId> ret = new HashSet<>();
     if (wipeIndex) {
       wipeWikiIndex(ref);
     } else {
@@ -345,7 +345,12 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
       searcher.search(query, collector);
       TopDocs topDocs = searcher.search(query, Math.max(1, collector.getTotalHits()));
       for (ScoreDoc scoreDoc : topDocs.scoreDocs) {
-        ret.add(searcher.doc(scoreDoc.doc).get(IndexFields.DOCUMENT_ID));
+        try {
+          SearchResult result = new SearchResult(searcher.doc(scoreDoc.doc), scoreDoc.score);
+          ret.add(result.getId());
+        } catch (IllegalArgumentException iae) {
+          LOGGER.warn("encountered invalid doc in index: {}", scoreDoc, iae);
+        }
       }
     }
     LOGGER.info("getAllIndexedDocs: found {} docs in index for ref '{}'", ret.size(), ref);
@@ -359,9 +364,9 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
     queue(new WikiData(wikiRef, true));
   }
 
-  private void cleanIndex(Set<String> danglingDocs) throws InterruptedException {
+  private void cleanIndex(Set<LuceneDocId> danglingDocs) throws InterruptedException {
     LOGGER.info("cleanIndex: {} for {} dangling docs", !wipeIndex, danglingDocs.size());
-    for (String docId : danglingDocs) {
+    for (LuceneDocId docId : danglingDocs) {
       waitForLowQueueSize();
       queue(new DeleteData(docId));
       LOGGER.trace("cleanIndex: deleted doc: {}", docId);
@@ -458,24 +463,12 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
     return query;
   }
 
-  static String getDocId(DocumentMetaData metaData) {
-    StringBuilder sb = new StringBuilder();
-    sb.append(getModelUtils().serializeRef(metaData.getDocRef()));
-    sb.append(".");
-    if (!Strings.isNullOrEmpty(metaData.getLanguage())) {
-      sb.append(metaData.getLanguage());
-    } else {
-      sb.append("default");
-    }
-    return sb.toString();
+  static LuceneDocId getDocId(DocumentMetaData metaData) {
+    return new LuceneDocId(metaData.getDocRef(), metaData.getLanguage());
   }
 
   private static IModelAccessFacade getModelAccess() {
     return Utils.getComponent(IModelAccessFacade.class);
-  }
-
-  private static ModelUtils getModelUtils() {
-    return Utils.getComponent(ModelUtils.class);
   }
 
   private static ModelContext getContext() {

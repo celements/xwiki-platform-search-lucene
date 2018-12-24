@@ -61,7 +61,7 @@ public interface IndexData {
   /**
    * @return string unique to this document across all languages and virtual wikis
    */
-  public String getId();
+  public LuceneDocId getId();
 
   public IndexQueuePriority getPriority();
 

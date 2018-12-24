@@ -70,7 +70,6 @@ import com.google.common.base.Strings;
 import com.google.common.collect.Iterables;
 import com.xpn.xwiki.XWikiContext;
 import com.xpn.xwiki.api.Api;
-import com.xpn.xwiki.api.XWiki;
 import com.xpn.xwiki.doc.XWikiAttachment;
 import com.xpn.xwiki.doc.XWikiDocument;
 import com.xpn.xwiki.plugin.XWikiDefaultPlugin;
@@ -568,8 +567,7 @@ public class LucenePlugin extends XWikiDefaultPlugin {
           + System.identityHashCode(results) + "].", q, results.getTotalHits());
 
       // Transform the raw Lucene search results into XWiki-aware results
-      return new SearchResults(results, searcher, theSearcherProvider, skipChecks, new XWiki(
-          context.getWiki(), context), context);
+      return new SearchResults(results, searcher, theSearcherProvider, skipChecks);
     } finally {
       theSearcherProvider.disconnect();
     }

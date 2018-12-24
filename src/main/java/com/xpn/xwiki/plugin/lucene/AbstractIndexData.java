@@ -66,7 +66,7 @@ public abstract class AbstractIndexData implements IndexData {
 
   @Override
   public Term getTerm() {
-    return new Term(IndexFields.DOCUMENT_ID, getId());
+    return new Term(IndexFields.DOCUMENT_ID, getId().asString());
   }
 
   @Override

@@ -23,20 +23,20 @@ import static com.google.common.base.Preconditions.*;
 
 import org.apache.lucene.document.Document;
 
-import com.google.common.base.Strings;
+import com.celements.search.lucene.index.LuceneDocId;
 import com.xpn.xwiki.XWikiException;
 
 public class DeleteData extends AbstractIndexData {
 
-  private final String docId;
+  private final LuceneDocId docId;
 
-  public DeleteData(String docId) {
+  public DeleteData(LuceneDocId docId) {
     super("", null, true);
-    this.docId = checkNotNull(Strings.emptyToNull(docId));
+    this.docId = checkNotNull(docId);
   }
 
   @Override
-  public String getId() {
+  public LuceneDocId getId() {
     return docId;
   }
 

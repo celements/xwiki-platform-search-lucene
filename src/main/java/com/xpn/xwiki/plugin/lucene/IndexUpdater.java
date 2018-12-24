@@ -52,6 +52,7 @@ import com.celements.model.context.ModelContext;
 import com.celements.model.util.ModelUtils;
 import com.celements.model.util.References;
 import com.celements.search.lucene.index.IndexData;
+import com.celements.search.lucene.index.LuceneDocId;
 import com.celements.search.lucene.index.queue.IndexQueuePriority;
 import com.celements.search.lucene.index.queue.IndexQueuePriorityManager;
 import com.celements.search.lucene.index.queue.LuceneIndexingQueue;
@@ -325,7 +326,7 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
     plugin.openSearchers();
   }
 
-  public void queueDeletion(String docId, IndexQueuePriority priority) {
+  public void queueDeletion(LuceneDocId docId, IndexQueuePriority priority) {
     queue(new DeleteData(docId).setPriority(priority));
   }
 

@@ -34,6 +34,7 @@ import org.slf4j.LoggerFactory;
 import org.xwiki.component.annotation.Component;
 
 import com.celements.search.lucene.index.IndexData;
+import com.celements.search.lucene.index.LuceneDocId;
 import com.celements.search.lucene.index.queue.LuceneIndexingQueue;
 
 /**
@@ -57,7 +58,7 @@ public class XWikiDocumentQueue implements LuceneIndexingQueue {
   /**
    * Maps names of documents to the document instances.
    */
-  private final Map<String, IndexData> documentsByName = new HashMap<>();
+  private final Map<LuceneDocId, IndexData> documentsByName = new HashMap<>();
 
   /**
    * Maintains FIFO order.
@@ -100,7 +101,7 @@ public class XWikiDocumentQueue implements LuceneIndexingQueue {
   @Override
   @SuppressWarnings("unchecked")
   public synchronized void add(IndexData data) {
-    String key = data.getId();
+    LuceneDocId key = data.getId();
 
     LOGGER.debug("adding element to queue. Key: " + key);
     if (!this.documentsByName.containsKey(key)) {
