@@ -84,7 +84,7 @@ public class XWikiDocumentQueue implements LuceneIndexingQueue {
   }
 
   @Override
-  public synchronized boolean contains(String id) {
+  public synchronized boolean contains(LuceneDocId id) {
     return this.documentsByName.containsKey(id);
   }
 
