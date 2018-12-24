@@ -25,6 +25,7 @@ import org.apache.lucene.document.Document;
 import org.apache.lucene.index.Term;
 import org.xwiki.model.reference.WikiReference;
 
+import com.celements.search.lucene.index.LuceneDocId;
 import com.xpn.xwiki.XWikiException;
 
 /**
@@ -41,8 +42,8 @@ public class WikiData extends AbstractIndexData {
   }
 
   @Override
-  public String getId() {
-    return getWiki();
+  public LuceneDocId getId() {
+    return new LuceneDocId(getEntityReference(), null);
   }
 
   @Override

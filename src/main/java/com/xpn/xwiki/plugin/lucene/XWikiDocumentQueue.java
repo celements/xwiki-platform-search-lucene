@@ -28,6 +28,8 @@ import org.apache.commons.collections.buffer.UnboundedFifoBuffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.celements.search.lucene.index.LuceneDocId;
+
 /**
  * This class represents a Queue (FirstInFirstOut) for XWikiDocument objects. It is used
  * during indexing of the wiki. The index is updated whenever the processing queue is not
@@ -44,7 +46,7 @@ public class XWikiDocumentQueue {
   /**
    * Maps names of documents to the document instances.
    */
-  private Map<String, AbstractIndexData> documentsByName = new HashMap<String, AbstractIndexData>();
+  private Map<LuceneDocId, AbstractIndexData> documentsByName = new HashMap<>();
 
   /**
    * Maintains FIFO order.
@@ -76,7 +78,7 @@ public class XWikiDocumentQueue {
    */
   @SuppressWarnings("unchecked")
   public synchronized void add(AbstractIndexData data) {
-    String key = data.getId();
+    LuceneDocId key = data.getId();
 
     LOGGER.debug("adding element to queue. Key: " + key);
     if (!this.documentsByName.containsKey(key)) {

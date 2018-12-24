@@ -51,6 +51,7 @@ import com.celements.common.observation.event.AbstractEntityEvent;
 import com.celements.model.context.ModelContext;
 import com.celements.model.util.ModelUtils;
 import com.celements.model.util.References;
+import com.celements.search.lucene.index.LuceneDocId;
 import com.xpn.xwiki.XWikiContext;
 import com.xpn.xwiki.XWikiException;
 import com.xpn.xwiki.doc.XWikiAttachment;
@@ -300,7 +301,7 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
     plugin.openSearchers();
   }
 
-  public void queueDeletion(String docId) {
+  public void queueDeletion(LuceneDocId docId) {
     queue(new DeleteData(docId));
   }
 

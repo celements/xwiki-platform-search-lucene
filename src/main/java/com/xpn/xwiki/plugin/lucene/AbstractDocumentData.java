@@ -26,7 +26,6 @@ import java.util.Date;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
-import org.apache.lucene.index.Term;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.xwiki.model.EntityType;
@@ -35,6 +34,7 @@ import org.xwiki.rendering.syntax.Syntax;
 
 import com.celements.model.access.IModelAccessFacade;
 import com.celements.model.access.exception.DocumentNotExistsException;
+import com.celements.search.lucene.index.LuceneDocId;
 import com.xpn.xwiki.XWikiException;
 import com.xpn.xwiki.doc.XWikiDocument;
 import com.xpn.xwiki.web.Utils;
@@ -132,8 +132,8 @@ public abstract class AbstractDocumentData extends AbstractIndexData {
         + "], space [" + getDocumentSpace() + "], fullname [" + getFullName() + "], hidden ["
         + doc.isHidden().toString() + "].");
     // Keyword fields: stored and indexed, but not tokenized
-    addFieldToDocument(IndexFields.DOCUMENT_ID, getId(), Field.Store.YES, Field.Index.NOT_ANALYZED,
-        ID_BOOST, luceneDoc);
+    addFieldToDocument(IndexFields.DOCUMENT_ID, getId().asString(), Field.Store.YES,
+        Field.Index.NOT_ANALYZED, ID_BOOST, luceneDoc);
 
     addFieldToDocument(IndexFields.DOCUMENT_LANGUAGE, getLanguage(), Field.Store.YES,
         Field.Index.ANALYZED, LANGUAGE_BOOST, luceneDoc);
@@ -207,19 +207,8 @@ public abstract class AbstractDocumentData extends AbstractIndexData {
   public abstract String getFullText(XWikiDocument doc);
 
   @Override
-  public String getId() {
-    StringBuilder retval = new StringBuilder();
-
-    retval.append(getFullName());
-    retval.append(".");
-    retval.append(getLanguage());
-
-    return retval.toString();
-  }
-
-  @Override
-  public Term getTerm() {
-    return new Term(IndexFields.DOCUMENT_ID, getId());
+  public LuceneDocId getId() {
+    return new LuceneDocId(getEntityReference(), getLanguage());
   }
 
   /**

@@ -29,6 +29,7 @@ import org.xwiki.model.reference.EntityReferenceSerializer;
 
 import com.celements.model.context.ModelContext;
 import com.celements.model.util.ModelUtils;
+import com.celements.search.lucene.index.LuceneDocId;
 import com.google.common.base.Strings;
 import com.xpn.xwiki.XWikiException;
 import com.xpn.xwiki.web.Utils;
@@ -84,12 +85,12 @@ public abstract class AbstractIndexData {
   public abstract void addDataToLuceneDocument(Document luceneDoc) throws XWikiException;
 
   /**
-   * @return string unique to this document across all languages and virtual wikis
+   * @return unique to this document across all languages and virtual wikis
    */
-  public abstract String getId();
+  public abstract LuceneDocId getId();
 
   public Term getTerm() {
-    return new Term(IndexFields.DOCUMENT_ID, getId());
+    return new Term(IndexFields.DOCUMENT_ID, getId().asString());
   }
 
   public String getType() {
