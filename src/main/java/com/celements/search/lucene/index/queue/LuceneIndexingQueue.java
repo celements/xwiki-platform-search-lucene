@@ -10,16 +10,43 @@ import com.celements.search.lucene.index.LuceneDocId;
 @ComponentRole
 public interface LuceneIndexingQueue {
 
-  boolean contains(LuceneDocId id);
-
-  void add(IndexData data);
-
-  IndexData remove() throws NoSuchElementException;
-
-  IndexData take() throws InterruptedException, UnsupportedOperationException;
+  int getSize();
 
   boolean isEmpty();
 
-  int getSize();
+  /**
+   * check if the queue contains data for the given id
+   */
+  boolean contains(LuceneDocId id);
+
+  /**
+   * Adds an element to the queue. If the element was already in the queue, the associated data is
+   * updated but its position will remain unchanged.
+   */
+  void add(IndexData data);
+
+  /**
+   * Like {@link #add(IndexData)} but blocking if max queue size is reached.
+   *
+   * @throws UnsupportedOperationException
+   *           if the implementation isn't a blocking queue
+   */
+  void put(IndexData data) throws InterruptedException, UnsupportedOperationException;
+
+  /**
+   * Retrieves and removes the head of the queue.
+   *
+   * @throws NoSuchElementException
+   *           if the queue is empty
+   */
+  IndexData remove() throws NoSuchElementException;
+
+  /**
+   * Like {@link #remove(IndexData)} but blocking if no element in queue.
+   *
+   * @throws UnsupportedOperationException
+   *           if the implementation isn't a blocking queue
+   */
+  IndexData take() throws InterruptedException, UnsupportedOperationException;
 
 }

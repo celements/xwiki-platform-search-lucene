@@ -135,7 +135,12 @@ public class XWikiDocumentQueue implements LuceneIndexingQueue {
   }
 
   @Override
-  public IndexData take() throws InterruptedException {
+  public void put(IndexData data) throws UnsupportedOperationException {
+    throw new UnsupportedOperationException("non blocking queue");
+  }
+
+  @Override
+  public IndexData take() throws UnsupportedOperationException {
     throw new UnsupportedOperationException("non blocking queue");
   }
 }
