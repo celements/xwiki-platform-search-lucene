@@ -52,6 +52,12 @@ import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.search.TopDocsCollector;
 import org.apache.lucene.search.TopFieldCollector;
 import org.apache.lucene.search.TopScoreDocCollector;
+import org.apache.lucene.search.highlight.Formatter;
+import org.apache.lucene.search.highlight.Highlighter;
+import org.apache.lucene.search.highlight.InvalidTokenOffsetsException;
+import org.apache.lucene.search.highlight.QueryScorer;
+import org.apache.lucene.search.highlight.SimpleHTMLFormatter;
+import org.apache.lucene.search.highlight.SimpleSpanFragmenter;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.store.LockObtainFailedException;
@@ -561,6 +567,9 @@ public class LucenePlugin extends XWikiDefaultPlugin {
         results = TopScoreDocCollector.create(resultLimit, false);
       }
       searcher.search(q, results);
+
+      String fragment = getHighlightedField(query, analyzer, fieldName, fieldValue);
+
       LOGGER.debug("search: query [{}] returned {} hits on result with hash-id ["
           + System.identityHashCode(results) + "].", q, results.getTotalHits());
 
@@ -570,6 +579,16 @@ public class LucenePlugin extends XWikiDefaultPlugin {
     } finally {
       theSearcherProvider.disconnect();
     }
+  }
+
+  private String getHighlightedField(Query query, String fieldName, String fieldValue)
+      throws IOException, InvalidTokenOffsetsException {
+    Formatter formatter = new SimpleHTMLFormatter();
+    QueryScorer queryScorer = new QueryScorer(query);
+    Highlighter highlighter = new Highlighter(formatter, queryScorer);
+    highlighter.setTextFragmenter(new SimpleSpanFragmenter(queryScorer, Integer.MAX_VALUE));
+    highlighter.setMaxDocCharsToAnalyze(Integer.MAX_VALUE);
+    return highlighter.getBestFragment(this.analyzer, fieldName, fieldValue);
   }
 
   /**
