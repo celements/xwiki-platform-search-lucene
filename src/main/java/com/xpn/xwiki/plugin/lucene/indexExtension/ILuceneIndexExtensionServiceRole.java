@@ -7,13 +7,13 @@ import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field.Index;
 import org.xwiki.component.annotation.ComponentRole;
 
-import com.xpn.xwiki.plugin.lucene.AbstractIndexData;
+import com.celements.search.lucene.index.IndexData;
 import com.xpn.xwiki.plugin.lucene.indexExtension.IndexExtensionField.ExtensionType;
 
 @ComponentRole
 public interface ILuceneIndexExtensionServiceRole {
 
-  public void extend(AbstractIndexData data, Document luceneDoc);
+  public void extend(IndexData data, Document luceneDoc);
 
   public IndexExtensionField createField(String name, String value, Index indexType,
       ExtensionType extensionType);

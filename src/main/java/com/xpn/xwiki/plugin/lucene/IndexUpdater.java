@@ -286,7 +286,7 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
     notify(data, new LuceneDocumentIndexingEvent(ref));
     Document luceneDoc = new Document();
     data.addDataToLuceneDocument(luceneDoc);
-    getLuceneExtensionService().extend((AbstractIndexData) data, luceneDoc);
+    getLuceneExtensionService().extend(data, luceneDoc);
     collectFields(luceneDoc);
     writer.updateDocument(data.getTerm(), luceneDoc);
     notify(data, new LuceneDocumentIndexedEvent(ref));
@@ -358,7 +358,7 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
     queue(new WikiData(wikiRef, deleted).setPriority(priority));
   }
 
-  public void queue(AbstractIndexData data) {
+  public void queue(IndexData data) {
     if (!isExit()) {
       LOGGER.debug("queue{}: '{}'", (data.isDeleted() ? " delete" : ""), data.getId());
       queue.add(data);

@@ -34,19 +34,19 @@ public interface LuceneIndexingQueue {
   void put(IndexData data) throws InterruptedException, UnsupportedOperationException;
 
   /**
-   * Retrieves and removes the head of the queue.
-   *
-   * @throws NoSuchElementException
-   *           if the queue is empty
-   */
-  IndexData remove() throws NoSuchElementException;
-
-  /**
    * Like {@link #remove(IndexData)} but blocking if no element in queue.
    *
    * @throws UnsupportedOperationException
    *           if the implementation isn't a blocking queue
    */
   IndexData take() throws InterruptedException, UnsupportedOperationException;
+
+  /**
+   * Retrieves and removes the head of the queue.
+   *
+   * @throws NoSuchElementException
+   *           if the queue is empty
+   */
+  IndexData remove() throws NoSuchElementException;
 
 }
