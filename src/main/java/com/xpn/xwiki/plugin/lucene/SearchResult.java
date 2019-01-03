@@ -27,8 +27,9 @@ import org.xwiki.model.reference.AttachmentReference;
 import org.xwiki.model.reference.DocumentReference;
 import org.xwiki.model.reference.EntityReference;
 
-import com.xpn.xwiki.XWikiException;
-import com.xpn.xwiki.api.Document;
+import com.celements.search.lucene.index.LuceneDocId;
+import com.celements.web.service.UrlService;
+import com.xpn.xwiki.web.Utils;
 
 /**
  * Result of a search. The Plugin will return a collection of these for display on the
@@ -38,7 +39,7 @@ import com.xpn.xwiki.api.Document;
  */
 public class SearchResult {
 
-  private String id;
+  private LuceneDocId id;
 
   private float score;
 
@@ -84,10 +85,9 @@ public class SearchResult {
    *       searchresults, esp. for external indexes and custom implementations of
    *       searchresults
    */
-  public SearchResult(org.apache.lucene.document.Document doc, float score,
-      com.xpn.xwiki.api.XWiki xwiki) {
+  public SearchResult(org.apache.lucene.document.Document doc, float score) {
     this.score = score;
-    this.id = doc.get(IndexFields.DOCUMENT_ID);
+    this.id = LuceneDocId.fromString(doc.get(IndexFields.DOCUMENT_ID));
     this.title = doc.get(IndexFields.DOCUMENT_TITLE);
     this.name = doc.get(IndexFields.DOCUMENT_NAME);
     this.space = doc.get(IndexFields.DOCUMENT_SPACE);
@@ -104,18 +104,7 @@ public class SearchResult {
     if (this.isAttachment()) {
       this.filename = doc.get(IndexFields.FILENAME);
       this.reference = new AttachmentReference(this.filename, (DocumentReference) this.reference);
-      Document document;
-      final String fullDocName = new StringBuffer(this.wiki).append(":").append(this.space).append(
-          ".").append(this.name).toString();
-      try {
-        document = xwiki.getDocument(fullDocName);
-        if (document != null) {
-          this.url = document.getAttachmentURL(this.filename, "download");
-        }
-      } catch (XWikiException e) {
-        LOGGER.error("error retrieving url for attachment [{}] of document [{}]", new Object[] {
-            this.filename, fullDocName, e });
-      }
+      this.url = getUrlService().getURL(this.reference, "download");
     } else {
       this.objects = doc.getValues("object");
     }
@@ -124,7 +113,7 @@ public class SearchResult {
   /**
    * @return the document id as indexed
    */
-  public String getId() {
+  public LuceneDocId getId() {
     return this.id;
   }
 
@@ -286,5 +275,9 @@ public class SearchResult {
    */
   public EntityReference getReference() {
     return this.reference;
+  }
+
+  private static final UrlService getUrlService() {
+    return Utils.getComponent(UrlService.class);
   }
 }

@@ -17,6 +17,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.xwiki.component.annotation.Component;
 
+import com.celements.search.lucene.index.IndexData;
+import com.celements.web.plugin.cmd.ConvertToPlainTextException;
 import com.celements.web.plugin.cmd.PlainTextCommand;
 import com.google.common.base.Strings;
 import com.xpn.xwiki.plugin.lucene.AbstractIndexData;
@@ -43,11 +45,12 @@ public class LuceneIndexExtensionService implements ILuceneIndexExtensionService
   }
 
   @Override
-  public void extend(AbstractIndexData data, Document luceneDoc) {
+  public void extend(IndexData data, Document luceneDoc) {
     for (ILuceneIndexExtender ext : getExtenders()) {
       try {
-        if (ext.isEligibleIndexData(data)) {
-          for (IndexExtensionField extField : ext.getExtensionFields(data)) {
+        AbstractIndexData abstrData = (AbstractIndexData) data;
+        if (ext.isEligibleIndexData(abstrData)) {
+          for (IndexExtensionField extField : ext.getExtensionFields(abstrData)) {
             if (extField != null) {
               switch (extField.getExtensionType()) {
                 case ADD:
@@ -77,7 +80,13 @@ public class LuceneIndexExtensionService implements ILuceneIndexExtensionService
   @Override
   public IndexExtensionField createField(String name, String value, Index indexType,
       ExtensionType extensionType) {
-    value = plainTextCmd.convertToPlainText(value).toLowerCase();
+    try {
+      value = plainTextCmd.convertHtmlToPlainText(value);
+    } catch (ConvertToPlainTextException exc) {
+      LOGGER.warn("createField - failed to convert html to plaintext for field '{}': '{}'", name,
+          value);
+    }
+    value = value.toLowerCase();
     return new IndexExtensionField(extensionType, new Field(name, value, Field.Store.YES,
         indexType));
   }

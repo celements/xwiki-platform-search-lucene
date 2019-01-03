@@ -51,6 +51,8 @@ import com.celements.common.observation.event.AbstractEntityEvent;
 import com.celements.model.context.ModelContext;
 import com.celements.model.util.ModelUtils;
 import com.celements.model.util.References;
+import com.celements.search.lucene.index.IndexData;
+import com.celements.search.lucene.index.LuceneDocId;
 import com.xpn.xwiki.XWikiContext;
 import com.xpn.xwiki.XWikiException;
 import com.xpn.xwiki.doc.XWikiAttachment;
@@ -218,7 +220,7 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
     boolean hasUncommitedWrites = false;
     long lastCommitTime = System.currentTimeMillis();
     while (!queue.isEmpty()) {
-      AbstractIndexData data = queue.remove();
+      IndexData data = queue.remove();
       try {
         LOGGER.debug("updateIndex start document '{}'", data.getEntityReference());
         indexData(data);
@@ -250,7 +252,7 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
     }
   }
 
-  private void indexData(AbstractIndexData data) throws IOException, XWikiException {
+  private void indexData(IndexData data) throws IOException, XWikiException {
     getContext().setWikiRef(References.extractRef(data.getEntityReference(),
         WikiReference.class).or(getContext().getWikiRef()));
     if (data.isDeleted()) {
@@ -260,7 +262,7 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
     }
   }
 
-  private void addToIndex(AbstractIndexData data) throws IOException, XWikiException {
+  private void addToIndex(IndexData data) throws IOException, XWikiException {
     LOGGER.debug("addToIndex: '{}'", data);
     EntityReference ref = data.getEntityReference();
     notify(data, new LuceneDocumentIndexingEvent(ref));
@@ -282,7 +284,7 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
     }
   }
 
-  private void removeFromIndex(AbstractIndexData data) throws CorruptIndexException, IOException {
+  private void removeFromIndex(IndexData data) throws CorruptIndexException, IOException {
     LOGGER.debug("removeFromIndex: '{}'", data);
     EntityReference ref = data.getEntityReference();
     if (ref != null) {
@@ -300,7 +302,7 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
     plugin.openSearchers();
   }
 
-  public void queueDeletion(String docId) {
+  public void queueDeletion(LuceneDocId docId) {
     queue(new DeleteData(docId));
   }
 
@@ -330,7 +332,7 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
     queue(new WikiData(wikiRef, deleted));
   }
 
-  public void queue(AbstractIndexData data) {
+  public void queue(IndexData data) {
     if (!isExit()) {
       LOGGER.debug("queue{}: '{}'", (data.isDeleted() ? " delete" : ""), data.getId());
       queue.add(data);
@@ -403,7 +405,7 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
     return new HashSet<>(COLLECTED_FIELDS);
   }
 
-  private void notify(AbstractIndexData data, AbstractEntityEvent event) {
+  private void notify(IndexData data, AbstractEntityEvent event) {
     if (data.notifyObservationEvents()) {
       Utils.getComponent(ObservationManager.class).notify(event, event.getReference(),
           getContext().getXWikiContext());

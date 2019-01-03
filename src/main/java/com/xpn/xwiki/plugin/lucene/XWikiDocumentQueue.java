@@ -21,12 +21,21 @@ package com.xpn.xwiki.plugin.lucene;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.NoSuchElementException;
+
+import javax.annotation.concurrent.ThreadSafe;
+import javax.inject.Singleton;
 
 import org.apache.commons.collections.Buffer;
 import org.apache.commons.collections.BufferUnderflowException;
 import org.apache.commons.collections.buffer.UnboundedFifoBuffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.xwiki.component.annotation.Component;
+
+import com.celements.search.lucene.index.IndexData;
+import com.celements.search.lucene.index.LuceneDocId;
+import com.celements.search.lucene.index.queue.LuceneIndexingQueue;
 
 /**
  * This class represents a Queue (FirstInFirstOut) for XWikiDocument objects. It is used
@@ -36,7 +45,12 @@ import org.slf4j.LoggerFactory;
  *
  * @version $Id: 04187bfc92c5273f46dd5d519cfd1835df839dd6 $
  */
-public class XWikiDocumentQueue {
+@Singleton
+@ThreadSafe
+@Component(XWikiDocumentQueue.NAME)
+public class XWikiDocumentQueue implements LuceneIndexingQueue {
+
+  public static final String NAME = "xwiki";
 
   /** Logging helper object. */
   private static final Logger LOGGER = LoggerFactory.getLogger(XWikiDocumentQueue.class);
@@ -44,12 +58,12 @@ public class XWikiDocumentQueue {
   /**
    * Maps names of documents to the document instances.
    */
-  private Map<String, AbstractIndexData> documentsByName = new HashMap<String, AbstractIndexData>();
+  private final Map<LuceneDocId, IndexData> documentsByName = new HashMap<>();
 
   /**
    * Maintains FIFO order.
    */
-  private Buffer namesQueue = new UnboundedFifoBuffer();
+  private final Buffer namesQueue = new UnboundedFifoBuffer();
 
   /**
    * Remove an item from the queue and return it. Since this is a FIFO, the element
@@ -59,9 +73,19 @@ public class XWikiDocumentQueue {
    * @throws BufferUnderflowException
    *           If the queue is empty.
    */
-  public synchronized AbstractIndexData remove() throws BufferUnderflowException {
+  @Override
+  public synchronized IndexData remove() throws NoSuchElementException {
     LOGGER.debug("removing element from queue.");
-    return this.documentsByName.remove(this.namesQueue.remove());
+    try {
+      return this.documentsByName.remove(this.namesQueue.remove());
+    } catch (BufferUnderflowException exc) {
+      throw new NoSuchElementException(exc.getMessage());
+    }
+  }
+
+  @Override
+  public synchronized boolean contains(LuceneDocId id) {
+    return this.documentsByName.containsKey(id);
   }
 
   /**
@@ -74,9 +98,10 @@ public class XWikiDocumentQueue {
    * @param data
    *          IndexData object to add to the queue.
    */
+  @Override
   @SuppressWarnings("unchecked")
-  public synchronized void add(AbstractIndexData data) {
-    String key = data.getId();
+  public synchronized void add(IndexData data) {
+    LuceneDocId key = data.getId();
 
     LOGGER.debug("adding element to queue. Key: " + key);
     if (!this.documentsByName.containsKey(key)) {
@@ -94,6 +119,7 @@ public class XWikiDocumentQueue {
    *
    * @return <code>true</code> if the queue is empty, <code>false</code> otherwise.
    */
+  @Override
   public synchronized boolean isEmpty() {
     return this.namesQueue.isEmpty();
   }
@@ -103,7 +129,9 @@ public class XWikiDocumentQueue {
    *
    * @return Number of elements in the queue.
    */
+  @Override
   public synchronized int getSize() {
     return this.namesQueue.size();
   }
+
 }

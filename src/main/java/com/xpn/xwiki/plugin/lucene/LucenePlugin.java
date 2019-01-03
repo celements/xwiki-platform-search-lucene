@@ -70,7 +70,6 @@ import com.google.common.base.Strings;
 import com.google.common.collect.Iterables;
 import com.xpn.xwiki.XWikiContext;
 import com.xpn.xwiki.api.Api;
-import com.xpn.xwiki.api.XWiki;
 import com.xpn.xwiki.doc.XWikiAttachment;
 import com.xpn.xwiki.doc.XWikiDocument;
 import com.xpn.xwiki.plugin.XWikiDefaultPlugin;
@@ -118,6 +117,8 @@ public class LucenePlugin extends XWikiDefaultPlugin {
   private static final String DEFAULT_ANALYZER = "org.apache.lucene.analysis.standard.StandardAnalyzer";
 
   static final String PROP_WRITER_BUFFER_SIZE = "xwiki.plugins.lucene.writerBufferSize";
+
+  static final String PROP_OPEN_WRITER_TRY_COUNT = "xwiki.plugins.lucene.openWriterTryCount";
 
   /**
    * Lucene index updater. Listens for changes and indexes wiki documents in a separate
@@ -568,8 +569,7 @@ public class LucenePlugin extends XWikiDefaultPlugin {
           + System.identityHashCode(results) + "].", q, results.getTotalHits());
 
       // Transform the raw Lucene search results into XWiki-aware results
-      return new SearchResults(results, searcher, theSearcherProvider, skipChecks, new XWiki(
-          context.getWiki(), context), context);
+      return new SearchResults(results, searcher, theSearcherProvider, skipChecks);
     } finally {
       theSearcherProvider.disconnect();
     }
@@ -702,7 +702,7 @@ public class LucenePlugin extends XWikiDefaultPlugin {
       }
       LOGGER.info("Lucene plugin initialized.");
     } catch (IOException exc) {
-      LOGGER.error("Failed to open the index directory: ", exc);
+      LOGGER.error("Failed to open the index directory '{}'", getWriteDirectory(), exc);
       throw new RuntimeException(exc);
     }
   }
@@ -717,6 +717,7 @@ public class LucenePlugin extends XWikiDefaultPlugin {
       if (!file.exists()) {
         file.mkdirs();
       }
+      LOGGER.warn("getIndexDirectories - file {} exists {}", file, file.exists());
       Directory dir = FSDirectory.open(file);
       if (!IndexReader.indexExists(dir)) {
         // If there's no index create an empty one
@@ -735,6 +736,7 @@ public class LucenePlugin extends XWikiDefaultPlugin {
   }
 
   IndexWriter openWriter(Directory directory, OpenMode openMode) throws IOException {
+    long tryCount = getContext().getWiki().ParamAsLong(PROP_OPEN_WRITER_TRY_COUNT, 10);
     IndexWriter ret = null;
     while (ret == null) {
       try {
@@ -746,12 +748,16 @@ public class LucenePlugin extends XWikiDefaultPlugin {
         }
         ret = new IndexWriter(directory, cfg);
       } catch (LockObtainFailedException exc) {
-        try {
-          int ms = new Random().nextInt(1000);
-          LOGGER.debug("failed to acquire lock, retrying in {}ms ...", ms);
-          Thread.sleep(ms);
-        } catch (InterruptedException ex) {
-          LOGGER.warn("Error while sleeping", ex);
+        if (tryCount-- > 0) {
+          try {
+            int ms = new Random().nextInt(1000);
+            LOGGER.debug("failed to acquire lock on '{}', retrying in {}ms ...", directory, ms);
+            Thread.sleep(ms);
+          } catch (InterruptedException ex) {
+            LOGGER.warn("Error while sleeping", ex);
+          }
+        } else {
+          throw exc;
         }
       }
     }
@@ -835,22 +841,37 @@ public class LucenePlugin extends XWikiDefaultPlugin {
   }
 
   public Directory getWriteDirectory() {
-    return indexDirs.get(0);
+    return Iterables.getFirst(indexDirs, null);
   }
 
   public long getQueueSize() {
     return this.indexUpdater.getQueueSize();
   }
 
+  @Deprecated
   public void queueDocument(XWikiDocument doc, XWikiContext context) {
-    this.indexUpdater.queueDocument(doc, false);
+    queueDocument(doc);
   }
 
+  public void queueDocument(XWikiDocument doc) {
+    indexUpdater.queueDocument(doc, false);
+  }
+
+  @Deprecated
   public void queueAttachment(XWikiDocument doc, XWikiAttachment attach, XWikiContext context) {
-    this.indexUpdater.queueAttachment(attach, false);
+    indexUpdater.queueAttachment(attach, false);
   }
 
+  public void queueAttachment(XWikiDocument doc, XWikiAttachment attach) {
+    indexUpdater.queueAttachment(attach, false);
+  }
+
+  @Deprecated
   public void queueAttachment(XWikiDocument doc, XWikiContext context) {
+    queueAttachments(doc);
+  }
+
+  public void queueAttachments(XWikiDocument doc) {
     this.indexUpdater.queueAttachments(doc);
   }
 

@@ -32,12 +32,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.xwiki.model.reference.DocumentReference;
 
+import com.celements.model.context.ModelContext;
 import com.celements.rights.access.EAccessLevel;
 import com.celements.rights.access.IRightsAccessFacadeRole;
-import com.xpn.xwiki.XWikiContext;
 import com.xpn.xwiki.XWikiException;
 import com.xpn.xwiki.api.Api;
-import com.xpn.xwiki.api.XWiki;
 import com.xpn.xwiki.plugin.lucene.searcherProvider.SearcherProvider;
 import com.xpn.xwiki.web.Utils;
 
@@ -53,8 +52,6 @@ import com.xpn.xwiki.web.Utils;
  */
 public class SearchResults extends Api {
 
-  private final XWiki xwiki;
-
   private final Searcher searcher;
 
   private final SearcherProvider searcherProvider;
@@ -67,32 +64,26 @@ public class SearchResults extends Api {
 
   private List<SearchResult> relevantResults;
 
-  private IRightsAccessFacadeRole rightsAccess;
-
   /**
    * @param results
    *          Lucene search results
    * @param searcher
    * @param skipChecks
    *          skips exists and access checks on documents
-   * @param xwiki
-   *          xwiki instance for access rights checking
    */
   SearchResults(TopDocsCollector<? extends ScoreDoc> results, Searcher searcher,
-      SearcherProvider theSearcherProvider, boolean skipChecks, XWiki xwiki, XWikiContext context) {
-    super(context);
-
+      SearcherProvider theSearcherProvider, boolean skipChecks) {
+    super(getContext().getXWikiContext());
     this.results = results;
     this.searcher = searcher;
     this.searcherProvider = theSearcherProvider;
     this.searcherProvider.connectSearchResults(this);
     this.skipChecks = skipChecks;
-    this.xwiki = xwiki;
   }
 
   private List<SearchResult> getRelevantResults() {
     if (this.relevantResults == null) {
-      this.relevantResults = new ArrayList<SearchResult>();
+      this.relevantResults = new ArrayList<>();
       try {
         TopDocs docs = this.results.topDocs();
         LOGGER.debug("getRelevantResults: checking access to scoreDocs [" + docs.scoreDocs.length
@@ -100,8 +91,7 @@ public class SearchResults extends Api {
             + "] and id-Hash [" + System.identityHashCode(results) + "].");
         for (ScoreDoc scoreDoc : docs.scoreDocs) {
           try {
-            SearchResult result = new SearchResult(searcher.doc(scoreDoc.doc), scoreDoc.score,
-                this.xwiki);
+            SearchResult result = new SearchResult(searcher.doc(scoreDoc.doc), scoreDoc.score);
             if (result.isWikiContent()) {
               try {
                 if (skipChecks || check(result.getDocumentReference())) {
@@ -117,8 +107,8 @@ public class SearchResults extends Api {
               LOGGER.debug("getRelevantResults: skipping because no wiki content"
                   + " (wiki-Document or wiki-Doc-Attachment).");
             }
-          } catch (IOException ioe) {
-            LOGGER.error("Error getting result doc '" + scoreDoc + "' from searcher", ioe);
+          } catch (IOException | IllegalArgumentException exc) {
+            LOGGER.error("Error getting result doc '" + scoreDoc + "' from searcher", exc);
           }
         }
       } finally {
@@ -137,7 +127,7 @@ public class SearchResults extends Api {
   }
 
   private boolean check(DocumentReference docRef) throws XWikiException {
-    return xwiki.exists(docRef) && getRightsAccess().hasAccessLevel(docRef, EAccessLevel.VIEW);
+    return getRightsAccess().hasAccessLevel(docRef, EAccessLevel.VIEW);
   }
 
   /**
@@ -257,11 +247,12 @@ public class SearchResults extends Api {
         + searcherProvider.isClosed() + "], isIdle [" + searcherProvider.isIdle() + "].");
   }
 
-  private IRightsAccessFacadeRole getRightsAccess() {
-    if (rightsAccess == null) {
-      rightsAccess = Utils.getComponent(IRightsAccessFacadeRole.class);
-    }
-    return rightsAccess;
+  private static final IRightsAccessFacadeRole getRightsAccess() {
+    return Utils.getComponent(IRightsAccessFacadeRole.class);
+  }
+
+  private static final ModelContext getContext() {
+    return Utils.getComponent(ModelContext.class);
   }
 
 }

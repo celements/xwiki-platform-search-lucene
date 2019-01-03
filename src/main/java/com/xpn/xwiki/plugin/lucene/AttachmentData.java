@@ -165,11 +165,6 @@ public class AttachmentData extends AbstractDocumentData {
   }
 
   @Override
-  public String getId() {
-    return new StringBuffer(super.getId()).append(".file.").append(this.filename).toString();
-  }
-
-  @Override
   public String getFullText(XWikiDocument doc) {
     return getContentAsText(doc);
   }
