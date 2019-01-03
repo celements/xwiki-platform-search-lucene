@@ -23,6 +23,7 @@ import org.apache.lucene.document.Document;
 import org.apache.lucene.index.Term;
 import org.xwiki.model.reference.EntityReference;
 
+import com.celements.search.lucene.LuceneDocType;
 import com.celements.search.lucene.index.queue.IndexQueuePriority;
 import com.xpn.xwiki.XWikiException;
 
@@ -67,7 +68,7 @@ public interface IndexData {
 
   public Term getTerm();
 
-  public String getType();
+  public LuceneDocType getType();
 
   /**
    * @return indicate of the element should be deleted from he index

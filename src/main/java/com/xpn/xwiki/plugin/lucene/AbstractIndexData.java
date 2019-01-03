@@ -19,6 +19,8 @@
  */
 package com.xpn.xwiki.plugin.lucene;
 
+import static com.google.common.base.Preconditions.*;
+
 import org.apache.lucene.index.Term;
 import org.xwiki.model.EntityType;
 import org.xwiki.model.reference.EntityReference;
@@ -26,10 +28,10 @@ import org.xwiki.model.reference.EntityReferenceSerializer;
 
 import com.celements.model.context.ModelContext;
 import com.celements.model.util.ModelUtils;
+import com.celements.search.lucene.LuceneDocType;
 import com.celements.search.lucene.index.IndexData;
 import com.celements.search.lucene.index.queue.IndexQueuePriority;
 import com.google.common.base.Optional;
-import com.google.common.base.Strings;
 import com.xpn.xwiki.web.Utils;
 
 /**
@@ -40,7 +42,7 @@ public abstract class AbstractIndexData implements IndexData {
 
   private IndexQueuePriority priority;
 
-  private String type;
+  private LuceneDocType type;
 
   private boolean deleted;
 
@@ -48,8 +50,8 @@ public abstract class AbstractIndexData implements IndexData {
 
   private boolean notifyObservationEvents = true;
 
-  public AbstractIndexData(String type, EntityReference entityReference, boolean deleted) {
-    this.type = Strings.emptyToNull(type);
+  public AbstractIndexData(LuceneDocType type, EntityReference entityReference, boolean deleted) {
+    this.type = checkNotNull(type);
     setEntityReference(entityReference);
     setDeleted(deleted);
   }
@@ -70,7 +72,7 @@ public abstract class AbstractIndexData implements IndexData {
   }
 
   @Override
-  public String getType() {
+  public LuceneDocType getType() {
     return this.type;
   }
 

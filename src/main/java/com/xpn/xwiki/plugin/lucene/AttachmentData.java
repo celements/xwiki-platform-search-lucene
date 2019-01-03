@@ -34,6 +34,7 @@ import org.apache.tika.metadata.TikaMetadataKeys;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.celements.search.lucene.LuceneDocType;
 import com.google.common.base.Strings;
 import com.xpn.xwiki.doc.XWikiAttachment;
 import com.xpn.xwiki.doc.XWikiDocument;
@@ -85,7 +86,7 @@ public class AttachmentData extends AbstractDocumentData {
   private String mimetype;
 
   public AttachmentData(XWikiAttachment attachment, boolean deleted) {
-    super(LucenePlugin.DOCTYPE_ATTACHMENT, checkNotNull(attachment).getDoc(), deleted);
+    super(LuceneDocType.attachment, checkNotNull(attachment).getDoc(), deleted);
     setModificationDate(attachment.getDate());
     setAuthor(attachment.getAuthor());
     setSize(attachment.getFilesize());
@@ -94,7 +95,7 @@ public class AttachmentData extends AbstractDocumentData {
   }
 
   public AttachmentData(XWikiDocument document, String filename, boolean deleted) {
-    super(LucenePlugin.DOCTYPE_ATTACHMENT, document, deleted);
+    super(LuceneDocType.attachment, document, deleted);
     setFilename(filename);
   }
 
