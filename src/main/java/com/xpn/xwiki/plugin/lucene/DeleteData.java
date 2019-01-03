@@ -23,6 +23,7 @@ import static com.google.common.base.Preconditions.*;
 
 import org.apache.lucene.document.Document;
 
+import com.celements.search.lucene.LuceneDocType;
 import com.google.common.base.Strings;
 import com.xpn.xwiki.XWikiException;
 
@@ -31,7 +32,7 @@ public class DeleteData extends AbstractIndexData {
   private final String docId;
 
   public DeleteData(String docId) {
-    super("", null, true);
+    super(LuceneDocType.none, null, true);
     this.docId = checkNotNull(Strings.emptyToNull(docId));
   }
 

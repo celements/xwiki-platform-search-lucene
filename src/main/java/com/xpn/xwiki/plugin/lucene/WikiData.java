@@ -25,6 +25,7 @@ import org.apache.lucene.document.Document;
 import org.apache.lucene.index.Term;
 import org.xwiki.model.reference.WikiReference;
 
+import com.celements.search.lucene.LuceneDocType;
 import com.xpn.xwiki.XWikiException;
 
 /**
@@ -37,7 +38,7 @@ import com.xpn.xwiki.XWikiException;
 public class WikiData extends AbstractIndexData {
 
   public WikiData(WikiReference wikiReference, boolean deleted) {
-    super(null, checkNotNull(wikiReference), deleted);
+    super(LuceneDocType.none, checkNotNull(wikiReference), deleted);
   }
 
   @Override

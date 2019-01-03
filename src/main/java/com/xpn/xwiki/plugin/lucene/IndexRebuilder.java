@@ -357,6 +357,8 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
 
   private void cleanIndex(Set<String> danglingDocs) throws InterruptedException {
     LOGGER.info("cleanIndex: {} for {} dangling docs", !wipeIndex, danglingDocs.size());
+    danglingDocs.remove(null);
+    danglingDocs.remove("");
     for (String docId : danglingDocs) {
       waitForLowQueueSize();
       queue(new DeleteData(docId));

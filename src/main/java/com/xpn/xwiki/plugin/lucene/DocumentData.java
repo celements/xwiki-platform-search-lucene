@@ -29,6 +29,7 @@ import org.apache.lucene.document.Field;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.celements.search.lucene.LuceneDocType;
 import com.celements.web.plugin.cmd.ConvertToPlainTextException;
 import com.celements.web.plugin.cmd.PlainTextCommand;
 import com.xpn.xwiki.XWikiContext;
@@ -63,7 +64,7 @@ public class DocumentData extends AbstractDocumentData {
   private PlainTextCommand plainTextCmd = new PlainTextCommand();
 
   public DocumentData(XWikiDocument doc, boolean deleted) {
-    super(LucenePlugin.DOCTYPE_WIKIPAGE, doc, deleted);
+    super(LuceneDocType.wikipage, doc, deleted);
     setAuthor(doc.getAuthor());
     setCreator(doc.getCreator());
     setModificationDate(doc.getDate());
