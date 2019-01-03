@@ -35,6 +35,7 @@ import org.xwiki.rendering.syntax.Syntax;
 
 import com.celements.model.access.IModelAccessFacade;
 import com.celements.model.access.exception.DocumentNotExistsException;
+import com.celements.search.lucene.LuceneDocType;
 import com.xpn.xwiki.XWikiException;
 import com.xpn.xwiki.doc.XWikiDocument;
 import com.xpn.xwiki.web.Utils;
@@ -103,7 +104,7 @@ public abstract class AbstractDocumentData extends AbstractIndexData {
 
   private Date modificationDate;
 
-  public AbstractDocumentData(String type, XWikiDocument doc, boolean deleted) {
+  public AbstractDocumentData(LuceneDocType type, XWikiDocument doc, boolean deleted) {
     super(type, checkNotNull(doc).getDocumentReference(), deleted);
 
     setVersion(doc.getVersion());
@@ -152,7 +153,7 @@ public abstract class AbstractDocumentData extends AbstractIndexData {
     }
 
     if (getType() != null) {
-      addFieldToDocument(IndexFields.DOCUMENT_TYPE, getType(), Field.Store.YES,
+      addFieldToDocument(IndexFields.DOCUMENT_TYPE, getType().name(), Field.Store.YES,
           Field.Index.NOT_ANALYZED, TYPE_BOOST, luceneDoc);
     }
     if (this.modificationDate != null) {

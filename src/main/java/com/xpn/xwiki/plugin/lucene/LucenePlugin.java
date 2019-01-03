@@ -64,6 +64,7 @@ import org.xwiki.model.reference.WikiReference;
 import org.xwiki.observation.ObservationManager;
 
 import com.celements.model.util.References;
+import com.celements.search.lucene.LuceneDocType;
 import com.google.common.base.Optional;
 import com.google.common.base.Strings;
 import com.google.common.collect.Iterables;
@@ -96,9 +97,11 @@ public class LucenePlugin extends XWikiDefaultPlugin {
 
   public static final String SORT_FIELD_SCORE = "score";
 
-  public static final String DOCTYPE_WIKIPAGE = "wikipage";
+  @Deprecated
+  public static final String DOCTYPE_WIKIPAGE = LuceneDocType.wikipage.name();
 
-  public static final String DOCTYPE_ATTACHMENT = "attachment";
+  @Deprecated
+  public static final String DOCTYPE_ATTACHMENT = LuceneDocType.attachment.name();
 
   public static final String PROP_INDEX_DIR = "xwiki.plugins.lucene.indexdir";
 

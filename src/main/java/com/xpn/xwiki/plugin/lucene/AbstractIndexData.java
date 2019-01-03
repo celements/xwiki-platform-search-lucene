@@ -29,7 +29,7 @@ import org.xwiki.model.reference.EntityReferenceSerializer;
 
 import com.celements.model.context.ModelContext;
 import com.celements.model.util.ModelUtils;
-import com.google.common.base.Strings;
+import com.celements.search.lucene.LuceneDocType;
 import com.xpn.xwiki.XWikiException;
 import com.xpn.xwiki.web.Utils;
 
@@ -39,7 +39,7 @@ import com.xpn.xwiki.web.Utils;
  */
 public abstract class AbstractIndexData {
 
-  private String type;
+  private LuceneDocType type;
 
   private boolean deleted;
 
@@ -47,8 +47,8 @@ public abstract class AbstractIndexData {
 
   private boolean notifyObservationEvents = true;
 
-  public AbstractIndexData(String type, EntityReference entityReference, boolean deleted) {
-    this.type = checkNotNull(Strings.emptyToNull(type));
+  public AbstractIndexData(LuceneDocType type, EntityReference entityReference, boolean deleted) {
+    this.type = checkNotNull(type);
     setEntityReference(entityReference);
     setDeleted(deleted);
   }
@@ -92,7 +92,7 @@ public abstract class AbstractIndexData {
     return new Term(IndexFields.DOCUMENT_ID, getId());
   }
 
-  public String getType() {
+  public LuceneDocType getType() {
     return this.type;
   }
 
