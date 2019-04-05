@@ -127,12 +127,14 @@ public class SearcherProvider {
     for (Thread thread : connectedThreads) {
       if (!thread.isAlive()) {
         connectedThreads.remove(thread);
-        connectedSearchResultsMap.remove(thread);
+        LOGGER.info("remove stale thread from connectedThreads set '{}'.", thread.getName());
       }
     }
     for (Thread thread : connectedSearchResultsMap.keySet()) {
       if (!thread.isAlive()) {
         connectedSearchResultsMap.remove(thread);
+        LOGGER.info("remove search results from connectedSearchResultsMap for stale thread '{}'.",
+            thread.getName());
       }
     }
     if (canBeClosed()) {
