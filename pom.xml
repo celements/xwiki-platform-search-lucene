@@ -4,7 +4,7 @@
   <parent>
       <groupId>com.celements</groupId>
       <artifactId>celements</artifactId>
-      <version>3.0</version>
+      <version>3.2</version>
   </parent>
   <artifactId>xwiki-platform-search-lucene</artifactId>
   <name>XWiki Platform - Search - Lucene</name>
@@ -40,8 +40,7 @@
     <dependency>
       <groupId>commons-collections</groupId>
       <artifactId>commons-collections</artifactId>
-      <version>3.2.1</version>
-    </dependency>
+      </dependency>
     <!-- Test dependencies -->
     <dependency>
       <groupId>org.slf4j</groupId>
@@ -50,13 +49,13 @@
     <dependency>
       <groupId>com.celements</groupId>
       <artifactId>celements-model</artifactId>
-      <version>3.2</version>
+      <version>3.16</version>
       <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>com.celements</groupId>
       <artifactId>celements-core</artifactId>
-      <version>3.1</version>
+      <version>3.11</version>
       <scope>provided</scope>
     </dependency>
     <dependency>
