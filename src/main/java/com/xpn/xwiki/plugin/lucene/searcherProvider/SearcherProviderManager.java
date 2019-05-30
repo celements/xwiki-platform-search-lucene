@@ -22,6 +22,7 @@ package com.xpn.xwiki.plugin.lucene.searcherProvider;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -98,8 +99,24 @@ public class SearcherProviderManager implements ISearcherProviderRole {
     } else if (getAllSearcherProviders().size() > 10) {
       LOGGER.info("createSearchProvider in manager [{}]: list increased to size [{}].",
           System.identityHashCode(this), getAllSearcherProviders().size());
+    } else if (getAllSearcherProviders().size() > 5) {
+      LOGGER.debug("createSearchProvider in manager [{}]: list increased to size [{}],"
+          + " number of connected Threads is [{}].", System.identityHashCode(this),
+          getAllSearcherProviders().size(), getConnectedThreads(getAllSearcherProviders()).size());
+    } else if (getAllSearcherProviders().size() > 3) {
+      LOGGER.trace("createSearchProvider in manager [{}]: list increased to size [{}],"
+          + " connected Threads are [{}].", System.identityHashCode(this),
+          getAllSearcherProviders().size(), getConnectedThreads(getAllSearcherProviders()));
     }
     return newSearcherProvider;
+  }
+
+  private Set<Thread> getConnectedThreads(Set<SearcherProvider> allSearcherProviders) {
+    Set<Thread> connectedThreads = new HashSet<>();
+    for (SearcherProvider searchProvider : allSearcherProviders) {
+      connectedThreads.addAll(searchProvider.internal_getConnectedThreads());
+    }
+    return connectedThreads;
   }
 
   class DisconnectToken {
