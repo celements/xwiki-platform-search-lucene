@@ -21,6 +21,7 @@ package com.xpn.xwiki.plugin.lucene;
 
 import static com.google.common.base.Preconditions.*;
 
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -176,25 +177,20 @@ public class AttachmentData extends AbstractDocumentData {
 
   private String getContentAsText(XWikiDocument doc) {
     String contentText = null;
-
     try {
       XWikiAttachment att = doc.getAttachment(this.filename);
-
       LOGGER.debug("Start parsing attachement [{}] in document [{}]", this.filename,
           doc.getDocumentReference());
-
       Tika tika = new Tika();
-
       Metadata metadata = new Metadata();
       metadata.set(TikaMetadataKeys.RESOURCE_NAME_KEY, this.filename);
-
-      contentText = StringUtils.lowerCase(tika.parseToString(att.getContentInputStream(
-          getContext().getXWikiContext()), metadata));
+      try (InputStream is = att.getContentInputStream(getContext().getXWikiContext())) {
+        contentText = StringUtils.lowerCase(tika.parseToString(is, metadata));
+      }
     } catch (Throwable ex) {
       LOGGER.error("error getting content of attachment [{}] for document [{}]", this.filename,
           doc.getDocumentReference(), ex);
     }
-
     return contentText;
   }
 }
