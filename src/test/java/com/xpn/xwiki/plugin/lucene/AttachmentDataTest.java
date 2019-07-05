@@ -19,6 +19,7 @@
  */
 package com.xpn.xwiki.plugin.lucene;
 
+import static com.celements.common.test.CelementsTestUtils.*;
 import static org.easymock.EasyMock.*;
 import static org.junit.Assert.*;
 
@@ -32,7 +33,7 @@ import org.junit.Test;
 import org.xwiki.model.reference.DocumentReference;
 import org.xwiki.rendering.syntax.Syntax;
 
-import com.celements.common.test.AbstractBridgedComponentTestCase;
+import com.celements.common.test.AbstractComponentTest;
 import com.xpn.xwiki.XWikiException;
 import com.xpn.xwiki.doc.XWikiAttachment;
 import com.xpn.xwiki.doc.XWikiDocument;
@@ -44,7 +45,7 @@ import com.xpn.xwiki.web.XWikiServletContext;
  *
  * @version $Id: 6235ccd3b45c79ed04c8c9ef57f99a45e11fbc01 $
  */
-public class AttachmentDataTest extends AbstractBridgedComponentTestCase {
+public class AttachmentDataTest extends AbstractComponentTest {
 
   private XWikiDocument document;
 
@@ -139,10 +140,9 @@ public class AttachmentDataTest extends AbstractBridgedComponentTestCase {
     expect(servletContext.getMimeType(eq(filename))).andReturn(mimetype).once();
     replayDefault();
     this.attachmentData = new AttachmentData(this.attachment, false);
-    this.attachmentData.setFilename(filename);
+    verifyDefault();
     assertEquals("Wrong attachment content indexed", content, attachmentData.getFullText(document));
     assertEquals("Wrong mimetype content indexed", mimetype, attachmentData.getMimeType());
-    verifyDefault();
   }
 
 }

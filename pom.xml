@@ -60,11 +60,6 @@
     </dependency>
     <dependency>
       <groupId>org.apache.tika</groupId>
-      <artifactId>tika-core</artifactId>
-      <version>1.21</version>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.tika</groupId>
       <artifactId>tika-parsers</artifactId>
       <version>1.21</version>
     </dependency>
