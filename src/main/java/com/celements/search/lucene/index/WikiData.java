@@ -27,6 +27,7 @@ import org.xwiki.model.reference.WikiReference;
 
 import com.celements.search.lucene.LuceneDocType;
 import com.xpn.xwiki.XWikiException;
+import com.xpn.xwiki.plugin.lucene.IndexFields;
 
 /**
  * Holds all data but the content of a wiki page to be indexed. The content is retrieved
@@ -52,7 +53,6 @@ public class WikiData extends IndexData {
   }
 
   @Override
-  public void addDataToLuceneDocument(Document luceneDoc) throws XWikiException {
-  }
+  public void addDataToLuceneDocument(Document luceneDoc) throws XWikiException {}
 
 }

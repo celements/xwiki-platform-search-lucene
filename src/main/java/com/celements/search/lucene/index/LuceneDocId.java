@@ -3,6 +3,7 @@ package com.celements.search.lucene.index;
 import static com.celements.model.util.References.*;
 import static com.google.common.base.MoreObjects.*;
 import static com.google.common.base.Preconditions.*;
+import static com.google.common.base.Strings.*;
 
 import java.util.List;
 import java.util.Objects;
@@ -88,7 +89,7 @@ public class LuceneDocId {
   }
 
   public static LuceneDocId parse(String docId) {
-    List<String> split = SPLITTER.splitToList(docId);
+    List<String> split = SPLITTER.splitToList(nullToEmpty(docId));
     checkArgument(!split.isEmpty(), docId);
     EntityReference ref = getModelUtils().resolveRef(split.get(0)); // 'wiki' or 'wiki:space'
     if (split.size() > 1) { // 'wiki:space.doc'
@@ -97,7 +98,7 @@ public class LuceneDocId {
     String lang = DEFAULT_LANG;
     if (split.size() > 2) { // 'wiki:space.doc.en'
       lang = split.get(2);
-      checkArgument(DEFAULT_LANG.equals(lang) || lang.length() == 2, docId);
+      checkArgument(DEFAULT_LANG.equals(lang) || (lang.length() == 2), docId);
     }
     if (split.size() > 3) { // 'wiki:space.doc.en.file.att.jpg'
       String fileName = extractFileName(split)
@@ -109,7 +110,7 @@ public class LuceneDocId {
 
   private static Optional<String> extractFileName(List<String> split) {
     int i = split.indexOf(ATTACHMENT_KEYWORD);
-    if ((i >= 2) && ((i + 1) < split.size())  ) {
+    if ((i >= 2) && ((i + 1) < split.size())) {
       return Optional.of(split.subList(i + 1, split.size()).stream()
           .filter(Objects::nonNull)
           .collect(Collectors.joining(".")));
