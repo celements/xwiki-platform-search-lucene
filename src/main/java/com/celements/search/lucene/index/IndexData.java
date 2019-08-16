@@ -98,12 +98,15 @@ public abstract class IndexData {
   }
 
   /**
-   * @return ture if the element should be deleted from the index
+   * @see #isDeleted()
    */
   public void setDeleted(boolean deleted) {
     this.deleted = deleted;
   }
 
+  /**
+   * @return true if the element should be deleted from the index
+   */
   public boolean isDeleted() {
     return this.deleted;
   }

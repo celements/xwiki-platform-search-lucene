@@ -118,8 +118,6 @@ public class LucenePlugin extends XWikiDefaultPlugin {
 
   static final String PROP_WRITER_BUFFER_SIZE = "xwiki.plugins.lucene.writerBufferSize";
 
-  static final String PROP_OPEN_WRITER_TRY_COUNT = "xwiki.plugins.lucene.openWriterTryCount";
-
   /**
    * Lucene index updater. Listens for changes and indexes wiki documents in a separate
    * thread.
@@ -736,7 +734,6 @@ public class LucenePlugin extends XWikiDefaultPlugin {
   }
 
   IndexWriter openWriter(Directory directory, OpenMode openMode) throws IOException {
-    long tryCount = getContext().getWiki().ParamAsLong(PROP_OPEN_WRITER_TRY_COUNT, 10);
     IndexWriter ret = null;
     while (ret == null) {
       try {
@@ -748,16 +745,13 @@ public class LucenePlugin extends XWikiDefaultPlugin {
         }
         ret = new IndexWriter(directory, cfg);
       } catch (LockObtainFailedException exc) {
-        if (tryCount-- > 0) {
-          try {
-            int ms = new Random().nextInt(1000);
-            LOGGER.debug("failed to acquire lock on '{}', retrying in {}ms ...", directory, ms);
-            Thread.sleep(ms);
-          } catch (InterruptedException ex) {
-            LOGGER.warn("Error while sleeping", ex);
-          }
-        } else {
-          throw exc;
+        try {
+          int ms = new Random().nextInt(1000);
+          LOGGER.debug("failed to acquire lock on '{}', retrying in {}ms ...", directory, ms);
+          Thread.sleep(ms);
+        } catch (InterruptedException ex) {
+          LOGGER.error("Error while sleeping", ex);
+          Thread.currentThread().interrupt();
         }
       }
     }

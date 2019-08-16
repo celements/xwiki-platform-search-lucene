@@ -347,8 +347,7 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
       TopDocs topDocs = searcher.search(query, Math.max(1, collector.getTotalHits()));
       for (ScoreDoc scoreDoc : topDocs.scoreDocs) {
         try {
-          SearchResult result = new SearchResult(searcher.doc(scoreDoc.doc), scoreDoc.score);
-          ret.add(result.getId());
+          ret.add(LuceneDocId.parse(searcher.doc(scoreDoc.doc).get(IndexFields.DOCUMENT_ID)));
         } catch (IllegalArgumentException iae) {
           LOGGER.warn("encountered invalid doc in index: {}", scoreDoc, iae);
         }
