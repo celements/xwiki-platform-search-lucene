@@ -54,7 +54,12 @@ import com.celements.model.access.exception.DocumentNotExistsException;
 import com.celements.model.context.ModelContext;
 import com.celements.model.metadata.DocumentMetaData;
 import com.celements.model.util.References;
+import com.celements.search.lucene.index.AttachmentData;
+import com.celements.search.lucene.index.DeleteData;
+import com.celements.search.lucene.index.DocumentData;
+import com.celements.search.lucene.index.IndexData;
 import com.celements.search.lucene.index.LuceneDocId;
+import com.celements.search.lucene.index.WikiData;
 import com.celements.search.lucene.index.queue.IndexQueuePriority;
 import com.celements.search.lucene.index.queue.IndexQueuePriorityManager;
 import com.celements.store.DocumentCacheStore;
@@ -346,8 +351,7 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
       TopDocs topDocs = searcher.search(query, Math.max(1, collector.getTotalHits()));
       for (ScoreDoc scoreDoc : topDocs.scoreDocs) {
         try {
-          SearchResult result = new SearchResult(searcher.doc(scoreDoc.doc), scoreDoc.score);
-          ret.add(result.getId());
+          ret.add(LuceneDocId.parse(searcher.doc(scoreDoc.doc).get(IndexFields.DOCUMENT_ID)));
         } catch (IllegalArgumentException iae) {
           LOGGER.warn("encountered invalid doc in index: {}", scoreDoc, iae);
         }
@@ -394,7 +398,7 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
     return retval;
   }
 
-  private void queue(AbstractIndexData data) {
+  private void queue(IndexData data) {
     data.disableObservationEventNotification();
     data.setPriority(getRebuldingPriority());
     indexUpdater.queue(data);

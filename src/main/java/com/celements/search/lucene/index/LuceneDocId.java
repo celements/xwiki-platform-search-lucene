@@ -1,10 +1,13 @@
 package com.celements.search.lucene.index;
 
 import static com.celements.model.util.References.*;
+import static com.google.common.base.MoreObjects.*;
 import static com.google.common.base.Preconditions.*;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 import org.xwiki.model.EntityType;
 import org.xwiki.model.reference.AttachmentReference;
@@ -12,26 +15,26 @@ import org.xwiki.model.reference.DocumentReference;
 import org.xwiki.model.reference.EntityReference;
 
 import com.celements.model.util.ModelUtils;
-import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
 import com.google.common.base.Strings;
-import com.google.common.collect.Lists;
 import com.xpn.xwiki.web.Utils;
 
 public class LuceneDocId {
 
-  static final String SEP = ".";
-  static final String ATT_ID = "file";
-  static final Splitter SPLITTER = Splitter.on(SEP).omitEmptyStrings().trimResults();
-  static final Joiner JOINER = Joiner.on(SEP).skipNulls();
   static final String DEFAULT_LANG = "default";
+  static final String ATTACHMENT_KEYWORD = "file";
+  static final Splitter SPLITTER = Splitter.on('.').omitEmptyStrings().trimResults();
 
   private final EntityReference ref;
   private final String lang;
 
+  public LuceneDocId(EntityReference ref) {
+    this(ref, null);
+  }
+
   public LuceneDocId(EntityReference ref, String lang) {
     this.ref = checkNotNull(ref);
-    this.lang = Strings.isNullOrEmpty(lang) ? DEFAULT_LANG : lang;
+    this.lang = firstNonNull(Strings.emptyToNull(lang), DEFAULT_LANG);
   }
 
   public EntityReference getRef() {
@@ -51,54 +54,67 @@ public class LuceneDocId {
   public boolean equals(Object obj) {
     if (obj instanceof LuceneDocId) {
       LuceneDocId other = (LuceneDocId) obj;
-      return Objects.equals(this.getRef(), other.getRef()) && (!isLangRelevant() || Objects.equals(
-          this.getLang(), other.getLang()));
+      return Objects.equals(this.getRef(), other.getRef())
+          && (!isLangDependent() || Objects.equals(this.getLang(), other.getLang()));
     }
     return false;
   }
 
-  private boolean isLangRelevant() {
+  private boolean isLangDependent() {
     return extractRef(getRef(), EntityType.DOCUMENT).isPresent();
   }
 
   @Override
   public String toString() {
-    return asString();
+    return serialize();
   }
 
-  public String asString() {
+  /**
+   * @return 'wiki:space.doc.en.file.att.jpg'
+   */
+  public String serialize() {
     StringBuilder sb = new StringBuilder();
-    sb.append(getModelUtils().serializeRef(extractRef(getRef(), EntityType.DOCUMENT).or(getRef())));
-    if (isLangRelevant()) {
-      sb.append(".");
+    sb.append(getModelUtils().serializeRef(extractRef(getRef(), EntityType.DOCUMENT)
+        .or(getRef())));
+    if (isLangDependent()) {
+      sb.append('.');
       sb.append(getLang());
     }
     if (extractRef(getRef(), EntityType.ATTACHMENT).isPresent()) {
-      sb.append(SEP + ATT_ID + SEP);
+      sb.append("." + ATTACHMENT_KEYWORD + ".");
       sb.append(getRef().getName());
     }
     return sb.toString();
   }
 
-  public static LuceneDocId fromString(String docId) throws IllegalArgumentException {
-    List<String> split = Lists.newArrayList(SPLITTER.split(docId));
-    checkArgument(split.size() > 0, docId);
+  public static LuceneDocId parse(String docId) {
+    List<String> split = SPLITTER.splitToList(docId);
+    checkArgument(!split.isEmpty(), docId);
     EntityReference ref = getModelUtils().resolveRef(split.get(0)); // 'wiki' or 'wiki:space'
-    String lang = null;
-    if (split.size() > 2) {
-      // 'wiki:space.doc.en'
+    if (split.size() > 1) { // 'wiki:space.doc'
       ref = getModelUtils().resolveRef(split.get(1), DocumentReference.class, ref);
-      lang = split.get(2);
     }
-    if (split.size() > 3) {
-      // 'wiki:space.doc.en.file.att.jpg'
-      int i = split.indexOf(ATT_ID);
-      checkArgument(i == 3, docId);
-      checkArgument(split.size() > 3, docId);
-      String fileName = JOINER.join(split.subList(i + 1, split.size()));
+    String lang = DEFAULT_LANG;
+    if (split.size() > 2) { // 'wiki:space.doc.en'
+      lang = split.get(2);
+      checkArgument(DEFAULT_LANG.equals(lang) || lang.length() == 2, docId);
+    }
+    if (split.size() > 3) { // 'wiki:space.doc.en.file.att.jpg'
+      String fileName = extractFileName(split)
+          .orElseThrow(() -> new IllegalArgumentException(docId));
       ref = getModelUtils().resolveRef(fileName, AttachmentReference.class, ref);
     }
     return new LuceneDocId(ref, lang);
+  }
+
+  private static Optional<String> extractFileName(List<String> split) {
+    int i = split.indexOf(ATTACHMENT_KEYWORD);
+    if ((i >= 2) && ((i + 1) < split.size())  ) {
+      return Optional.of(split.subList(i + 1, split.size()).stream()
+          .filter(Objects::nonNull)
+          .collect(Collectors.joining(".")));
+    }
+    return Optional.empty();
   }
 
   private static ModelUtils getModelUtils() {

@@ -1,4 +1,4 @@
-package com.xpn.xwiki.plugin.lucene.indexExtension;
+package com.celements.search.lucene.index.extension;
 
 import java.util.Objects;
 

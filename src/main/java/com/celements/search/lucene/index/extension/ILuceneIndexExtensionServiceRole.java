@@ -1,4 +1,4 @@
-package com.xpn.xwiki.plugin.lucene.indexExtension;
+package com.celements.search.lucene.index.extension;
 
 import java.util.Collection;
 import java.util.Map;
@@ -8,7 +8,7 @@ import org.apache.lucene.document.Field.Index;
 import org.xwiki.component.annotation.ComponentRole;
 
 import com.celements.search.lucene.index.IndexData;
-import com.xpn.xwiki.plugin.lucene.indexExtension.IndexExtensionField.ExtensionType;
+import com.celements.search.lucene.index.extension.IndexExtensionField.ExtensionType;
 
 @ComponentRole
 public interface ILuceneIndexExtensionServiceRole {

@@ -17,7 +17,7 @@
  * Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
  * 02110-1301 USA, or see the FSF site: http://www.fsf.org.
  */
-package com.xpn.xwiki.plugin.lucene;
+package com.celements.search.lucene.index;
 
 import static com.google.common.base.Preconditions.*;
 
@@ -35,7 +35,6 @@ import org.xwiki.rendering.syntax.Syntax;
 import com.celements.model.access.IModelAccessFacade;
 import com.celements.model.access.exception.DocumentNotExistsException;
 import com.celements.search.lucene.LuceneDocType;
-import com.celements.search.lucene.index.LuceneDocId;
 import com.xpn.xwiki.XWikiException;
 import com.xpn.xwiki.doc.XWikiDocument;
 import com.xpn.xwiki.web.Utils;
@@ -44,7 +43,7 @@ import com.xpn.xwiki.web.Utils;
  * @version $Id: 97f3293fd1c3899d5edca377a2eb32905295a78a $
  * @since 1.23
  */
-public abstract class AbstractDocumentData extends AbstractIndexData {
+public abstract class AbstractDocumentData extends IndexData {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(AbstractDocumentData.class);
 
@@ -133,7 +132,7 @@ public abstract class AbstractDocumentData extends AbstractIndexData {
         + "], space [" + getDocumentSpace() + "], fullname [" + getFullName() + "], hidden ["
         + doc.isHidden().toString() + "].");
     // Keyword fields: stored and indexed, but not tokenized
-    addFieldToDocument(IndexFields.DOCUMENT_ID, getId().asString(), Field.Store.YES,
+    addFieldToDocument(IndexFields.DOCUMENT_ID, getId().serialize(), Field.Store.YES,
         Field.Index.NOT_ANALYZED, ID_BOOST, luceneDoc);
 
     addFieldToDocument(IndexFields.DOCUMENT_LANGUAGE, getLanguage(), Field.Store.YES,

@@ -19,20 +19,50 @@
  */
 package com.celements.search.lucene.index;
 
+import static com.google.common.base.Preconditions.*;
+
+import java.util.Optional;
+
 import org.apache.lucene.document.Document;
 import org.apache.lucene.index.Term;
+import org.xwiki.model.EntityType;
 import org.xwiki.model.reference.EntityReference;
+import org.xwiki.model.reference.EntityReferenceSerializer;
 
+import com.celements.model.context.ModelContext;
+import com.celements.model.util.ModelUtils;
 import com.celements.search.lucene.LuceneDocType;
 import com.celements.search.lucene.index.queue.IndexQueuePriority;
 import com.xpn.xwiki.XWikiException;
+import com.xpn.xwiki.plugin.lucene.IndexFields;
+import com.xpn.xwiki.web.Utils;
 
-public interface IndexData {
+/**
+ * @version $Id: 7078d17d13ffdd29d41a0b5367bbaf3ce545ba36 $
+ * @since 1.23
+ */
+public abstract class IndexData {
+
+  private IndexQueuePriority priority;
+
+  private LuceneDocType type;
+
+  private boolean deleted;
+
+  private EntityReference entityReference;
+
+  private boolean notifyObservationEvents = true;
+
+  protected IndexData(LuceneDocType type, EntityReference entityReference, boolean deleted) {
+    this.type = checkNotNull(type);
+    setEntityReference(entityReference);
+    setDeleted(deleted);
+  }
 
   /**
    * Adds this documents data to a lucene Document instance for indexing.
    * <p>
-   * <strong>Short introduction to Lucene field types </strong>
+   * <strong>Short introduction to Lucene field types</strong>
    * </p>
    * <p>
    * Which type of Lucene field is used determines what Lucene does with data and how we
@@ -57,32 +87,100 @@ public interface IndexData {
    *          if not null, this controls which translated version of the content will be
    *          indexed. If null, the content in the default language will be used.
    */
-  public void addDataToLuceneDocument(Document luceneDoc) throws XWikiException;
+  public abstract void addDataToLuceneDocument(Document luceneDoc) throws XWikiException;
 
   /**
-   * @return string unique to this document across all languages and virtual wikis
+   * @return unique id to this document across all languages and virtual wikis
    */
-  public LuceneDocId getId();
+  public abstract LuceneDocId getId();
 
-  public IndexQueuePriority getPriority();
+  public IndexQueuePriority getPriority() {
+    return Optional.ofNullable(priority).orElse(IndexQueuePriority.DEFAULT);
+  }
 
-  public Term getTerm();
+  public IndexData setPriority(IndexQueuePriority priority) {
+    this.priority = priority;
+    return this;
+  }
 
-  public LuceneDocType getType();
+  public Term getTerm() {
+    return new Term(IndexFields.DOCUMENT_ID, getId().serialize());
+  }
+
+  public LuceneDocType getType() {
+    return this.type;
+  }
 
   /**
-   * @return indicate of the element should be deleted from he index
+   * @see #isDeleted()
    */
-  public boolean isDeleted();
+  public void setDeleted(boolean deleted) {
+    this.deleted = deleted;
+  }
 
-  public EntityReference getEntityReference();
+  /**
+   * @return true if the element should be deleted from the index
+   */
+  public boolean isDeleted() {
+    return this.deleted;
+  }
 
-  public boolean notifyObservationEvents();
+  public EntityReference getEntityReference() {
+    return this.entityReference;
+  }
 
-  public String getDocumentName();
+  public void setEntityReference(EntityReference entityReference) {
+    this.entityReference = entityReference;
+  }
 
-  public String getDocumentSpace();
+  public boolean notifyObservationEvents() {
+    return notifyObservationEvents;
+  }
 
-  public String getWiki();
+  public void disableObservationEventNotification() {
+    this.notifyObservationEvents = false;
+  }
+
+  protected String getEntityName(EntityType type) {
+    EntityReference extract = getEntityReference().extractReference(type);
+
+    return extract != null ? extract.getName() : null;
+  }
+
+  public String getDocumentName() {
+    return getEntityName(EntityType.DOCUMENT);
+  }
+
+  public String getDocumentSpace() {
+    return getEntityName(EntityType.SPACE);
+  }
+
+  public String getWiki() {
+    return getEntityName(EntityType.WIKI);
+  }
+
+  public String getDocumentFullName() {
+    return (String) Utils.getComponent(EntityReferenceSerializer.class, "local").serialize(
+        getEntityReference());
+  }
+
+  public String getFullName() {
+    return (String) Utils.getComponent(EntityReferenceSerializer.class).serialize(
+        getEntityReference());
+  }
+
+  @Override
+  public String toString() {
+    return this.getClass().getSimpleName() + " [id=" + getId() + ", deleted=" + deleted + ", type="
+        + type + "]";
+  }
+
+  protected ModelContext getContext() {
+    return Utils.getComponent(ModelContext.class);
+  }
+
+  protected ModelUtils getModelUtils() {
+    return Utils.getComponent(ModelUtils.class);
+  }
 
 }

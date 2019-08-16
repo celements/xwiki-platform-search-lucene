@@ -1,10 +1,10 @@
-package com.xpn.xwiki.plugin.lucene.indexExtension;
+package com.celements.search.lucene.index.extension;
 
 import java.util.Collection;
 
 import org.xwiki.component.annotation.ComponentRole;
 
-import com.xpn.xwiki.plugin.lucene.AbstractIndexData;
+import com.celements.search.lucene.index.IndexData;
 
 @ComponentRole
 public interface ILuceneIndexExtender {
@@ -19,13 +19,13 @@ public interface ILuceneIndexExtender {
    *          about to be indexed
    * @return true if the provided data is eligible and should be extended by this extender
    */
-  public boolean isEligibleIndexData(AbstractIndexData data);
+  public boolean isEligibleIndexData(IndexData data);
 
   /**
    * @param data
    *          about to be indexed
    * @return the fields to be added to the lucene document
    */
-  public Collection<IndexExtensionField> getExtensionFields(AbstractIndexData data);
+  public Collection<IndexExtensionField> getExtensionFields(IndexData data);
 
 }

@@ -1,4 +1,4 @@
-package com.xpn.xwiki.plugin.lucene.indexExtension;
+package com.celements.search.lucene.index.extension;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -18,12 +18,11 @@ import org.slf4j.LoggerFactory;
 import org.xwiki.component.annotation.Component;
 
 import com.celements.search.lucene.index.IndexData;
+import com.celements.search.lucene.index.extension.IndexExtensionField.ExtensionType;
 import com.celements.web.plugin.cmd.ConvertToPlainTextException;
 import com.celements.web.plugin.cmd.PlainTextCommand;
 import com.google.common.base.Strings;
-import com.xpn.xwiki.plugin.lucene.AbstractIndexData;
 import com.xpn.xwiki.plugin.lucene.IndexFields;
-import com.xpn.xwiki.plugin.lucene.indexExtension.IndexExtensionField.ExtensionType;
 import com.xpn.xwiki.web.Utils;
 
 @Component
@@ -48,9 +47,8 @@ public class LuceneIndexExtensionService implements ILuceneIndexExtensionService
   public void extend(IndexData data, Document luceneDoc) {
     for (ILuceneIndexExtender ext : getExtenders()) {
       try {
-        AbstractIndexData abstrData = (AbstractIndexData) data;
-        if (ext.isEligibleIndexData(abstrData)) {
-          for (IndexExtensionField extField : ext.getExtensionFields(abstrData)) {
+        if (ext.isEligibleIndexData(data)) {
+          for (IndexExtensionField extField : ext.getExtensionFields(data)) {
             if (extField != null) {
               switch (extField.getExtensionType()) {
                 case ADD:
