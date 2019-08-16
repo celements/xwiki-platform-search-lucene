@@ -21,9 +21,9 @@ import com.xpn.xwiki.web.Utils;
 
 public class LuceneDocId {
 
+  static final String DEFAULT_LANG = "default";
   static final String ATTACHMENT_KEYWORD = "file";
   static final Splitter SPLITTER = Splitter.on('.').omitEmptyStrings().trimResults();
-  static final String DEFAULT_LANG = "default";
 
   private final EntityReference ref;
   private final String lang;
