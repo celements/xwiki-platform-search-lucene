@@ -44,7 +44,7 @@ import com.xpn.xwiki.web.Utils;
  * @version $Id: 97f3293fd1c3899d5edca377a2eb32905295a78a $
  * @since 1.23
  */
-public abstract class AbstractDocumentData extends AbstractIndexData {
+public abstract class AbstractDocumentData extends IndexData {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(AbstractDocumentData.class);
 

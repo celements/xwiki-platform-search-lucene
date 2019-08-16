@@ -27,7 +27,7 @@ import com.celements.search.lucene.LuceneDocType;
 import com.celements.search.lucene.index.LuceneDocId;
 import com.xpn.xwiki.XWikiException;
 
-public class DeleteData extends AbstractIndexData {
+public class DeleteData extends IndexData {
 
   private final LuceneDocId docId;
 

@@ -90,7 +90,7 @@ public class DocumentData extends AbstractDocumentData {
 
   /**
    * Add to the string builder, the result of
-   * {@link AbstractIndexData#getFullText(XWikiDocument,XWikiContext)}plus the full text
+   * {@link IndexData#getFullText(XWikiDocument,XWikiContext)}plus the full text
    * content (values of title,category,content and extract ) XWiki.ArticleClass Object, as
    * far as it could be extracted.
    */

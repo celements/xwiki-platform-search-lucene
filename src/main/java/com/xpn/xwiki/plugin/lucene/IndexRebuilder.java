@@ -390,7 +390,7 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
     return retval;
   }
 
-  private void queue(AbstractIndexData data) {
+  private void queue(IndexData data) {
     data.disableObservationEventNotification();
     indexUpdater.queue(data);
   }

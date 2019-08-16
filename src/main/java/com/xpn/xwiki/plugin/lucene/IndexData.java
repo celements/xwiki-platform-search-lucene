@@ -38,7 +38,7 @@ import com.xpn.xwiki.web.Utils;
  * @version $Id: 7078d17d13ffdd29d41a0b5367bbaf3ce545ba36 $
  * @since 1.23
  */
-public abstract class AbstractIndexData {
+public abstract class IndexData {
 
   private LuceneDocType type;
 
@@ -48,7 +48,7 @@ public abstract class AbstractIndexData {
 
   private boolean notifyObservationEvents = true;
 
-  public AbstractIndexData(LuceneDocType type, EntityReference entityReference, boolean deleted) {
+  protected IndexData(LuceneDocType type, EntityReference entityReference, boolean deleted) {
     this.type = checkNotNull(type);
     setEntityReference(entityReference);
     setDeleted(deleted);

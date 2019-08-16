@@ -36,7 +36,7 @@ import com.xpn.xwiki.XWikiException;
  *
  * @version $Id: 9b8dc406f6212de2110fb11415ee7dd66c0bbdb0 $
  */
-public class WikiData extends AbstractIndexData {
+public class WikiData extends IndexData {
 
   public WikiData(WikiReference wikiReference, boolean deleted) {
     super(LuceneDocType.none, checkNotNull(wikiReference), deleted);

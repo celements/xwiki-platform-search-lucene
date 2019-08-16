@@ -7,7 +7,7 @@ import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field.Index;
 import org.xwiki.component.annotation.ComponentRole;
 
-import com.celements.search.lucene.index.IndexData;
+import com.xpn.xwiki.plugin.lucene.IndexData;
 import com.xpn.xwiki.plugin.lucene.indexExtension.IndexExtensionField.ExtensionType;
 
 @ComponentRole

@@ -17,11 +17,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.xwiki.component.annotation.Component;
 
-import com.celements.search.lucene.index.IndexData;
 import com.celements.web.plugin.cmd.ConvertToPlainTextException;
 import com.celements.web.plugin.cmd.PlainTextCommand;
 import com.google.common.base.Strings;
-import com.xpn.xwiki.plugin.lucene.AbstractIndexData;
+import com.xpn.xwiki.plugin.lucene.IndexData;
 import com.xpn.xwiki.plugin.lucene.IndexFields;
 import com.xpn.xwiki.plugin.lucene.indexExtension.IndexExtensionField.ExtensionType;
 import com.xpn.xwiki.web.Utils;
@@ -48,9 +47,8 @@ public class LuceneIndexExtensionService implements ILuceneIndexExtensionService
   public void extend(IndexData data, Document luceneDoc) {
     for (ILuceneIndexExtender ext : getExtenders()) {
       try {
-        AbstractIndexData abstrData = (AbstractIndexData) data;
-        if (ext.isEligibleIndexData(abstrData)) {
-          for (IndexExtensionField extField : ext.getExtensionFields(abstrData)) {
+        if (ext.isEligibleIndexData(data)) {
+          for (IndexExtensionField extField : ext.getExtensionFields(data)) {
             if (extField != null) {
               switch (extField.getExtensionType()) {
                 case ADD:
