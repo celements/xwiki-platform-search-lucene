@@ -393,7 +393,8 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
   }
 
   private void queueFromEvent(Event event, Object source) {
-    IndexQueuePriority priority = getIndexQueuePriorityManager().getPriority().orNull();
+    IndexQueuePriority priority = getIndexQueuePriorityManager().getPriority()
+        .orElse(IndexQueuePriority.DEFAULT);
     if (source == null) {
       LOGGER.error("onEvent: received null source");
     } else if ((event instanceof DocumentUpdatedEvent) || (event instanceof DocumentCreatedEvent)) {
