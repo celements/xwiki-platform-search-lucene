@@ -1,10 +1,10 @@
-package com.xpn.xwiki.plugin.lucene.indexExtension;
+package com.celements.search.lucene.index.extension;
 
 import java.util.Collection;
 
 import org.xwiki.component.annotation.ComponentRole;
 
-import com.xpn.xwiki.plugin.lucene.IndexData;
+import com.celements.search.lucene.index.IndexData;
 
 @ComponentRole
 public interface ILuceneIndexExtender {

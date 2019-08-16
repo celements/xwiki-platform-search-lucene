@@ -17,7 +17,7 @@
  * Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
  * 02110-1301 USA, or see the FSF site: http://www.fsf.org.
  */
-package com.xpn.xwiki.plugin.lucene;
+package com.celements.search.lucene.index;
 
 import static com.google.common.base.Preconditions.*;
 
@@ -26,7 +26,6 @@ import org.apache.lucene.index.Term;
 import org.xwiki.model.reference.WikiReference;
 
 import com.celements.search.lucene.LuceneDocType;
-import com.celements.search.lucene.index.LuceneDocId;
 import com.xpn.xwiki.XWikiException;
 
 /**

@@ -7,7 +7,10 @@ import org.junit.Before;
 import org.junit.Test;
 
 import com.celements.common.test.AbstractComponentTest;
-import com.xpn.xwiki.plugin.lucene.indexExtension.IndexExtensionField.ExtensionType;
+import com.celements.search.lucene.index.extension.ILuceneIndexExtensionServiceRole;
+import com.celements.search.lucene.index.extension.IndexExtensionField;
+import com.celements.search.lucene.index.extension.LuceneIndexExtensionService;
+import com.celements.search.lucene.index.extension.IndexExtensionField.ExtensionType;
 import com.xpn.xwiki.web.Utils;
 
 public class LuceneIndexExtensionServiceTest extends AbstractComponentTest {
