@@ -133,7 +133,7 @@ public abstract class AbstractDocumentData extends AbstractIndexData {
         + "], space [" + getDocumentSpace() + "], fullname [" + getFullName() + "], hidden ["
         + doc.isHidden().toString() + "].");
     // Keyword fields: stored and indexed, but not tokenized
-    addFieldToDocument(IndexFields.DOCUMENT_ID, getId().asString(), Field.Store.YES,
+    addFieldToDocument(IndexFields.DOCUMENT_ID, getId().serialize(), Field.Store.YES,
         Field.Index.NOT_ANALYZED, ID_BOOST, luceneDoc);
 
     addFieldToDocument(IndexFields.DOCUMENT_LANGUAGE, getLanguage(), Field.Store.YES,

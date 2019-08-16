@@ -87,7 +87,7 @@ public class SearchResult {
    */
   public SearchResult(org.apache.lucene.document.Document doc, float score) {
     this.score = score;
-    this.id = LuceneDocId.fromString(doc.get(IndexFields.DOCUMENT_ID));
+    this.id = LuceneDocId.parse(doc.get(IndexFields.DOCUMENT_ID));
     this.title = doc.get(IndexFields.DOCUMENT_TITLE);
     this.name = doc.get(IndexFields.DOCUMENT_NAME);
     this.space = doc.get(IndexFields.DOCUMENT_SPACE);
