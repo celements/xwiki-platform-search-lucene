@@ -48,8 +48,7 @@ public class SearcherProviderManager implements ISearcherProviderRole {
     int numSearchProviders = getAllSearcherProviders().size();
     LOGGER.debug("closeAllForCurrentThread start in manager [{}]: remaining [{}] searchProviders.",
         System.identityHashCode(this), numSearchProviders);
-    List<SearcherProvider> searcherProviderToRemove = new ArrayList<SearcherProvider>(
-        numSearchProviders);
+    List<SearcherProvider> searcherProviderToRemove = new ArrayList<>(numSearchProviders);
     for (SearcherProvider searcherProvider : getAllSearcherProviders()) {
       try {
         LOGGER.trace("before cleanup for searchProvider [" + System.identityHashCode(
@@ -93,6 +92,13 @@ public class SearcherProviderManager implements ISearcherProviderRole {
     getAllSearcherProviders().add(newSearcherProvider);
     LOGGER.debug("createSearchProvider in manager [{}]: returning new SearchProvider and added to"
         + " list [{}].", System.identityHashCode(this), getAllSearcherProviders().size());
+    if (getAllSearcherProviders().size() > 20) {
+      LOGGER.warn("createSearchProvider in manager [{}]: list increased to size [{}]. Looks like "
+          + "a memory leak?", System.identityHashCode(this), getAllSearcherProviders().size());
+    } else if (getAllSearcherProviders().size() > 10) {
+      LOGGER.info("createSearchProvider in manager [{}]: list increased to size [{}].",
+          System.identityHashCode(this), getAllSearcherProviders().size());
+    }
     return newSearcherProvider;
   }
 
