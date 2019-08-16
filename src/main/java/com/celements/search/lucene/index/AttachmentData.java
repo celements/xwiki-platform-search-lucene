@@ -43,6 +43,7 @@ import com.google.common.base.Strings;
 import com.xpn.xwiki.XWikiException;
 import com.xpn.xwiki.doc.XWikiAttachment;
 import com.xpn.xwiki.doc.XWikiDocument;
+import com.xpn.xwiki.plugin.lucene.IndexFields;
 
 /**
  * Holds all data but the content of an attachment to be indexed. The content is retrieved
@@ -194,11 +195,15 @@ public class AttachmentData extends AbstractDocumentData {
   }
 
   /**
-   * We wrap the content input stream in a BufferedInputStream to make sure that all the detectors can
+   * We wrap the content input stream in a BufferedInputStream to make sure that all the detectors
+   * can
    * read the content even if the input stream is configured to auto close when it reaches the end.
-   * This can happen for small files if AutoCloseInputStream is used, which supports the mark and reset
-   * methods so Tika uses it directly. In this case, the input stream is automatically closed after the
+   * This can happen for small files if AutoCloseInputStream is used, which supports the mark and
+   * reset
+   * methods so Tika uses it directly. In this case, the input stream is automatically closed after
+   * the
    * first detector reads it so the next detector fails to read it.
+   * 
    * @see https://issues.apache.org/jira/browse/TIKA-2395
    * @see https://issues.apache.org/jira/browse/IO-568
    */

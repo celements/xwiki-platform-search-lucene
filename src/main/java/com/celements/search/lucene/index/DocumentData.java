@@ -42,6 +42,7 @@ import com.xpn.xwiki.objects.classes.DateClass;
 import com.xpn.xwiki.objects.classes.ListItem;
 import com.xpn.xwiki.objects.classes.PasswordClass;
 import com.xpn.xwiki.objects.classes.StaticListClass;
+import com.xpn.xwiki.plugin.lucene.IndexFields;
 
 /**
  * Holds all data but the content of a wiki page to be indexed. The content is retrieved

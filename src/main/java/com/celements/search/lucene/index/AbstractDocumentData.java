@@ -37,6 +37,7 @@ import com.celements.model.access.exception.DocumentNotExistsException;
 import com.celements.search.lucene.LuceneDocType;
 import com.xpn.xwiki.XWikiException;
 import com.xpn.xwiki.doc.XWikiDocument;
+import com.xpn.xwiki.plugin.lucene.IndexFields;
 import com.xpn.xwiki.web.Utils;
 
 /**
