@@ -1,17 +1,43 @@
 package com.celements.search.lucene.index.queue;
 
-import com.google.common.collect.ImmutableList;
+import static com.celements.common.MoreObjectsCel.*;
 
-public enum IndexQueuePriority {
+import java.util.Objects;
 
-  LOWEST, LOWER, LOW, DEFAULT, HIGH, HIGHER, HIGHEST;
+public class IndexQueuePriority implements Comparable<IndexQueuePriority> {
 
-  public static int size() {
-    return IndexQueuePriority.values().length;
+  public static final IndexQueuePriority LOWEST = new IndexQueuePriority(Integer.MIN_VALUE);
+  public static final IndexQueuePriority LOW = new IndexQueuePriority(-1000);
+  public static final IndexQueuePriority DEFAULT = new IndexQueuePriority(0);
+  public static final IndexQueuePriority HIGH = new IndexQueuePriority(1000);
+  public static final IndexQueuePriority HIGHEST = new IndexQueuePriority(Integer.MAX_VALUE);
+
+  public final int value;
+
+  public IndexQueuePriority(int value) {
+    this.value = value;
   }
 
-  public static ImmutableList<IndexQueuePriority> list() {
-    return ImmutableList.copyOf(IndexQueuePriority.values());
+  @Override
+  public int compareTo(IndexQueuePriority other) {
+    return Integer.compare(this.value, other.value);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(value);
+  }
+
+  @Override
+  public boolean equals(Object obj) {
+    return tryCast(obj, IndexQueuePriority.class)
+        .map(other -> this.value == other.value)
+        .orElse(false);
+  }
+
+  @Override
+  public String toString() {
+    return "IndexQueuePriority [" + value + "]";
   }
 
 }
