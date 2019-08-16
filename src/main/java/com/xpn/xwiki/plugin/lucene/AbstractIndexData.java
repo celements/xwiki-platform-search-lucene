@@ -21,6 +21,7 @@ package com.xpn.xwiki.plugin.lucene;
 
 import static com.google.common.base.Preconditions.*;
 
+import org.apache.lucene.document.Document;
 import org.apache.lucene.index.Term;
 import org.xwiki.model.EntityType;
 import org.xwiki.model.reference.EntityReference;
@@ -29,14 +30,15 @@ import org.xwiki.model.reference.EntityReferenceSerializer;
 import com.celements.model.context.ModelContext;
 import com.celements.model.util.ModelUtils;
 import com.celements.search.lucene.LuceneDocType;
-import com.celements.search.lucene.index.IndexData;
+import com.celements.search.lucene.index.LuceneDocId;
+import com.xpn.xwiki.XWikiException;
 import com.xpn.xwiki.web.Utils;
 
 /**
  * @version $Id: 7078d17d13ffdd29d41a0b5367bbaf3ce545ba36 $
  * @since 1.23
  */
-public abstract class AbstractIndexData implements IndexData {
+public abstract class AbstractIndexData {
 
   private LuceneDocType type;
 
@@ -52,29 +54,60 @@ public abstract class AbstractIndexData implements IndexData {
     setDeleted(deleted);
   }
 
-  @Override
+  /**
+   * Adds this documents data to a lucene Document instance for indexing.
+   * <p>
+   * <strong>Short introduction to Lucene field types</strong>
+   * </p>
+   * <p>
+   * Which type of Lucene field is used determines what Lucene does with data and how we
+   * can use it for searching and showing search results:
+   * </p>
+   * <ul>
+   * <li>Keyword fields don't get tokenized, but are searchable and stored in the index.
+   * This is perfect for fields you want to search in programmatically (like ids and
+   * such), and date fields. Since all user-entered queries are tokenized, letting the
+   * user search these fields makes almost no sense, except of queries for date fields,
+   * where tokenization is useless.</li>
+   * <li>the stored text fields are used for short texts which should be searchable by the
+   * user, and stored in the index for reconstruction. Perfect for document names, titles,
+   * abstracts.</li>
+   * <li>the unstored field takes the biggest part of the content - the full text. It is
+   * tokenized and indexed, but not stored in the index. This makes sense, since when the
+   * user wants to see the full content, he clicks the link to vie the full version of a
+   * document, which is then delivered by xwiki.</li>
+   * </ul>
+   *
+   * @param luceneDoc
+   *          if not null, this controls which translated version of the content will be
+   *          indexed. If null, the content in the default language will be used.
+   */
+  public abstract void addDataToLuceneDocument(Document luceneDoc) throws XWikiException;
+
+  /**
+   * @return unique id to this document across all languages and virtual wikis
+   */
+  public abstract LuceneDocId getId();
+
   public Term getTerm() {
     return new Term(IndexFields.DOCUMENT_ID, getId().serialize());
   }
 
-  @Override
   public LuceneDocType getType() {
     return this.type;
   }
 
   /**
-   * @see #isDeleted()
+   * @return ture if the element should be deleted from the index
    */
   public void setDeleted(boolean deleted) {
     this.deleted = deleted;
   }
 
-  @Override
   public boolean isDeleted() {
     return this.deleted;
   }
 
-  @Override
   public EntityReference getEntityReference() {
     return this.entityReference;
   }
@@ -83,7 +116,6 @@ public abstract class AbstractIndexData implements IndexData {
     this.entityReference = entityReference;
   }
 
-  @Override
   public boolean notifyObservationEvents() {
     return notifyObservationEvents;
   }
@@ -98,17 +130,14 @@ public abstract class AbstractIndexData implements IndexData {
     return extract != null ? extract.getName() : null;
   }
 
-  @Override
   public String getDocumentName() {
     return getEntityName(EntityType.DOCUMENT);
   }
 
-  @Override
   public String getDocumentSpace() {
     return getEntityName(EntityType.SPACE);
   }
 
-  @Override
   public String getWiki() {
     return getEntityName(EntityType.WIKI);
   }
