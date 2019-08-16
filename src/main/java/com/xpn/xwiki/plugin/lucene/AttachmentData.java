@@ -21,6 +21,9 @@ package com.xpn.xwiki.plugin.lucene;
 
 import static com.google.common.base.Preconditions.*;
 
+import java.io.BufferedInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -29,6 +32,7 @@ import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.Fieldable;
 import org.apache.tika.Tika;
+import org.apache.tika.exception.TikaException;
 import org.apache.tika.metadata.Metadata;
 import org.apache.tika.metadata.TikaMetadataKeys;
 import org.slf4j.Logger;
@@ -36,6 +40,7 @@ import org.slf4j.LoggerFactory;
 
 import com.celements.search.lucene.LuceneDocType;
 import com.google.common.base.Strings;
+import com.xpn.xwiki.XWikiException;
 import com.xpn.xwiki.doc.XWikiAttachment;
 import com.xpn.xwiki.doc.XWikiDocument;
 
@@ -171,25 +176,33 @@ public class AttachmentData extends AbstractDocumentData {
 
   private String getContentAsText(XWikiDocument doc) {
     String contentText = null;
-
     try {
       XWikiAttachment att = doc.getAttachment(this.filename);
-
       LOGGER.debug("Start parsing attachement [{}] in document [{}]", this.filename,
           doc.getDocumentReference());
-
       Tika tika = new Tika();
-
       Metadata metadata = new Metadata();
       metadata.set(TikaMetadataKeys.RESOURCE_NAME_KEY, this.filename);
-
-      contentText = StringUtils.lowerCase(tika.parseToString(att.getContentInputStream(
-          getContext().getXWikiContext()), metadata));
-    } catch (Throwable ex) {
+      try (InputStream is = getContentInputStream(att)) {
+        contentText = StringUtils.lowerCase(tika.parseToString(is, metadata));
+      }
+    } catch (XWikiException | IOException | TikaException ex) {
       LOGGER.error("error getting content of attachment [{}] for document [{}]", this.filename,
           doc.getDocumentReference(), ex);
     }
-
     return contentText;
+  }
+
+  /**
+   * We wrap the content input stream in a BufferedInputStream to make sure that all the detectors can
+   * read the content even if the input stream is configured to auto close when it reaches the end.
+   * This can happen for small files if AutoCloseInputStream is used, which supports the mark and reset
+   * methods so Tika uses it directly. In this case, the input stream is automatically closed after the
+   * first detector reads it so the next detector fails to read it.
+   * @see https://issues.apache.org/jira/browse/TIKA-2395
+   * @see https://issues.apache.org/jira/browse/IO-568
+   */
+  private BufferedInputStream getContentInputStream(XWikiAttachment att) throws XWikiException {
+    return new BufferedInputStream(att.getContentInputStream(getContext().getXWikiContext()));
   }
 }
