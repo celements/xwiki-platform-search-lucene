@@ -20,7 +20,7 @@ public class IndexQueuePriority implements Comparable<IndexQueuePriority> {
 
   @Override
   public int compareTo(IndexQueuePriority other) {
-    return Integer.compare(this.value, other.value);
+    return -1 * Integer.compare(this.value, other.value);
   }
 
   @Override
