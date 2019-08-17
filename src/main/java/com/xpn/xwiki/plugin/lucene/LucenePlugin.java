@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -66,7 +67,6 @@ import org.xwiki.observation.ObservationManager;
 import com.celements.model.util.References;
 import com.celements.search.lucene.LuceneDocType;
 import com.celements.search.lucene.index.queue.IndexQueuePriority;
-import com.google.common.base.Optional;
 import com.google.common.base.Strings;
 import com.google.common.collect.Iterables;
 import com.xpn.xwiki.XWikiContext;
@@ -186,17 +186,17 @@ public class LucenePlugin extends XWikiDefaultPlugin {
   }
 
   public boolean rebuildIndex() {
-    return indexRebuilder.startIndexRebuild(null, Optional.<EntityReference>absent(), false);
+    return indexRebuilder.startIndexRebuild(null, Optional.empty(), false);
   }
 
   public boolean rebuildIndex(EntityReference entityRef, boolean onlyNew) {
-    Optional<WikiReference> wikiRef = References.extractRef(entityRef, WikiReference.class);
-    List<WikiReference> wikis = wikiRef.isPresent() ? Arrays.asList(wikiRef.get()) : null;
-    return indexRebuilder.startIndexRebuild(wikis, Optional.fromNullable(entityRef), onlyNew);
+    List<WikiReference> wikis = References.extractRef(entityRef, WikiReference.class).toJavaUtil()
+        .map(Arrays::asList).orElse(null);
+    return indexRebuilder.startIndexRebuild(wikis, Optional.ofNullable(entityRef), onlyNew);
   }
 
   public boolean rebuildIndex(List<WikiReference> wikis, boolean onlyNew) {
-    return indexRebuilder.startIndexRebuild(wikis, Optional.<EntityReference>absent(), onlyNew);
+    return indexRebuilder.startIndexRebuild(wikis, Optional.empty(), onlyNew);
   }
 
   public boolean rebuildIndexWithWipe(List<WikiReference> wikis, boolean onlyNew) {
