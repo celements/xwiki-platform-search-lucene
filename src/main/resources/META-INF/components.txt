@@ -2,3 +2,4 @@ com.xpn.xwiki.plugin.lucene.searcherProvider.SearcherProviderManager
 com.xpn.xwiki.plugin.lucene.searcherProvider.ActionExecutionEventListener
 com.celements.search.lucene.index.extension.LuceneIndexExtensionService
 com.xpn.xwiki.plugin.lucene.XWikiDocumentQueue
+com.celements.search.lucene.index.queue.LuceneIndexingDefaultQueue
