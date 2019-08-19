@@ -15,7 +15,7 @@ public class IndexQueuePriorityTest {
   @Test
   public void test() {
     IndexQueuePriority custom = new IndexQueuePriority(412);
-    List<IndexQueuePriority> list = Stream.of(DEFAULT, LOW, LOWEST, HIGH, HIGHEST, custom)
+    List<IndexQueuePriority> list = Stream.of(DEFAULT, LOWEST, LOW, HIGH, HIGHEST, custom)
         .collect(toList());
     Collections.sort(list);
     assertSame(HIGHEST, list.remove(0));
