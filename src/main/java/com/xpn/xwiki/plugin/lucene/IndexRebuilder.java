@@ -22,7 +22,6 @@ package com.xpn.xwiki.plugin.lucene;
 import static com.google.common.base.Preconditions.*;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -40,6 +39,7 @@ import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.search.TotalHitCountCollector;
+import org.apache.lucene.store.Directory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.suigeneris.jrcs.rcs.Version;
@@ -53,6 +53,7 @@ import com.celements.model.access.IModelAccessFacade;
 import com.celements.model.access.exception.DocumentNotExistsException;
 import com.celements.model.context.ModelContext;
 import com.celements.model.metadata.DocumentMetaData;
+import com.celements.model.util.ModelUtils;
 import com.celements.model.util.References;
 import com.celements.search.lucene.index.AttachmentData;
 import com.celements.search.lucene.index.DeleteData;
@@ -62,9 +63,12 @@ import com.celements.search.lucene.index.LuceneDocId;
 import com.celements.search.lucene.index.WikiData;
 import com.celements.search.lucene.index.queue.IndexQueuePriority;
 import com.celements.search.lucene.index.queue.IndexQueuePriorityManager;
+import com.celements.search.lucene.index.queue.LuceneIndexingQueue;
 import com.celements.store.DocumentCacheStore;
 import com.celements.store.MetaDataStoreExtension;
 import com.google.common.base.Strings;
+import com.google.common.collect.ImmutableSet;
+import com.xpn.xwiki.XWiki;
 import com.xpn.xwiki.XWikiContext;
 import com.xpn.xwiki.XWikiException;
 import com.xpn.xwiki.doc.XWikiAttachment;
@@ -111,28 +115,9 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(IndexRebuilder.class);
 
-  static final String PROP_UPDATER_RETRY_INTERVAL = "xwiki.plugins.lucene.updaterRetryInterval";
+  private final Directory directory;
 
-  static final String PROP_MAX_QUEUE_SIZE = "xwiki.plugins.lucene.maxQueueSize";
-
-  /**
-   * Amount of time (milliseconds) to sleep while waiting for the indexing queue to empty.
-   */
-  private final int retryInterval;
-
-  /**
-   * Soft threshold after which no more documents will be added to the indexing queue.
-   * When the queue size gets larger than this value, the index rebuilding thread will
-   * sleep chunks of {@code IndexRebuilder#retryInterval} milliseconds until the queue
-   * size will get back bellow this threshold. This does not affect normal indexing
-   * through wiki updates.
-   */
-  private final long maxQueueSize;
-
-  /**
-   * The actual object/thread that indexes data.
-   */
-  private final IndexUpdater indexUpdater;
+  private final LuceneIndexingQueue indexingQueue;
 
   /**
    * Variable used for indicating that a rebuild is already in progress.
@@ -140,9 +125,9 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
   private final AtomicBoolean rebuildInProgress = new AtomicBoolean(false);
 
   /**
-   * Wikis where to search.
+   * Wikis to rebuild
    */
-  private volatile List<WikiReference> wikis = null;
+  private volatile Set<WikiReference> wikis = null;
 
   /**
    * Reference to filter reindex data with.
@@ -160,12 +145,10 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
    */
   private volatile boolean wipeIndex = false;
 
-  public IndexRebuilder(IndexUpdater indexUpdater, XWikiContext context) {
+  public IndexRebuilder(Directory directory, XWikiContext context) {
     super(XWikiContext.EXECUTIONCONTEXT_KEY, context.clone());
-    this.indexUpdater = indexUpdater;
-    this.retryInterval = 1000 * (int) context.getWiki().ParamAsLong(PROP_UPDATER_RETRY_INTERVAL,
-        30);
-    this.maxQueueSize = context.getWiki().ParamAsLong(PROP_MAX_QUEUE_SIZE, 1000);
+    this.directory = directory;
+    this.indexingQueue = Utils.getComponent(LuceneIndexingQueue.class);
   }
 
   public boolean startIndexRebuildWithWipe(List<WikiReference> wikis, boolean onlyNew) {
@@ -191,28 +174,24 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
     }
   }
 
-  private List<WikiReference> getWikis(List<WikiReference> wikis) {
+  private Set<WikiReference> getWikis(List<WikiReference> wikis) {
+    ImmutableSet.Builder<WikiReference> builder = new ImmutableSet.Builder<>();
     if (wikis != null) {
-      return wikis;
+      builder.addAll(wikis);
     } else {
-      Set<WikiReference> ret = new HashSet<>();
-      if (getContext().getXWikiContext().getWiki().isVirtualMode()) {
+      builder.add(getContext().getWikiRef());
+      if (getWiki().isVirtualMode()) {
+        builder.add(getModelUtils().getMainWikiRef());
         try {
-          for (String wiki : getContext().getXWikiContext().getWiki().getVirtualWikisDatabaseNames(
-              getContext().getXWikiContext())) {
-            ret.add(new WikiReference(wiki));
-          }
-          ret.add(getContext().getMainWikiRef());
+          getWiki().getVirtualWikisDatabaseNames(getContext().getXWikiContext()).stream()
+              .map(WikiReference::new)
+              .forEach(builder::add);
         } catch (XWikiException xwe) {
           LOGGER.error("failed to load virtual wiki names", xwe);
         }
-        LOGGER.debug("found {} virtual wikis: '{}'", ret.size(), ret);
-      } else {
-        // No virtual wiki configuration, just index the wiki the context belongs to
-        ret.add(getContext().getWikiRef());
       }
-      return new ArrayList<>(ret);
     }
+    return builder.build();
   }
 
   @Override
@@ -220,15 +199,12 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
     LOGGER.info("Starting lucene index rebuild");
     XWikiContext context = null;
     try {
-      // The context must be cloned, as otherwise setDatabase() might affect the response
-      // to
-      // the current request.
-      // TODO This is not a good way to do this; ideally there would be a method that
-      // creates
-      // a new context and copies only a few needed objects, as some objects are not
-      // supposed
-      // to be used in 2 different contexts.
-      // TODO This seems to work on a simple run:
+      // TODO [CELDEV-543] IndexUpdater/Rebuilder XWikiContext clone
+      // The context must be cloned, as otherwise setDatabase() might affect the response to the
+      // current request. This is not a good way to do this; ideally there would be a method that
+      // creates a new context and copies only a few needed objects, as some objects are not
+      // supposed to be used in 2 different contexts.
+      // This seems to work on a simple run:
       // context = new XWikiContext();
       // context.setWiki(this.context.getWiki());
       // context.setEngineContext(this.context.getEngineContext());
@@ -282,7 +258,7 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
     WikiReference beforeWikiRef = getContext().getWikiRef();
     for (WikiReference wikiRef : wikis) {
       getContext().setWikiRef(wikiRef);
-      try (IndexSearcher searcher = new IndexSearcher(indexUpdater.getDirectory(), true)) {
+      try (IndexSearcher searcher = new IndexSearcher(directory, true)) {
         retval += rebuildWiki(wikiRef, searcher);
       } catch (IOException | QueryException | InterruptedException exc) {
         LOGGER.error("Failed rebulding wiki [{}]", wikiRef, exc);
@@ -325,8 +301,8 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
   private Set<DocumentMetaData> getAllDocMetaData(@NotNull EntityReference ref)
       throws QueryException {
     MetaDataStoreExtension store;
-    if (getContext().getXWikiContext().getWiki().getStore() instanceof MetaDataStoreExtension) {
-      store = (MetaDataStoreExtension) getContext().getXWikiContext().getWiki().getStore();
+    if (getWiki().getStore() instanceof MetaDataStoreExtension) {
+      store = (MetaDataStoreExtension) getWiki().getStore();
     } else {
       store = (MetaDataStoreExtension) Utils.getComponent(XWikiCacheStoreInterface.class,
           DocumentCacheStore.COMPONENT_NAME);
@@ -358,7 +334,6 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
 
   private void wipeWikiIndex(@NotNull EntityReference ref) throws InterruptedException {
     WikiReference wikiRef = References.extractRef(ref, WikiReference.class).get();
-    waitForLowQueueSize();
     LOGGER.info("wipeWikiIndex: for '{}'", wikiRef);
     queue(new WikiData(wikiRef, true));
   }
@@ -367,7 +342,6 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
     LOGGER.info("cleanIndex: {} for {} dangling docs", !wipeIndex, danglingDocs.size());
     danglingDocs.remove(null);
     for (LuceneDocId docId : danglingDocs) {
-      waitForLowQueueSize();
       queue(new DeleteData(docId));
       LOGGER.trace("cleanIndex: deleted doc: {}", docId);
     }
@@ -378,7 +352,6 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
     try {
       XWikiDocument doc = getModelAccess().getDocument(metaData.getDocRef(),
           metaData.getLanguage());
-      waitForLowQueueSize();
       queue(new DocumentData(doc, false));
       ++retval;
       if (!getModelAccess().isTranslation(doc)) {
@@ -393,31 +366,20 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
     return retval;
   }
 
-  private void queue(IndexData data) {
+  private void queue(IndexData data) throws InterruptedException {
     data.disableObservationEventNotification();
     data.setPriority(getRebuldingPriority());
-    indexUpdater.queue(data);
+    try {
+      indexingQueue.put(data);
+    } catch (UnsupportedOperationException exc) {
+      // TODO check indexingQueue#isFull
+      // -> Thread.sleep(30 * 1000);
+      indexingQueue.add(data);
+    }
   }
 
   private IndexQueuePriority getRebuldingPriority() {
     return IndexQueuePriority.LOW;
-  }
-
-  // In order not to load the whole database in memory, we're limiting the number
-  // of documents that are in the processing queue at a moment. We could use a
-  // Bounded Queue in the index updater, but that would generate exceptions in the
-  // rest of the platform, as the index rebuilder could fill the queue, and then a
-  // user trying to save a document would cause an exception. Thus, it is better
-  // to limit the index rebuilder thread only, and not the index updater.
-  private void waitForLowQueueSize() throws InterruptedException {
-    long size;
-    while ((size = indexUpdater.getQueueSize()) > maxQueueSize) {
-      // Don't leave any database connections open while sleeping
-      // This shouldn't be needed, but we never know what bugs might be there
-      getContext().getXWikiContext().getWiki().getStore().cleanUp(getContext().getXWikiContext());
-      LOGGER.debug("sleeping for {}ms since queue size {} too big", retryInterval, size);
-      Thread.sleep(retryInterval);
-    }
   }
 
   public boolean isIndexed(DocumentReference docRef, IndexSearcher searcher) throws IOException {
@@ -459,8 +421,16 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
     return query;
   }
 
+  private static XWiki getWiki() {
+    return getContext().getXWikiContext().getWiki();
+  }
+
   static LuceneDocId getDocId(DocumentMetaData metaData) {
     return new LuceneDocId(metaData.getDocRef(), metaData.getLanguage());
+  }
+
+  private static IndexQueuePriorityManager getIndexQueuePriorityManager() {
+    return Utils.getComponent(IndexQueuePriorityManager.class);
   }
 
   private static IModelAccessFacade getModelAccess() {
@@ -471,8 +441,8 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
     return Utils.getComponent(ModelContext.class);
   }
 
-  private static IndexQueuePriorityManager getIndexQueuePriorityManager() {
-    return Utils.getComponent(IndexQueuePriorityManager.class);
+  private static ModelUtils getModelUtils() {
+    return Utils.getComponent(ModelUtils.class);
   }
 
 }

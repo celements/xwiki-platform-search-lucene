@@ -66,7 +66,9 @@ import org.xwiki.observation.ObservationManager;
 
 import com.celements.model.util.References;
 import com.celements.search.lucene.LuceneDocType;
-import com.celements.search.lucene.index.queue.IndexQueuePriority;
+import com.celements.search.lucene.index.AttachmentData;
+import com.celements.search.lucene.index.DocumentData;
+import com.celements.search.lucene.index.queue.LuceneIndexingQueue;
 import com.google.common.base.Strings;
 import com.google.common.collect.Iterables;
 import com.xpn.xwiki.XWikiContext;
@@ -692,7 +694,7 @@ public class LucenePlugin extends XWikiDefaultPlugin {
       IndexWriter writer = openWriter(getWriteDirectory(), OpenMode.CREATE_OR_APPEND);
       this.indexUpdater = new IndexUpdater(writer, this, context);
       indexUpdaterExecutor.submit(indexUpdater);
-      this.indexRebuilder = new IndexRebuilder(indexUpdater, context);
+      this.indexRebuilder = new IndexRebuilder(getWriteDirectory(), context);
       openSearchers();
       registerIndexUpdater();
       if (doRebuild) {
@@ -716,7 +718,6 @@ public class LucenePlugin extends XWikiDefaultPlugin {
       if (!file.exists()) {
         file.mkdirs();
       }
-      LOGGER.warn("getIndexDirectories - file {} exists {}", file, file.exists());
       Directory dir = FSDirectory.open(file);
       if (!IndexReader.indexExists(dir)) {
         // If there's no index create an empty one
@@ -840,47 +841,21 @@ public class LucenePlugin extends XWikiDefaultPlugin {
   }
 
   public long getQueueSize() {
-    return this.indexUpdater.getQueueSize();
+    return getIndexingQueue().getSize();
   }
 
-  @Deprecated
   public void queueDocument(XWikiDocument doc, XWikiContext context) {
-    queueDocument(doc);
+    getIndexingQueue().add(new DocumentData(doc, false));
   }
 
-  public void queueDocument(XWikiDocument doc) {
-    queueDocument(doc, (IndexQueuePriority) null);
-  }
-
-  public void queueDocument(XWikiDocument doc, IndexQueuePriority priorty) {
-    indexUpdater.queueDocument(doc, false, priorty);
-  }
-
-  @Deprecated
   public void queueAttachment(XWikiDocument doc, XWikiAttachment attach, XWikiContext context) {
-    queueAttachment(doc, attach);
+    getIndexingQueue().add(new AttachmentData(attach, false));
   }
 
-  public void queueAttachment(XWikiDocument doc, XWikiAttachment attach) {
-    queueAttachment(doc, attach, (IndexQueuePriority) null);
-  }
-
-  public void queueAttachment(XWikiDocument doc, XWikiAttachment attach,
-      IndexQueuePriority priorty) {
-    indexUpdater.queueAttachment(attach, false, priorty);
-  }
-
-  @Deprecated
   public void queueAttachment(XWikiDocument doc, XWikiContext context) {
-    queueAttachments(doc);
-  }
-
-  public void queueAttachments(XWikiDocument doc) {
-    queueAttachments(doc, (IndexQueuePriority) null);
-  }
-
-  public void queueAttachments(XWikiDocument doc, IndexQueuePriority priorty) {
-    this.indexUpdater.queueAttachments(doc, priorty);
+    for (XWikiAttachment attach : doc.getAttachmentList()) {
+      queueAttachment(doc, attach, context);
+    }
   }
 
   /**
@@ -932,6 +907,10 @@ public class LucenePlugin extends XWikiDefaultPlugin {
 
   private ISearcherProviderRole getSearcherProviderManager() {
     return Utils.getComponent(ISearcherProviderRole.class);
+  }
+
+  private LuceneIndexingQueue getIndexingQueue() {
+    return Utils.getComponent(LuceneIndexingQueue.class);
   }
 
 }

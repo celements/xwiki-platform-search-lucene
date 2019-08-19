@@ -19,13 +19,12 @@
  */
 package com.xpn.xwiki.plugin.lucene;
 
-import static com.google.common.base.Preconditions.*;
-
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -52,10 +51,8 @@ import com.celements.model.context.ModelContext;
 import com.celements.model.util.ModelUtils;
 import com.celements.model.util.References;
 import com.celements.search.lucene.index.AttachmentData;
-import com.celements.search.lucene.index.DeleteData;
 import com.celements.search.lucene.index.DocumentData;
 import com.celements.search.lucene.index.IndexData;
-import com.celements.search.lucene.index.LuceneDocId;
 import com.celements.search.lucene.index.WikiData;
 import com.celements.search.lucene.index.extension.ILuceneIndexExtensionServiceRole;
 import com.celements.search.lucene.index.queue.IndexQueuePriority;
@@ -87,8 +84,6 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
 
   static final String PROP_COMMIT_INTERVAL = "xwiki.plugins.lucene.commitinterval";
 
-  static final String PROP_QUEUE_IMPL = "celements.lucene.index.queue";
-
   public static final String NAME = "lucene";
 
   /**
@@ -118,7 +113,7 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
 
   private final long commitInterval;
 
-  private final LuceneIndexingQueue queue;
+  private final LuceneIndexingQueue indexingQueue;
 
   private final AtomicBoolean exit = new AtomicBoolean(false);
 
@@ -130,8 +125,7 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
     this.indexingInterval = 1000 * context.getWiki().ParamAsLong(PROP_INDEXING_INTERVAL, 30);
     this.commitInterval = context.getWiki().ParamAsLong(PROP_COMMIT_INTERVAL, 5000);
     this.writer = writer;
-    this.queue = Utils.getComponent(LuceneIndexingQueue.class,
-        getContext().getXWikiContext().getWiki().Param(PROP_QUEUE_IMPL, XWikiDocumentQueue.NAME));
+    this.indexingQueue = Utils.getComponent(LuceneIndexingQueue.class);
   }
 
   public boolean isExit() {
@@ -172,7 +166,7 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
         runBlocking();
       } catch (UnsupportedOperationException exc) {
         LOGGER.info("running as blocking unsupported by '{}', running as waiting instead",
-            queue.getClass().getSimpleName());
+            indexingQueue.getClass().getSimpleName());
         runWaiting();
       }
     } catch (Throwable exc) {
@@ -191,12 +185,12 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
     long lastCommitTime = System.currentTimeMillis();
     while (!isExit()) {
       try {
-        indexData(queue.take());
+        indexData(indexingQueue.take());
       } catch (InterruptedException exc) {
         LOGGER.error("IndexUpdater interrupted", exc);
         doExit();
       } finally {
-        if (queue.isEmpty() || isCommitTime(lastCommitTime)) {
+        if (indexingQueue.isEmpty() || isCommitTime(lastCommitTime)) {
           commitIndex();
           lastCommitTime = System.currentTimeMillis();
         }
@@ -237,8 +231,8 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
     LOGGER.info("reduceQueue - started");
     boolean hasUncommitedWrites = false;
     long lastCommitTime = System.currentTimeMillis();
-    while (!queue.isEmpty()) {
-      indexData(queue.remove());
+    while (!indexingQueue.isEmpty()) {
+      indexData(indexingQueue.remove());
       hasUncommitedWrites = true;
       if (isCommitTime(lastCommitTime)) {
         commitIndex();
@@ -330,47 +324,6 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
     plugin.openSearchers();
   }
 
-  public void queueDeletion(LuceneDocId docId, IndexQueuePriority priority) {
-    queue(new DeleteData(docId).setPriority(priority));
-  }
-
-  public void queueDocument(XWikiDocument document, boolean deleted, IndexQueuePriority priority) {
-    queue(new DocumentData(document, deleted).setPriority(priority));
-  }
-
-  public void queueAttachment(XWikiAttachment attachment, boolean deleted,
-      IndexQueuePriority priority) {
-    queue(new AttachmentData(attachment, deleted).setPriority(priority));
-  }
-
-  public void queueAttachment(XWikiDocument document, String attachmentName, boolean deleted,
-      IndexQueuePriority priority) {
-    queue(new AttachmentData(document, attachmentName, deleted).setPriority(priority));
-  }
-
-  public int queueAttachments(XWikiDocument document, IndexQueuePriority priority) {
-    int ret = 0;
-    checkNotNull(document);
-    for (XWikiAttachment attachment : document.getAttachmentList()) {
-      queueAttachment(attachment, false, priority);
-      ret++;
-    }
-    return ret;
-  }
-
-  public void queueWiki(WikiReference wikiRef, boolean deleted, IndexQueuePriority priority) {
-    queue(new WikiData(wikiRef, deleted).setPriority(priority));
-  }
-
-  public void queue(IndexData data) {
-    if (!isExit()) {
-      LOGGER.debug("queue{}: '{}'", (data.isDeleted() ? " delete" : ""), data.getId());
-      queue.add(data);
-    } else {
-      throw new IllegalStateException("IndexUpdater has been shut down");
-    }
-  }
-
   @Override
   public String getName() {
     return NAME;
@@ -383,41 +336,43 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
   }
 
   @Override
-  public void onEvent(Event event, Object source, Object data) {
-    LOGGER.debug("onEvent: for '{}' on '{}'", event.getClass(), source);
-    try {
-      queueFromEvent(event, source);
-    } catch (IllegalStateException ise) {
-      LOGGER.error("failed to queue '{}': " + ise.getMessage(), source);
+  public void onEvent(Event event, Object source, Object any) {
+    LOGGER.trace("onEvent: for '{}' on '{}'", event.getClass(), source);
+    if (!isExit()) {
+      IndexQueuePriority priority = getIndexQueuePriorityManager().getPriority()
+          .orElse(IndexQueuePriority.DEFAULT);
+      buildIndexDataFromEvent(event, source).ifPresent(data -> {
+        data.setPriority(priority);
+        indexingQueue.add(data);
+        LOGGER.debug("queued{} at priority {}: {}", (data.isDeleted() ? " delete" : ""), priority,
+            data.getId());
+      });
+    } else {
+      LOGGER.error("IndexUpdater has been shut down", source);
     }
   }
 
-  private void queueFromEvent(Event event, Object source) {
-    IndexQueuePriority priority = getIndexQueuePriorityManager().getPriority()
-        .orElse(IndexQueuePriority.DEFAULT);
+  private Optional<IndexData> buildIndexDataFromEvent(Event event, Object source) {
+    IndexData data = null;
     if (source == null) {
       LOGGER.error("onEvent: received null source");
     } else if ((event instanceof DocumentUpdatedEvent) || (event instanceof DocumentCreatedEvent)) {
-      queueDocument((XWikiDocument) source, false, priority);
+      data = new DocumentData((XWikiDocument) source, false);
     } else if (event instanceof DocumentDeletedEvent) {
-      queueDocument((XWikiDocument) source, true, priority);
+      data = new DocumentData((XWikiDocument) source, true);
     } else if ((event instanceof AttachmentUpdatedEvent)
         || (event instanceof AttachmentAddedEvent)) {
-      queueAttachment(((XWikiDocument) source).getAttachment(
-          ((AbstractAttachmentEvent) event).getName()), false, priority);
+      XWikiAttachment attachment = ((XWikiDocument) source)
+          .getAttachment(((AbstractAttachmentEvent) event).getName());
+      data = new AttachmentData(attachment, false);
     } else if (event instanceof AttachmentDeletedEvent) {
-      queueAttachment((XWikiDocument) source, ((AbstractAttachmentEvent) event).getName(), true,
-          priority);
+      String fileName = ((AbstractAttachmentEvent) event).getName();
+      data = new AttachmentData((XWikiDocument) source, fileName, true);
     } else if (event instanceof WikiDeletedEvent) {
-      queueWiki(getModelUtils().resolveRef((String) source, WikiReference.class), true, priority);
+      WikiReference wikiRef = getModelUtils().resolveRef((String) source, WikiReference.class);
+      data = new WikiData(wikiRef, true);
     }
-  }
-
-  /**
-   * @return the number of documents in the queue.
-   */
-  public long getQueueSize() {
-    return this.queue.getSize();
+    return Optional.ofNullable(data);
   }
 
   /**
