@@ -62,7 +62,6 @@ import org.slf4j.LoggerFactory;
 import org.xwiki.context.Execution;
 import org.xwiki.model.reference.EntityReference;
 import org.xwiki.model.reference.WikiReference;
-import org.xwiki.observation.ObservationManager;
 
 import com.celements.model.util.References;
 import com.celements.search.lucene.LuceneDocType;
@@ -692,11 +691,10 @@ public class LucenePlugin extends XWikiDefaultPlugin {
     try {
       indexDirs = getIndexDirectories("");
       IndexWriter writer = openWriter(getWriteDirectory(), OpenMode.CREATE_OR_APPEND);
-      this.indexUpdater = new IndexUpdater(writer, this, context);
+      this.indexUpdater = new IndexUpdater(writer, this);
       indexUpdaterExecutor.submit(indexUpdater);
-      this.indexRebuilder = new IndexRebuilder(getWriteDirectory(), context);
+      this.indexRebuilder = new IndexRebuilder(getWriteDirectory());
       openSearchers();
-      registerIndexUpdater();
       if (doRebuild) {
         rebuildIndex();
         LOGGER.info("Launched initial lucene indexing");
@@ -775,18 +773,6 @@ public class LucenePlugin extends XWikiDefaultPlugin {
     return ret;
   }
 
-  /**
-   * Register the Index Updater as an Event Listener so that modified documents/attachments are
-   * added to the Lucene indexing queue.
-   * If the Index Updater is already registered don't do anything.
-   */
-  private void registerIndexUpdater() {
-    ObservationManager observationManager = Utils.getComponent(ObservationManager.class);
-    if (observationManager.getListener(indexUpdater.getName()) == null) {
-      observationManager.addListener(indexUpdater);
-    }
-  }
-
   @Override
   public void flushCache(XWikiContext context) {
     LOGGER.warn("flushing cache not supported");
@@ -840,18 +826,22 @@ public class LucenePlugin extends XWikiDefaultPlugin {
     return Iterables.getFirst(indexDirs, null);
   }
 
+  @Deprecated
   public long getQueueSize() {
     return getIndexingQueue().getSize();
   }
 
+  @Deprecated
   public void queueDocument(XWikiDocument doc, XWikiContext context) {
-    getIndexingQueue().add(new DocumentData(doc, false));
+    getIndexingQueue().add(new DocumentData(doc));
   }
 
+  @Deprecated
   public void queueAttachment(XWikiDocument doc, XWikiAttachment attach, XWikiContext context) {
-    getIndexingQueue().add(new AttachmentData(attach, false));
+    getIndexingQueue().add(new AttachmentData(attach));
   }
 
+  @Deprecated
   public void queueAttachment(XWikiDocument doc, XWikiContext context) {
     for (XWikiAttachment attach : doc.getAttachmentList()) {
       queueAttachment(doc, attach, context);

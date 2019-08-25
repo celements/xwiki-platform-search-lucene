@@ -19,6 +19,7 @@
  */
 package com.xpn.xwiki.plugin.lucene;
 
+import static com.celements.common.test.CelementsTestUtils.*;
 import static org.easymock.EasyMock.*;
 
 import java.io.IOException;
@@ -27,12 +28,13 @@ import java.util.Date;
 import java.util.concurrent.Semaphore;
 
 import org.apache.lucene.index.IndexWriter;
+import org.apache.lucene.store.Directory;
 import org.junit.Before;
 import org.junit.Test;
 import org.xwiki.model.reference.DocumentReference;
 import org.xwiki.rendering.syntax.Syntax;
 
-import com.celements.common.test.AbstractBridgedComponentTestCase;
+import com.celements.common.test.AbstractComponentTest;
 import com.xpn.xwiki.XWiki;
 import com.xpn.xwiki.XWikiContext;
 import com.xpn.xwiki.doc.XWikiDocument;
@@ -43,7 +45,7 @@ import com.xpn.xwiki.store.XWikiStoreInterface;
  *
  * @version $Id: 5f372b2802536fc296cc8ceb6eba31bdf3528d0a $
  */
-public class IndexUpdaterTest extends AbstractBridgedComponentTestCase {
+public class IndexUpdaterTest extends AbstractComponentTest {
 
   private final static String INDEXDIR = "target/lucenetest";
 
@@ -61,8 +63,8 @@ public class IndexUpdaterTest extends AbstractBridgedComponentTestCase {
 
   private class TestIndexRebuilder extends IndexRebuilder {
 
-    public TestIndexRebuilder(IndexUpdater indexUpdater, XWikiContext context) {
-      super(indexUpdater, context);
+    public TestIndexRebuilder(Directory directory) {
+      super(directory);
     }
 
     @Override
@@ -74,9 +76,9 @@ public class IndexUpdaterTest extends AbstractBridgedComponentTestCase {
 
   private class TestIndexUpdater extends IndexUpdater {
 
-    TestIndexUpdater(IndexWriter writer, LucenePlugin plugin, XWikiContext context)
+    TestIndexUpdater(IndexWriter writer, LucenePlugin plugin)
         throws IOException {
-      super(writer, plugin, context);
+      super(writer, plugin);
     }
 
     @Override
@@ -86,16 +88,14 @@ public class IndexUpdaterTest extends AbstractBridgedComponentTestCase {
           // IndexWriter writer = openWriter(OpenMode.CREATE);
           Thread.sleep(5000);
           writer.close();
-        } catch (Exception e) {
-        }
+        } catch (Exception e) {}
       } else if (Thread.currentThread().getName().equals("permanentBlocker")) {
         try {
           // IndexWriter writer = openWriter(OpenMode.CREATE_OR_APPEND);
           IndexUpdaterTest.this.writeBlockerAcquiresLock.release();
           IndexUpdaterTest.this.writeBlockerWait.acquireUninterruptibly();
           writer.close();
-        } catch (Exception e) {
-        }
+        } catch (Exception e) {}
       } else {
         super.runInternal();
       }
@@ -132,8 +132,6 @@ public class IndexUpdaterTest extends AbstractBridgedComponentTestCase {
         "").anyTimes();
     expect(mockXWiki.Param(eq(LucenePlugin.PROP_INDEX_DIR))).andReturn(
         IndexUpdaterTest.INDEXDIR).anyTimes();
-    expect(mockXWiki.ParamAsLong(eq(IndexRebuilder.PROP_UPDATER_RETRY_INTERVAL), eq(
-        30L))).andReturn(1L).anyTimes();
     expect(mockXWiki.search(anyObject(String.class), anyObject(XWikiContext.class))).andReturn(
         Collections.emptyList()).anyTimes();
     expect(mockXWiki.isVirtualMode()).andReturn(false).anyTimes();
