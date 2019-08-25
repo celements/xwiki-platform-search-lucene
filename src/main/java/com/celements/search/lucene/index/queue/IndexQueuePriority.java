@@ -2,9 +2,12 @@ package com.celements.search.lucene.index.queue;
 
 import static com.celements.common.MoreObjectsCel.*;
 
+import java.io.Serializable;
 import java.util.Objects;
 
-public class IndexQueuePriority implements Comparable<IndexQueuePriority> {
+public class IndexQueuePriority implements Comparable<IndexQueuePriority>, Serializable {
+
+  private static final long serialVersionUID = 8658025884755697061L;
 
   public static final IndexQueuePriority LOWEST = new IndexQueuePriority(Integer.MIN_VALUE);
   public static final IndexQueuePriority LOW = new IndexQueuePriority(-1000);
