@@ -60,7 +60,6 @@ import com.celements.search.lucene.index.DeleteData;
 import com.celements.search.lucene.index.DocumentData;
 import com.celements.search.lucene.index.IndexData;
 import com.celements.search.lucene.index.LuceneDocId;
-import com.celements.search.lucene.index.WikiData;
 import com.celements.search.lucene.index.queue.IndexQueuePriority;
 import com.celements.search.lucene.index.queue.IndexQueuePriorityManager;
 import com.celements.search.lucene.index.queue.LuceneIndexingQueue;
@@ -145,8 +144,8 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
    */
   private volatile boolean wipeIndex = false;
 
-  public IndexRebuilder(Directory directory, XWikiContext context) {
-    super(XWikiContext.EXECUTIONCONTEXT_KEY, context.clone());
+  public IndexRebuilder(Directory directory) {
+    super(XWikiContext.EXECUTIONCONTEXT_KEY, getContext().getXWikiContext().clone());
     this.directory = directory;
     this.indexingQueue = Utils.getComponent(LuceneIndexingQueue.class);
   }
@@ -335,7 +334,7 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
   private void wipeWikiIndex(@NotNull EntityReference ref) throws InterruptedException {
     WikiReference wikiRef = References.extractRef(ref, WikiReference.class).get();
     LOGGER.info("wipeWikiIndex: for '{}'", wikiRef);
-    queue(new WikiData(wikiRef, true));
+    queue(new DeleteData(new LuceneDocId(wikiRef)));
   }
 
   private void cleanIndex(Set<LuceneDocId> danglingDocs) throws InterruptedException {
@@ -352,11 +351,11 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
     try {
       XWikiDocument doc = getModelAccess().getDocument(metaData.getDocRef(),
           metaData.getLanguage());
-      queue(new DocumentData(doc, false));
+      queue(new DocumentData(doc));
       ++retval;
       if (!getModelAccess().isTranslation(doc)) {
         for (XWikiAttachment att : doc.getAttachmentList()) {
-          queue(new AttachmentData(att, false));
+          queue(new AttachmentData(att));
           ++retval;
         }
       }
@@ -369,13 +368,7 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
   private void queue(IndexData data) throws InterruptedException {
     data.disableObservationEventNotification();
     data.setPriority(getRebuldingPriority());
-    try {
-      indexingQueue.put(data);
-    } catch (UnsupportedOperationException exc) {
-      // TODO check indexingQueue#isFull
-      // -> Thread.sleep(30 * 1000);
-      indexingQueue.add(data);
-    }
+    indexingQueue.put(data);
   }
 
   private IndexQueuePriority getRebuldingPriority() {

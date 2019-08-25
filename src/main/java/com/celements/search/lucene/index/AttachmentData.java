@@ -91,8 +91,8 @@ public class AttachmentData extends AbstractDocumentData {
 
   private String mimetype;
 
-  public AttachmentData(XWikiAttachment attachment, boolean deleted) {
-    super(LuceneDocType.attachment, checkNotNull(attachment).getDoc(), deleted);
+  public AttachmentData(XWikiAttachment attachment) {
+    super(LuceneDocType.attachment, checkNotNull(attachment).getDoc());
     setModificationDate(attachment.getDate());
     setAuthor(attachment.getAuthor());
     setSize(attachment.getFilesize());
@@ -100,8 +100,8 @@ public class AttachmentData extends AbstractDocumentData {
     setMimeType(attachment.getMimeType(getContext().getXWikiContext()));
   }
 
-  public AttachmentData(XWikiDocument document, String filename, boolean deleted) {
-    super(LuceneDocType.attachment, document, deleted);
+  public AttachmentData(XWikiDocument document, String filename) {
+    super(LuceneDocType.attachment, document);
     setFilename(filename);
   }
 
@@ -203,7 +203,7 @@ public class AttachmentData extends AbstractDocumentData {
    * methods so Tika uses it directly. In this case, the input stream is automatically closed after
    * the
    * first detector reads it so the next detector fails to read it.
-   * 
+   *
    * @see https://issues.apache.org/jira/browse/TIKA-2395
    * @see https://issues.apache.org/jira/browse/IO-568
    */

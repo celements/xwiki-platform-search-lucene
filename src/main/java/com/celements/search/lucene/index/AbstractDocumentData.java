@@ -104,8 +104,8 @@ public abstract class AbstractDocumentData extends IndexData {
 
   private Date modificationDate;
 
-  public AbstractDocumentData(LuceneDocType type, XWikiDocument doc, boolean deleted) {
-    super(type, checkNotNull(doc).getDocumentReference(), deleted);
+  public AbstractDocumentData(LuceneDocType type, XWikiDocument doc) {
+    super(type, checkNotNull(doc).getDocumentReference());
 
     setVersion(doc.getVersion());
     setDocumentTitle(doc.getRenderedTitle(Syntax.PLAIN_1_0, getContext().getXWikiContext()));
@@ -126,12 +126,7 @@ public abstract class AbstractDocumentData extends IndexData {
   protected abstract void addAdditionalData(Document luceneDoc, XWikiDocument doc);
 
   private void addDocumentData(Document luceneDoc, XWikiDocument doc) {
-    LOGGER.trace("addDocumentDataToLuceneDocument: id [" + getId() + "], lang [" + getLanguage()
-        + "], wiki [" + getWiki() + "], author [" + this.author + "], creator [" + this.creator
-        + "], type [" + getType() + "], date [" + this.modificationDate + "], creationDate ["
-        + this.creationDate + "], title [" + this.documentTitle + "], name [" + getDocumentName()
-        + "], space [" + getDocumentSpace() + "], fullname [" + getFullName() + "], hidden ["
-        + doc.isHidden().toString() + "].");
+    LOGGER.trace("addDocumentData [{}]", getId());
     // Keyword fields: stored and indexed, but not tokenized
     addFieldToDocument(IndexFields.DOCUMENT_ID, getId().serialize(), Field.Store.YES,
         Field.Index.NOT_ANALYZED, ID_BOOST, luceneDoc);

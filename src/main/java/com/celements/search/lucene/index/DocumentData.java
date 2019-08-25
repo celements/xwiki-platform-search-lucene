@@ -64,8 +64,8 @@ public class DocumentData extends AbstractDocumentData {
 
   private PlainTextCommand plainTextCmd = new PlainTextCommand();
 
-  public DocumentData(XWikiDocument doc, boolean deleted) {
-    super(LuceneDocType.wikipage, doc, deleted);
+  public DocumentData(XWikiDocument doc) {
+    super(LuceneDocType.wikipage, doc);
     setAuthor(doc.getAuthor());
     setCreator(doc.getCreator());
     setModificationDate(doc.getDate());

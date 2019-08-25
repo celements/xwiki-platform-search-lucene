@@ -47,16 +47,13 @@ public abstract class IndexData {
 
   private LuceneDocType type;
 
-  private boolean deleted;
-
   private EntityReference entityReference;
 
   private boolean notifyObservationEvents = true;
 
-  protected IndexData(LuceneDocType type, EntityReference entityReference, boolean deleted) {
+  protected IndexData(LuceneDocType type, EntityReference entityReference) {
     this.type = checkNotNull(type);
     setEntityReference(entityReference);
-    setDeleted(deleted);
   }
 
   /**
@@ -112,17 +109,10 @@ public abstract class IndexData {
   }
 
   /**
-   * @see #isDeleted()
-   */
-  public void setDeleted(boolean deleted) {
-    this.deleted = deleted;
-  }
-
-  /**
    * @return true if the element should be deleted from the index
    */
   public boolean isDeleted() {
-    return this.deleted;
+    return this instanceof DeleteData;
   }
 
   public EntityReference getEntityReference() {
@@ -171,8 +161,7 @@ public abstract class IndexData {
 
   @Override
   public String toString() {
-    return this.getClass().getSimpleName() + " [id=" + getId() + ", deleted=" + deleted + ", type="
-        + type + "]";
+    return this.getClass().getSimpleName() + " [id=" + getId() + ", type=" + type + "]";
   }
 
   protected ModelContext getContext() {

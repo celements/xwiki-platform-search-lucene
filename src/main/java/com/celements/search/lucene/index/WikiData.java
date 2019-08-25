@@ -38,8 +38,8 @@ import com.xpn.xwiki.plugin.lucene.IndexFields;
  */
 public class WikiData extends IndexData {
 
-  public WikiData(WikiReference wikiReference, boolean deleted) {
-    super(LuceneDocType.none, checkNotNull(wikiReference), deleted);
+  public WikiData(WikiReference wikiReference) {
+    super(LuceneDocType.none, checkNotNull(wikiReference));
   }
 
   @Override

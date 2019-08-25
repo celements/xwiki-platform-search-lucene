@@ -140,7 +140,7 @@ public class AttachmentDataTest extends AbstractComponentTest {
     attachment.setContent(getClass().getResourceAsStream("/" + filename));
     expect(servletContext.getMimeType(eq(filename))).andReturn(mimetype).once();
     replayDefault();
-    this.attachmentData = new AttachmentData(this.attachment, false);
+    this.attachmentData = new AttachmentData(this.attachment);
     verifyDefault();
     assertEquals("Wrong attachment content indexed", content, attachmentData.getFullText(document));
     assertEquals("Wrong mimetype content indexed", mimetype, attachmentData.getMimeType());
