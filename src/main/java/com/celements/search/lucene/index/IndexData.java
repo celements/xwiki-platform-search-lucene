@@ -23,12 +23,12 @@ import static com.google.common.base.Preconditions.*;
 
 import org.apache.lucene.document.Document;
 import org.apache.lucene.index.Term;
-import org.xwiki.model.EntityType;
 import org.xwiki.model.reference.EntityReference;
-import org.xwiki.model.reference.EntityReferenceSerializer;
+import org.xwiki.model.reference.WikiReference;
 
 import com.celements.model.context.ModelContext;
 import com.celements.model.util.ModelUtils;
+import com.celements.model.util.References;
 import com.celements.search.lucene.LuceneDocType;
 import com.xpn.xwiki.XWikiException;
 import com.xpn.xwiki.plugin.lucene.IndexFields;
@@ -116,7 +116,7 @@ public abstract class IndexData {
   }
 
   public void setEntityReference(EntityReference entityReference) {
-    this.entityReference = entityReference;
+    this.entityReference = checkNotNull(entityReference);
   }
 
   public boolean notifyObservationEvents() {
@@ -127,32 +127,12 @@ public abstract class IndexData {
     this.notifyObservationEvents = false;
   }
 
-  protected String getEntityName(EntityType type) {
-    EntityReference extract = getEntityReference().extractReference(type);
-
-    return extract != null ? extract.getName() : null;
-  }
-
-  public String getDocumentName() {
-    return getEntityName(EntityType.DOCUMENT);
-  }
-
-  public String getDocumentSpace() {
-    return getEntityName(EntityType.SPACE);
-  }
-
-  public String getWiki() {
-    return getEntityName(EntityType.WIKI);
-  }
-
-  public String getDocumentFullName() {
-    return (String) Utils.getComponent(EntityReferenceSerializer.class, "local").serialize(
-        getEntityReference());
+  public WikiReference getWikiRef() {
+    return References.extractRef(getEntityReference(), WikiReference.class).get();
   }
 
   public String getFullName() {
-    return (String) Utils.getComponent(EntityReferenceSerializer.class).serialize(
-        getEntityReference());
+    return getModelUtils().serializeRef(getEntityReference());
   }
 
   @Override

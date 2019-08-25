@@ -50,7 +50,6 @@ import org.xwiki.observation.event.Event;
 import com.celements.common.observation.event.AbstractEntityEvent;
 import com.celements.model.context.ModelContext;
 import com.celements.model.util.ModelUtils;
-import com.celements.model.util.References;
 import com.celements.search.lucene.index.AttachmentData;
 import com.celements.search.lucene.index.DeleteData;
 import com.celements.search.lucene.index.DocumentData;
@@ -257,8 +256,7 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
   }
 
   private void indexData(IndexData data) throws IOException, XWikiException {
-    getContext().setWikiRef(References.extractRef(data.getEntityReference(),
-        WikiReference.class).or(getContext().getWikiRef()));
+    getContext().setWikiRef(data.getWikiRef());
     if (data.isDeleted()) {
       removeFromIndex(data);
     } else {
