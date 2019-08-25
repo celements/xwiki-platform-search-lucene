@@ -31,8 +31,8 @@ public class DeleteData extends IndexData {
   private final LuceneDocId docId;
 
   public DeleteData(LuceneDocId docId) {
-    super(LuceneDocType.none, null);
-    this.docId = checkNotNull(docId);
+    super(LuceneDocType.none, checkNotNull(docId).getRef());
+    this.docId = docId;
   }
 
   @Override
@@ -41,6 +41,7 @@ public class DeleteData extends IndexData {
   }
 
   @Override
-  public void addDataToLuceneDocument(Document luceneDoc) throws XWikiException {}
+  public void addDataToLuceneDocument(Document luceneDoc) throws XWikiException {
+  }
 
 }
