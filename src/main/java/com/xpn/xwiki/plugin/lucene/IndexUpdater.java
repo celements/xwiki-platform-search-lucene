@@ -34,13 +34,11 @@ import org.apache.lucene.store.Directory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.xwiki.model.reference.EntityReference;
-import org.xwiki.model.reference.WikiReference;
 import org.xwiki.observation.ObservationManager;
 
 import com.celements.common.observation.event.AbstractEntityEvent;
 import com.celements.model.context.ModelContext;
 import com.celements.model.util.ModelUtils;
-import com.celements.model.util.References;
 import com.celements.search.lucene.index.DeleteData;
 import com.celements.search.lucene.index.IndexData;
 import com.celements.search.lucene.index.extension.ILuceneIndexExtensionServiceRole;
@@ -137,17 +135,16 @@ public class IndexUpdater extends AbstractXWikiRunnable {
   }
 
   private void indexData(IndexData data) {
-    LOGGER.debug("indexData - '{}'", data.getEntityReference());
+    LOGGER.debug("indexData - '{}'", data);
     try {
-      getContext().setWikiRef(References.extractRef(data.getEntityReference(),
-          WikiReference.class).or(getContext().getWikiRef()));
+      getContext().setWikiRef(data.getWikiRef());
       if (data.isDeleted()) {
         removeFromIndex((DeleteData) data);
       } else {
         addToIndex(data);
       }
     } catch (Exception exc) {
-      LOGGER.error("error indexing document '{}'", data.getEntityReference(), exc);
+      LOGGER.error("error indexing document '{}'", data, exc);
     } finally {
       getContext().setWikiRef(getModelUtils().getMainWikiRef());
     }

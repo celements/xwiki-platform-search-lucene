@@ -30,10 +30,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.xwiki.model.EntityType;
 import org.xwiki.model.reference.DocumentReference;
+import org.xwiki.model.reference.EntityReference;
 import org.xwiki.rendering.syntax.Syntax;
 
 import com.celements.model.access.IModelAccessFacade;
 import com.celements.model.access.exception.DocumentNotExistsException;
+import com.celements.model.util.References;
 import com.celements.search.lucene.LuceneDocType;
 import com.xpn.xwiki.XWikiException;
 import com.xpn.xwiki.doc.XWikiDocument;
@@ -104,9 +106,10 @@ public abstract class AbstractDocumentData extends IndexData {
 
   private Date modificationDate;
 
-  public AbstractDocumentData(LuceneDocType type, XWikiDocument doc) {
-    super(type, checkNotNull(doc).getDocumentReference());
-
+  public AbstractDocumentData(LuceneDocType type, EntityReference entityReference,
+      XWikiDocument doc) {
+    super(type, entityReference);
+    checkNotNull(doc);
     setVersion(doc.getVersion());
     setDocumentTitle(doc.getRenderedTitle(Syntax.PLAIN_1_0, getContext().getXWikiContext()));
     setLanguage(doc.getLanguage());
@@ -126,7 +129,7 @@ public abstract class AbstractDocumentData extends IndexData {
   protected abstract void addAdditionalData(Document luceneDoc, XWikiDocument doc);
 
   private void addDocumentData(Document luceneDoc, XWikiDocument doc) {
-    LOGGER.trace("addDocumentData [{}]", getId());
+    LOGGER.trace("addDocumentData: id [{}]", getId());
     // Keyword fields: stored and indexed, but not tokenized
     addFieldToDocument(IndexFields.DOCUMENT_ID, getId().serialize(), Field.Store.YES,
         Field.Index.NOT_ANALYZED, ID_BOOST, luceneDoc);
@@ -134,7 +137,7 @@ public abstract class AbstractDocumentData extends IndexData {
     addFieldToDocument(IndexFields.DOCUMENT_LANGUAGE, getLanguage(), Field.Store.YES,
         Field.Index.ANALYZED, LANGUAGE_BOOST, luceneDoc);
 
-    addFieldToDocument(IndexFields.DOCUMENT_WIKI, getWiki(), Field.Store.YES,
+    addFieldToDocument(IndexFields.DOCUMENT_WIKI, getWikiRef().getName(), Field.Store.YES,
         Field.Index.NOT_ANALYZED, WIKI_BOOST, luceneDoc);
 
     if (StringUtils.isNotBlank(this.author)) {
@@ -244,27 +247,25 @@ public abstract class AbstractDocumentData extends IndexData {
   }
 
   public DocumentReference getDocumentReference() {
-    return (DocumentReference) getEntityReference();
+    return References.extractRef(getEntityReference(), DocumentReference.class).get();
   }
 
-  @Override
   public String getDocumentName() {
     return getEntityName(EntityType.DOCUMENT);
   }
 
-  @Override
   public String getDocumentSpace() {
     return getEntityName(EntityType.SPACE);
   }
 
-  @Override
-  public String getWiki() {
-    return getEntityName(EntityType.WIKI);
+  private String getEntityName(EntityType type) {
+    return References.extractRef(getEntityReference(), type)
+        .transform(EntityReference::getName)
+        .orNull();
   }
 
-  @Override
-  public String getDocumentFullName() {
-    return getModelUtils().serializeRefLocal(getEntityReference());
+  protected String getDocumentFullName() {
+    return getModelUtils().serializeRefLocal(getDocumentReference());
   }
 
   public String getVersion() {
@@ -285,11 +286,6 @@ public abstract class AbstractDocumentData extends IndexData {
 
   public void setCreator(String creator) {
     this.creator = creator;
-  }
-
-  @Override
-  public String getFullName() {
-    return getModelUtils().serializeRef(getEntityReference());
   }
 
   public String getLanguage() {

@@ -49,10 +49,11 @@ public class WikiData extends IndexData {
 
   @Override
   public Term getTerm() {
-    return new Term(IndexFields.DOCUMENT_WIKI, getWiki());
+    return new Term(IndexFields.DOCUMENT_WIKI, getWikiRef().getName());
   }
 
   @Override
-  public void addDataToLuceneDocument(Document luceneDoc) throws XWikiException {}
+  public void addDataToLuceneDocument(Document luceneDoc) throws XWikiException {
+  }
 
 }

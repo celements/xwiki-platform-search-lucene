@@ -37,7 +37,10 @@ import org.apache.tika.metadata.Metadata;
 import org.apache.tika.metadata.TikaMetadataKeys;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.xwiki.model.EntityType;
+import org.xwiki.model.reference.AttachmentReference;
 
+import com.celements.model.reference.RefBuilder;
 import com.celements.search.lucene.LuceneDocType;
 import com.google.common.base.Strings;
 import com.xpn.xwiki.XWikiException;
@@ -92,7 +95,8 @@ public class AttachmentData extends AbstractDocumentData {
   private String mimetype;
 
   public AttachmentData(XWikiAttachment attachment) {
-    super(LuceneDocType.attachment, checkNotNull(attachment).getDoc());
+    super(LuceneDocType.attachment, createRef(attachment.getDoc(), attachment.getFilename()),
+        attachment.getDoc());
     setModificationDate(attachment.getDate());
     setAuthor(attachment.getAuthor());
     setSize(attachment.getFilesize());
@@ -100,9 +104,15 @@ public class AttachmentData extends AbstractDocumentData {
     setMimeType(attachment.getMimeType(getContext().getXWikiContext()));
   }
 
-  public AttachmentData(XWikiDocument document, String filename) {
-    super(LuceneDocType.attachment, document);
+  public AttachmentData(XWikiDocument doc, String fileName) {
+    super(LuceneDocType.attachment, createRef(doc, fileName), doc);
     setFilename(filename);
+  }
+
+  private static AttachmentReference createRef(XWikiDocument doc, String fileName) {
+    return RefBuilder.from(checkNotNull(doc).getDocumentReference())
+        .with(EntityType.ATTACHMENT, fileName)
+        .build(AttachmentReference.class);
   }
 
   @Override
