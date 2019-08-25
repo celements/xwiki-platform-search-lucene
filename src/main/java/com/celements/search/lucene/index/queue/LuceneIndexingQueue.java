@@ -31,7 +31,7 @@ public interface LuceneIndexingQueue {
    * @throws UnsupportedOperationException
    *           if the implementation isn't a blocking queue
    */
-  void put(IndexData data) throws InterruptedException, UnsupportedOperationException;
+  void put(IndexData data) throws InterruptedException;
 
   /**
    * Like {@link #remove(IndexData)} but blocking if no element in queue.
@@ -39,7 +39,7 @@ public interface LuceneIndexingQueue {
    * @throws UnsupportedOperationException
    *           if the implementation isn't a blocking queue
    */
-  IndexData take() throws InterruptedException, UnsupportedOperationException;
+  IndexData take() throws InterruptedException;
 
   /**
    * Retrieves and removes the head of the queue.

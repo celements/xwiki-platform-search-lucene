@@ -102,8 +102,7 @@ public class XWikiDocumentQueue implements LuceneIndexingQueue {
   @SuppressWarnings("unchecked")
   public synchronized void add(IndexData data) {
     LuceneDocId key = data.getId();
-
-    LOGGER.debug("adding element to queue. Key: " + key);
+    LOGGER.debug("adding element to queue. Key: {}", key);
     if (!this.documentsByName.containsKey(key)) {
       // Document with this name not yet in the Queue, so add it
       this.namesQueue.add(key);
@@ -135,12 +134,12 @@ public class XWikiDocumentQueue implements LuceneIndexingQueue {
   }
 
   @Override
-  public void put(IndexData data) throws UnsupportedOperationException {
-    throw new UnsupportedOperationException("non blocking queue");
+  public void put(IndexData data) {
+    this.add(data);
   }
 
   @Override
-  public IndexData take() throws UnsupportedOperationException {
+  public IndexData take() {
     throw new UnsupportedOperationException("non blocking queue");
   }
 }
