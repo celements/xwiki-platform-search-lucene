@@ -1,5 +1,6 @@
 package com.celements.search.lucene.index;
 
+import static com.celements.common.MoreObjectsCel.*;
 import static com.celements.model.util.References.*;
 import static com.google.common.base.MoreObjects.*;
 import static com.google.common.base.Preconditions.*;
@@ -17,7 +18,6 @@ import org.xwiki.model.reference.EntityReference;
 
 import com.celements.model.util.ModelUtils;
 import com.google.common.base.Splitter;
-import com.google.common.base.Strings;
 import com.xpn.xwiki.web.Utils;
 
 public class LuceneDocId {
@@ -35,7 +35,11 @@ public class LuceneDocId {
 
   public LuceneDocId(EntityReference ref, String lang) {
     this.ref = checkNotNull(ref);
-    this.lang = firstNonNull(Strings.emptyToNull(lang), DEFAULT_LANG);
+    if (extractRef(getRef(), EntityType.DOCUMENT).isPresent()) {
+      this.lang = firstNonNull(emptyToNull(lang), DEFAULT_LANG);
+    } else {
+      this.lang = "";
+    }
   }
 
   public EntityReference getRef() {
@@ -53,16 +57,10 @@ public class LuceneDocId {
 
   @Override
   public boolean equals(Object obj) {
-    if (obj instanceof LuceneDocId) {
-      LuceneDocId other = (LuceneDocId) obj;
-      return Objects.equals(this.getRef(), other.getRef())
-          && (!isLangDependent() || Objects.equals(this.getLang(), other.getLang()));
-    }
-    return false;
-  }
-
-  private boolean isLangDependent() {
-    return extractRef(getRef(), EntityType.DOCUMENT).isPresent();
+    return tryCast(obj, LuceneDocId.class)
+        .map(other -> Objects.equals(this.getRef(), other.getRef())
+            && Objects.equals(this.getLang(), other.getLang()))
+        .orElse(false);
   }
 
   @Override
@@ -77,7 +75,7 @@ public class LuceneDocId {
     StringBuilder sb = new StringBuilder();
     sb.append(getModelUtils().serializeRef(extractRef(getRef(), EntityType.DOCUMENT)
         .or(getRef())));
-    if (isLangDependent()) {
+    if (!getLang().isEmpty()) {
       sb.append('.');
       sb.append(getLang());
     }

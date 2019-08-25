@@ -44,7 +44,7 @@ public class WikiData extends IndexData {
 
   @Override
   public LuceneDocId getId() {
-    return new LuceneDocId(getEntityReference(), null);
+    return new LuceneDocId(getEntityReference());
   }
 
   @Override

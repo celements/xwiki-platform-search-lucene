@@ -28,14 +28,18 @@ public class LuceneDocIdTest extends AbstractComponentTest {
 
   @Test
   public void test_wiki() {
-    assertDocId(wikiRef, null, "wiki");
-    assertDocId(wikiRef, "en", "wiki");
+    assertDocId(wikiRef, "wiki");
+    assertDocId(wikiRef, "wiki");
   }
 
   @Test
   public void test_space() {
-    assertDocId(spaceRef, null, "wiki:space");
-    assertDocId(spaceRef, "en", "wiki:space");
+    assertDocId(spaceRef, "wiki:space");
+    assertDocId(spaceRef, "wiki:space");
+  }
+
+  private void assertDocId(EntityReference ref, String strDocId) {
+    assertDocId(ref, "", strDocId, true);
   }
 
   @Test
