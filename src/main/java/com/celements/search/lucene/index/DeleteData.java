@@ -31,8 +31,8 @@ public class DeleteData extends IndexData {
   private final LuceneDocId docId;
 
   public DeleteData(LuceneDocId docId) {
-    super(LuceneDocType.none, null, true);
-    this.docId = checkNotNull(docId);
+    super(LuceneDocType.none, checkNotNull(docId).getRef(), true);
+    this.docId = docId;
   }
 
   @Override
