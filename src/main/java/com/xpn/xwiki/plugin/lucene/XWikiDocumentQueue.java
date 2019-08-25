@@ -35,7 +35,6 @@ import org.xwiki.component.annotation.Component;
 
 import com.celements.search.lucene.index.IndexData;
 import com.celements.search.lucene.index.LuceneDocId;
-import com.celements.search.lucene.index.queue.LuceneIndexingQueue;
 
 /**
  * This class represents a Queue (FirstInFirstOut) for XWikiDocument objects. It is used
@@ -48,7 +47,7 @@ import com.celements.search.lucene.index.queue.LuceneIndexingQueue;
 @Singleton
 @ThreadSafe
 @Component(XWikiDocumentQueue.NAME)
-public class XWikiDocumentQueue implements LuceneIndexingQueue {
+public class XWikiDocumentQueue {
 
   public static final String NAME = "xwiki";
 
@@ -73,7 +72,6 @@ public class XWikiDocumentQueue implements LuceneIndexingQueue {
    * @throws BufferUnderflowException
    *           If the queue is empty.
    */
-  @Override
   public synchronized IndexData remove() throws NoSuchElementException {
     LOGGER.debug("removing element from queue.");
     try {
@@ -83,7 +81,6 @@ public class XWikiDocumentQueue implements LuceneIndexingQueue {
     }
   }
 
-  @Override
   public synchronized boolean contains(LuceneDocId id) {
     return this.documentsByName.containsKey(id);
   }
@@ -98,11 +95,9 @@ public class XWikiDocumentQueue implements LuceneIndexingQueue {
    * @param data
    *          IndexData object to add to the queue.
    */
-  @Override
   @SuppressWarnings("unchecked")
   public synchronized void add(IndexData data) {
     LuceneDocId key = data.getId();
-
     LOGGER.debug("adding element to queue. Key: " + key);
     if (!this.documentsByName.containsKey(key)) {
       // Document with this name not yet in the Queue, so add it
@@ -119,7 +114,6 @@ public class XWikiDocumentQueue implements LuceneIndexingQueue {
    *
    * @return <code>true</code> if the queue is empty, <code>false</code> otherwise.
    */
-  @Override
   public synchronized boolean isEmpty() {
     return this.namesQueue.isEmpty();
   }
@@ -129,7 +123,6 @@ public class XWikiDocumentQueue implements LuceneIndexingQueue {
    *
    * @return Number of elements in the queue.
    */
-  @Override
   public synchronized int getSize() {
     return this.namesQueue.size();
   }
