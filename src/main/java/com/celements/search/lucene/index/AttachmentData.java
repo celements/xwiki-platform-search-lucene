@@ -116,6 +116,11 @@ public class AttachmentData extends AbstractDocumentData {
   }
 
   @Override
+  public LuceneDocId getId() {
+    return new LuceneDocId(getEntityReference());
+  }
+
+  @Override
   protected void addAdditionalData(Document luceneDoc, XWikiDocument doc) {
     // Lower the importance of the fields inherited from the document
     List<Fieldable> existingFields = luceneDoc.getFields();

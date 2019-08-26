@@ -63,7 +63,7 @@ public class LuceneDocIdTest extends AbstractComponentTest {
   }
 
   private void assertDocId(EntityReference ref, String lang, String strDocId, boolean strict) {
-    LuceneDocId docId = new LuceneDocId(ref, lang);
+    LuceneDocId docId = LuceneDocId.createInternal(ref, lang);
     assertEquals(ref, docId.getRef());
     assertEquals(firstNonNull(lang, LuceneDocId.DEFAULT_LANG), docId.getLang());
     assertEquals(docId, LuceneDocId.parse(docId.serialize()));
