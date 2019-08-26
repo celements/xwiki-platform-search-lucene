@@ -1,5 +1,6 @@
 package com.celements.search.lucene.index;
 
+import static com.celements.common.MoreObjectsCel.*;
 import static com.celements.model.util.References.*;
 import static com.google.common.base.MoreObjects.*;
 import static com.google.common.base.Preconditions.*;
@@ -17,7 +18,6 @@ import org.xwiki.model.reference.EntityReference;
 
 import com.celements.model.util.ModelUtils;
 import com.google.common.base.Splitter;
-import com.google.common.base.Strings;
 import com.xpn.xwiki.web.Utils;
 
 public class LuceneDocId {
@@ -35,7 +35,11 @@ public class LuceneDocId {
 
   public LuceneDocId(EntityReference ref, String lang) {
     this.ref = checkNotNull(ref);
-    this.lang = firstNonNull(Strings.emptyToNull(lang), DEFAULT_LANG);
+    if (ref instanceof DocumentReference) {
+      this.lang = firstNonNull(emptyToNull(lang), DEFAULT_LANG);
+    } else {
+      this.lang = "";
+    }
   }
 
   public EntityReference getRef() {
@@ -53,16 +57,10 @@ public class LuceneDocId {
 
   @Override
   public boolean equals(Object obj) {
-    if (obj instanceof LuceneDocId) {
-      LuceneDocId other = (LuceneDocId) obj;
-      return Objects.equals(this.getRef(), other.getRef())
-          && (!isLangDependent() || Objects.equals(this.getLang(), other.getLang()));
-    }
-    return false;
-  }
-
-  private boolean isLangDependent() {
-    return extractRef(getRef(), EntityType.DOCUMENT).isPresent();
+    return tryCast(obj, LuceneDocId.class)
+        .map(other -> Objects.equals(this.getRef(), other.getRef())
+            && Objects.equals(this.getLang(), other.getLang()))
+        .orElse(false);
   }
 
   @Override
@@ -71,17 +69,19 @@ public class LuceneDocId {
   }
 
   /**
-   * @return 'wiki:space.doc.en.file.att.jpg'
+   * wiki: 'wiki',
+   * doc: 'wiki:space.doc.en',
+   * att: 'wiki:space.doc.file.att.jpg'
    */
   public String serialize() {
     StringBuilder sb = new StringBuilder();
     sb.append(getModelUtils().serializeRef(extractRef(getRef(), EntityType.DOCUMENT)
         .or(getRef())));
-    if (isLangDependent()) {
+    if (!getLang().isEmpty()) {
       sb.append('.');
       sb.append(getLang());
     }
-    if (extractRef(getRef(), EntityType.ATTACHMENT).isPresent()) {
+    if (getRef().getType() == EntityType.ATTACHMENT) {
       sb.append("." + ATTACHMENT_KEYWORD + ".");
       sb.append(getRef().getName());
     }
@@ -96,19 +96,17 @@ public class LuceneDocId {
       ref = getModelUtils().resolveRef(split.get(1), DocumentReference.class, ref);
     }
     String lang = DEFAULT_LANG;
-    if (split.size() > 2) { // 'wiki:space.doc.en'
+    Optional<String> attachmentFileName = extractAttachmentFileName(split);
+    if (attachmentFileName.isPresent()) { // 'wiki:space.doc.file.att.jpg'
+      ref = getModelUtils().resolveRef(attachmentFileName.get(), AttachmentReference.class, ref);
+    } else if (split.size() > 2) { // 'wiki:space.doc.en'
       lang = split.get(2);
       checkArgument(DEFAULT_LANG.equals(lang) || (lang.length() == 2), docId);
-    }
-    if (split.size() > 3) { // 'wiki:space.doc.en.file.att.jpg'
-      String fileName = extractFileName(split)
-          .orElseThrow(() -> new IllegalArgumentException(docId));
-      ref = getModelUtils().resolveRef(fileName, AttachmentReference.class, ref);
     }
     return new LuceneDocId(ref, lang);
   }
 
-  private static Optional<String> extractFileName(List<String> split) {
+  private static Optional<String> extractAttachmentFileName(List<String> split) {
     int i = split.indexOf(ATTACHMENT_KEYWORD);
     if ((i >= 2) && ((i + 1) < split.size())) {
       return Optional.of(split.subList(i + 1, split.size()).stream()
