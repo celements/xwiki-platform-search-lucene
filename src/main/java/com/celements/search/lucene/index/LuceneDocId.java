@@ -36,13 +36,20 @@ public class LuceneDocId implements Serializable {
   private final String lang;
 
   public LuceneDocId(EntityReference ref) {
-    this.ref = checkNotNull(ref);
-    this.lang = "";
+    this(ref, "");
   }
 
   public LuceneDocId(DocumentReference docRef, String lang) {
-    this.ref = checkNotNull(docRef);
-    this.lang = firstNonNull(emptyToNull(lang), DEFAULT_LANG);
+    this((EntityReference) docRef, lang);
+  }
+
+  LuceneDocId(EntityReference ref, String lang) {
+    this.ref = checkNotNull(ref);
+    if (ref instanceof DocumentReference) {
+      this.lang = firstNonNull(emptyToNull(lang), DEFAULT_LANG);
+    } else {
+      this.lang = "";
+    }
   }
 
   public EntityReference getRef() {
@@ -106,7 +113,7 @@ public class LuceneDocId implements Serializable {
       lang = split.get(2);
       checkArgument(DEFAULT_LANG.equals(lang) || (lang.length() == 2), docId);
     }
-    return createInternal(ref, lang);
+    return new LuceneDocId(ref, lang);
   }
 
   private static Optional<String> extractAttachmentFileName(List<String> split) {
@@ -117,12 +124,6 @@ public class LuceneDocId implements Serializable {
           .collect(Collectors.joining(".")));
     }
     return Optional.empty();
-  }
-
-  static LuceneDocId createInternal(EntityReference ref, String lang) {
-    return tryCast(ref, DocumentReference.class)
-        .map(docRef -> new LuceneDocId(docRef, lang))
-        .orElseGet(() -> new LuceneDocId(ref));
   }
 
   private static ModelUtils getModelUtils() {
