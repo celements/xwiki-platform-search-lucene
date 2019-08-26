@@ -205,11 +205,6 @@ public abstract class AbstractDocumentData extends IndexData {
    */
   public abstract String getFullText(XWikiDocument doc);
 
-  @Override
-  public LuceneDocId getId() {
-    return new LuceneDocId(getEntityReference(), getLanguage());
-  }
-
   /**
    * @param author
    *          The author to set.

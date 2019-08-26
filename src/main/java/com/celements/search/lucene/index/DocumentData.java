@@ -73,6 +73,11 @@ public class DocumentData extends AbstractDocumentData {
   }
 
   @Override
+  public LuceneDocId getId() {
+    return new LuceneDocId(getDocumentReference(), getLanguage());
+  }
+
+  @Override
   public String getFullText(XWikiDocument doc) {
     // XXX removing xwiki adding all properties to fulltext. What should it be good for?
     // getObjectFullText(sb, doc, context);

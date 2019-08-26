@@ -6,10 +6,13 @@ import static com.google.common.base.MoreObjects.*;
 import static com.google.common.base.Preconditions.*;
 import static com.google.common.base.Strings.*;
 
+import java.io.Serializable;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
+
+import javax.annotation.concurrent.Immutable;
 
 import org.xwiki.model.EntityType;
 import org.xwiki.model.reference.AttachmentReference;
@@ -20,7 +23,10 @@ import com.celements.model.util.ModelUtils;
 import com.google.common.base.Splitter;
 import com.xpn.xwiki.web.Utils;
 
-public class LuceneDocId {
+@Immutable
+public class LuceneDocId implements Serializable {
+
+  private static final long serialVersionUID = -1560717270552881216L;
 
   static final String DEFAULT_LANG = "default";
   static final String ATTACHMENT_KEYWORD = "file";
@@ -30,16 +36,13 @@ public class LuceneDocId {
   private final String lang;
 
   public LuceneDocId(EntityReference ref) {
-    this(ref, null);
+    this.ref = checkNotNull(ref);
+    this.lang = "";
   }
 
-  public LuceneDocId(EntityReference ref, String lang) {
-    this.ref = checkNotNull(ref);
-    if (ref instanceof DocumentReference) {
-      this.lang = firstNonNull(emptyToNull(lang), DEFAULT_LANG);
-    } else {
-      this.lang = "";
-    }
+  public LuceneDocId(DocumentReference docRef, String lang) {
+    this.ref = checkNotNull(docRef);
+    this.lang = firstNonNull(emptyToNull(lang), DEFAULT_LANG);
   }
 
   public EntityReference getRef() {
@@ -103,7 +106,7 @@ public class LuceneDocId {
       lang = split.get(2);
       checkArgument(DEFAULT_LANG.equals(lang) || (lang.length() == 2), docId);
     }
-    return new LuceneDocId(ref, lang);
+    return createInternal(ref, lang);
   }
 
   private static Optional<String> extractAttachmentFileName(List<String> split) {
@@ -114,6 +117,12 @@ public class LuceneDocId {
           .collect(Collectors.joining(".")));
     }
     return Optional.empty();
+  }
+
+  static LuceneDocId createInternal(EntityReference ref, String lang) {
+    return tryCast(ref, DocumentReference.class)
+        .map(docRef -> new LuceneDocId(docRef, lang))
+        .orElseGet(() -> new LuceneDocId(ref));
   }
 
   private static ModelUtils getModelUtils() {
