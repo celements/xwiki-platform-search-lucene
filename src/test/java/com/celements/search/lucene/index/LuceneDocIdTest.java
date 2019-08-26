@@ -42,7 +42,7 @@ public class LuceneDocIdTest extends AbstractComponentTest {
   public void test_doc() {
     assertDocId(docRef, null, "wiki:space.doc.default", true);
     assertDocId(docRef, "en", "wiki:space.doc.en", true);
-    assertDocId(docRef, null, "space.doc.default", false);
+    assertDocId(docRef, "en", "space.doc.en", false);
   }
 
   @Test
@@ -63,7 +63,7 @@ public class LuceneDocIdTest extends AbstractComponentTest {
   }
 
   private void assertDocId(EntityReference ref, String lang, String strDocId, boolean strict) {
-    LuceneDocId docId = LuceneDocId.createInternal(ref, lang);
+    LuceneDocId docId = new LuceneDocId(ref, lang);
     assertEquals(ref, docId.getRef());
     assertEquals(firstNonNull(lang, LuceneDocId.DEFAULT_LANG), docId.getLang());
     assertEquals(docId, LuceneDocId.parse(docId.serialize()));
