@@ -35,7 +35,7 @@ public class LuceneDocId {
 
   public LuceneDocId(EntityReference ref, String lang) {
     this.ref = checkNotNull(ref);
-    if (extractRef(getRef(), EntityType.DOCUMENT).isPresent()) {
+    if (ref instanceof DocumentReference) {
       this.lang = firstNonNull(emptyToNull(lang), DEFAULT_LANG);
     } else {
       this.lang = "";
@@ -69,7 +69,9 @@ public class LuceneDocId {
   }
 
   /**
-   * @return 'wiki:space.doc.en.file.att.jpg'
+   * wiki: 'wiki',
+   * doc: 'wiki:space.doc.en',
+   * att: 'wiki:space.doc.file.att.jpg'
    */
   public String serialize() {
     StringBuilder sb = new StringBuilder();
@@ -79,7 +81,7 @@ public class LuceneDocId {
       sb.append('.');
       sb.append(getLang());
     }
-    if (extractRef(getRef(), EntityType.ATTACHMENT).isPresent()) {
+    if (getRef().getType() == EntityType.ATTACHMENT) {
       sb.append("." + ATTACHMENT_KEYWORD + ".");
       sb.append(getRef().getName());
     }
@@ -94,19 +96,17 @@ public class LuceneDocId {
       ref = getModelUtils().resolveRef(split.get(1), DocumentReference.class, ref);
     }
     String lang = DEFAULT_LANG;
-    if (split.size() > 2) { // 'wiki:space.doc.en'
+    Optional<String> attachmentFileName = extractAttachmentFileName(split);
+    if (attachmentFileName.isPresent()) { // 'wiki:space.doc.file.att.jpg'
+      ref = getModelUtils().resolveRef(attachmentFileName.get(), AttachmentReference.class, ref);
+    } else if (split.size() > 2) { // 'wiki:space.doc.en'
       lang = split.get(2);
       checkArgument(DEFAULT_LANG.equals(lang) || (lang.length() == 2), docId);
-    }
-    if (split.size() > 3) { // 'wiki:space.doc.en.file.att.jpg'
-      String fileName = extractFileName(split)
-          .orElseThrow(() -> new IllegalArgumentException(docId));
-      ref = getModelUtils().resolveRef(fileName, AttachmentReference.class, ref);
     }
     return new LuceneDocId(ref, lang);
   }
 
-  private static Optional<String> extractFileName(List<String> split) {
+  private static Optional<String> extractAttachmentFileName(List<String> split) {
     int i = split.indexOf(ATTACHMENT_KEYWORD);
     if ((i >= 2) && ((i + 1) < split.size())) {
       return Optional.of(split.subList(i + 1, split.size()).stream()
