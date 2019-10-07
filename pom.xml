@@ -4,7 +4,7 @@
   <parent>
       <groupId>com.celements</groupId>
       <artifactId>celements</artifactId>
-      <version>4.0-M1</version>
+      <version>4.0</version>
   </parent>
   <artifactId>xwiki-platform-search-lucene</artifactId>
   <name>XWiki Platform - Search - Lucene</name>
@@ -48,13 +48,13 @@
     <dependency>
       <groupId>com.celements</groupId>
       <artifactId>celements-model</artifactId>
-      <version>4.0-M3</version>
+      <version>4.0</version>
       <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>com.celements</groupId>
       <artifactId>celements-core</artifactId>
-      <version>4.0-M4</version>
+      <version>4.0</version>
       <scope>provided</scope>
     </dependency>
     <dependency>
