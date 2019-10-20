@@ -23,6 +23,7 @@ import static com.google.common.base.Preconditions.*;
 
 import java.io.IOException;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -47,7 +48,6 @@ import org.xwiki.model.reference.DocumentReference;
 import org.xwiki.model.reference.EntityReference;
 import org.xwiki.model.reference.SpaceReference;
 import org.xwiki.model.reference.WikiReference;
-import org.xwiki.query.QueryException;
 
 import com.celements.model.access.IModelAccessFacade;
 import com.celements.model.access.exception.DocumentNotExistsException;
@@ -67,6 +67,7 @@ import com.celements.store.DocumentCacheStore;
 import com.celements.store.MetaDataStoreExtension;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Sets;
 import com.xpn.xwiki.XWiki;
 import com.xpn.xwiki.XWikiContext;
 import com.xpn.xwiki.XWikiException;
@@ -249,56 +250,60 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
   /**
    * First empties the index, then fetches all Documents, their translations and their
    * attachments for re-addition to the index.
-   *
-   * @return the number of indexed elements
    */
-  private int rebuildIndex() {
-    int retval = 0;
+  private void rebuildIndex() {
     WikiReference beforeWikiRef = getContext().getWikiRef();
     for (WikiReference wikiRef : wikis) {
       getContext().setWikiRef(wikiRef);
       try (IndexSearcher searcher = new IndexSearcher(directory, true)) {
-        retval += rebuildWiki(wikiRef, searcher);
-      } catch (IOException | QueryException | InterruptedException exc) {
+        rebuildWiki(wikiRef, searcher);
+      } catch (IOException | InterruptedException exc) {
         LOGGER.error("Failed rebulding wiki [{}]", wikiRef, exc);
       } finally {
         getContext().setWikiRef(beforeWikiRef);
       }
     }
-    return retval;
   }
 
-  private int rebuildWiki(@NotNull WikiReference wikiRef, @NotNull IndexSearcher searcher)
-      throws IOException, QueryException, InterruptedException {
-    EntityReference filterRef = this.filterRef.orElse(checkNotNull(wikiRef));
-    checkArgument(References.extractRef(filterRef, WikiReference.class).get().equals(wikiRef),
-        "unable to index wiki '" + wikiRef + "' for set filter '" + filterRef + "'");
+  private void rebuildWiki(@NotNull WikiReference wikiRef, @NotNull IndexSearcher searcher)
+      throws IOException, InterruptedException {
+    EntityReference ref = this.filterRef.orElse(checkNotNull(wikiRef));
+    checkArgument(References.extractRef(ref, WikiReference.class).get().equals(wikiRef),
+        "unable to index wiki '" + wikiRef + "' for set filter '" + ref + "'");
     LOGGER.info("rebuilding wiki '{}'", wikiRef);
-    int ret = 0, count = 0;
-    Set<LuceneDocId> docsInIndex = getAllIndexedDocs(filterRef, searcher);
-    Set<DocumentMetaData> docsToIndex = getAllDocMetaData(filterRef);
-    for (DocumentMetaData metaData : docsToIndex) {
+    if (wipeIndex) {
+      wipeWikiIndex(ref);
+    }
+    Set<LuceneDocId> indexed = rebuildIndex(ref, searcher);
+    if (!wipeIndex) {
+      cleanIndex(Sets.difference(getAllIndexedDocs(ref, searcher), indexed));
+    }
+  }
+
+  public Set<LuceneDocId> rebuildIndex(EntityReference ref, IndexSearcher searcher)
+      throws IOException, InterruptedException {
+    Set<LuceneDocId> indexed = new HashSet<>();
+    Set<DocumentMetaData> docsToIndex = getAllDocMetaData(ref);
+    int totalSize = docsToIndex.size();
+    for (Iterator<DocumentMetaData> iter = docsToIndex.iterator(); iter.hasNext();) {
+      DocumentMetaData metaData = iter.next();
       LuceneDocId docId = getDocId(metaData);
       if (!onlyNew || !isIndexed(metaData, searcher)) {
-        ret += queueDocument(metaData);
+        queueDocument(metaData);
         LOGGER.trace("indexed {}", docId);
       } else {
         LOGGER.trace("skipped '{}', already indexed", docId);
       }
-      if (!docsInIndex.remove(docId)) {
-        LOGGER.debug("couldn't reduce remaining docs for docId '{}'", docId);
+      indexed.add(docId);
+      if ((indexed.size() % 500) == 0) {
+        LOGGER.info("indexed docs {}/{}", indexed.size(), totalSize);
       }
-      if ((++count % 500) == 0) {
-        LOGGER.info("indexed docs {}/{}, {} docs remaining", count, docsToIndex.size(),
-            docsInIndex.size());
-      }
+      iter.remove(); // reduces docsToIndex and thus the memory footprint
     }
-    cleanIndex(docsInIndex);
-    return ret;
+    return indexed;
   }
 
-  private Set<DocumentMetaData> getAllDocMetaData(@NotNull EntityReference ref)
-      throws QueryException {
+  private Set<DocumentMetaData> getAllDocMetaData(@NotNull EntityReference ref) {
     MetaDataStoreExtension store;
     if (getWiki().getStore() instanceof MetaDataStoreExtension) {
       store = (MetaDataStoreExtension) getWiki().getStore();
@@ -309,22 +314,18 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
     return store.listDocumentMetaData(ref);
   }
 
-  public Set<LuceneDocId> getAllIndexedDocs(@NotNull EntityReference ref,
-      @NotNull IndexSearcher searcher) throws IOException, InterruptedException {
+  private Set<LuceneDocId> getAllIndexedDocs(@NotNull EntityReference ref,
+      @NotNull IndexSearcher searcher) throws IOException {
     Set<LuceneDocId> ret = new HashSet<>();
-    if (wipeIndex) {
-      wipeWikiIndex(ref);
-    } else {
-      Query query = getLuceneSearchRefQuery(ref);
-      TotalHitCountCollector collector = new TotalHitCountCollector();
-      searcher.search(query, collector);
-      TopDocs topDocs = searcher.search(query, Math.max(1, collector.getTotalHits()));
-      for (ScoreDoc scoreDoc : topDocs.scoreDocs) {
-        try {
-          ret.add(LuceneDocId.parse(searcher.doc(scoreDoc.doc).get(IndexFields.DOCUMENT_ID)));
-        } catch (IllegalArgumentException iae) {
-          LOGGER.warn("encountered invalid doc in index: {}", scoreDoc, iae);
-        }
+    Query query = getLuceneSearchRefQuery(ref);
+    TotalHitCountCollector collector = new TotalHitCountCollector();
+    searcher.search(query, collector);
+    TopDocs topDocs = searcher.search(query, Math.max(1, collector.getTotalHits()));
+    for (ScoreDoc scoreDoc : topDocs.scoreDocs) {
+      try {
+        ret.add(LuceneDocId.parse(searcher.doc(scoreDoc.doc).get(IndexFields.DOCUMENT_ID)));
+      } catch (IllegalArgumentException iae) {
+        LOGGER.warn("encountered invalid doc in index: {}", scoreDoc, iae);
       }
     }
     LOGGER.info("getAllIndexedDocs: found {} docs in index for ref '{}'", ret.size(), ref);
@@ -338,7 +339,7 @@ public class IndexRebuilder extends AbstractXWikiRunnable {
   }
 
   private void cleanIndex(Set<LuceneDocId> danglingDocs) throws InterruptedException {
-    LOGGER.info("cleanIndex: {} for {} dangling docs", !wipeIndex, danglingDocs.size());
+    LOGGER.info("cleanIndex: for {} dangling docs", danglingDocs.size());
     danglingDocs.remove(null);
     for (LuceneDocId docId : danglingDocs) {
       queue(new DeleteData(docId));
