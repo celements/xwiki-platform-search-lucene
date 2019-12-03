@@ -51,6 +51,7 @@ public class IndexFields {
    * Title of the document
    */
   public static final String DOCUMENT_TITLE = "title";
+  public static final String DOCUMENT_TITLE_SORT = "title_s";
 
   /**
    * Name of the document
