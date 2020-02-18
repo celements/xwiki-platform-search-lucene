@@ -33,8 +33,7 @@ import org.apache.commons.lang3.time.FastDateFormat;
  */
 public class IndexFields {
 
-  private IndexFields() {
-  }
+  private IndexFields() {}
 
   /**
    * Keyword field, holds a string uniquely identifying a document across the index. this
@@ -73,6 +72,11 @@ public class IndexFields {
    * FullName of the document (example : Main.WebHome)
    */
   public static final String DOCUMENT_FULLNAME = "fullname";
+
+  /**
+   * FullName of the parent
+   */
+  public static final String DOCUMENT_PARENT = "parent";
 
   /**
    * Version of the document
