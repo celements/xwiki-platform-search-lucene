@@ -24,8 +24,10 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -60,12 +62,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.xwiki.context.Execution;
 import org.xwiki.model.reference.EntityReference;
-import org.xwiki.model.reference.WikiReference;
 import org.xwiki.observation.ObservationManager;
 
-import com.celements.model.util.References;
 import com.celements.search.lucene.LuceneDocType;
-import com.google.common.base.Optional;
+import com.google.common.base.Stopwatch;
 import com.google.common.base.Strings;
 import com.google.common.collect.Iterables;
 import com.xpn.xwiki.XWikiContext;
@@ -151,8 +151,6 @@ public class LucenePlugin extends XWikiDefaultPlugin {
    */
   private volatile List<Directory> indexDirs;
 
-  private volatile boolean doRebuild = false;
-
   public LucenePlugin(String name, String className, XWikiContext context) {
     super(name, className, context);
     indexUpdaterExecutor = Executors.newSingleThreadExecutor();
@@ -177,30 +175,12 @@ public class LucenePlugin extends XWikiDefaultPlugin {
     super.finalize();
   }
 
-  /**
-   * @deprecated instead use rebuildIndex()
-   */
-  @Deprecated
-  public int rebuildIndex(XWikiContext context) {
-    return rebuildIndex() ? 0 : LucenePluginApi.REBUILD_IN_PROGRESS;
+  public CompletableFuture<Long> rebuildIndex(EntityReference ref) {
+    return indexRebuilder.startIndexRebuild(ref);
   }
 
-  public boolean rebuildIndex() {
-    return indexRebuilder.startIndexRebuild(null, Optional.<EntityReference>absent(), false);
-  }
-
-  public boolean rebuildIndex(EntityReference entityRef, boolean onlyNew) {
-    Optional<WikiReference> wikiRef = References.extractRef(entityRef, WikiReference.class);
-    List<WikiReference> wikis = wikiRef.isPresent() ? Arrays.asList(wikiRef.get()) : null;
-    return indexRebuilder.startIndexRebuild(wikis, Optional.fromNullable(entityRef), onlyNew);
-  }
-
-  public boolean rebuildIndex(List<WikiReference> wikis, boolean onlyNew) {
-    return indexRebuilder.startIndexRebuild(wikis, Optional.<EntityReference>absent(), onlyNew);
-  }
-
-  public boolean rebuildIndexWithWipe(List<WikiReference> wikis, boolean onlyNew) {
-    return indexRebuilder.startIndexRebuildWithWipe(wikis, onlyNew);
+  public Optional<CompletableFuture<Long>> getLatestRebuildFuture() {
+    return indexRebuilder.getLatestRebuildFuture();
   }
 
   /**
@@ -693,13 +673,9 @@ public class LucenePlugin extends XWikiDefaultPlugin {
       IndexWriter writer = openWriter(getWriteDirectory(), OpenMode.CREATE_OR_APPEND);
       this.indexUpdater = new IndexUpdater(writer, this, context);
       indexUpdaterExecutor.submit(indexUpdater);
-      this.indexRebuilder = new IndexRebuilder(indexUpdater, context);
+      this.indexRebuilder = new IndexRebuilder(indexUpdater);
       openSearchers();
       registerIndexUpdater();
-      if (doRebuild) {
-        rebuildIndex();
-        LOGGER.info("Launched initial lucene indexing");
-      }
       LOGGER.info("Lucene plugin initialized.");
     } catch (IOException exc) {
       LOGGER.error("Failed to open the index directory: ", exc);
@@ -721,10 +697,6 @@ public class LucenePlugin extends XWikiDefaultPlugin {
       if (!IndexReader.indexExists(dir)) {
         // If there's no index create an empty one
         openWriter(dir, OpenMode.CREATE_OR_APPEND).close();
-        if (indexDirs.startsWith(path)) {
-          // writeIndex didn't exist, do a rebuild
-          doRebuild = true;
-        }
       }
       ret.add(FSDirectory.open(file));
     }
@@ -887,13 +859,6 @@ public class LucenePlugin extends XWikiDefaultPlugin {
       }
     }
     return ret;
-  }
-
-  /**
-   * Handle a corrupt index by clearing it and rebuilding from scratch.
-   */
-  void handleCorruptIndex() throws IOException {
-    rebuildIndex();
   }
 
   private XWikiContext getContext() {

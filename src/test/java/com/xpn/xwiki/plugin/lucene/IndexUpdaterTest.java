@@ -26,7 +26,10 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.concurrent.Semaphore;
 
+import javax.validation.constraints.NotNull;
+
 import org.apache.lucene.index.IndexWriter;
+import org.apache.lucene.search.IndexSearcher;
 import org.junit.Before;
 import org.junit.Test;
 import org.xwiki.model.reference.DocumentReference;
@@ -61,14 +64,16 @@ public class IndexUpdaterTest extends AbstractBridgedComponentTestCase {
 
   private class TestIndexRebuilder extends IndexRebuilder {
 
-    public TestIndexRebuilder(IndexUpdater indexUpdater, XWikiContext context) {
-      super(indexUpdater, context);
+    public TestIndexRebuilder(IndexUpdater indexUpdater) {
+      super(indexUpdater);
     }
 
     @Override
-    protected void runInternal() {
-      super.runInternal();
+    protected long rebuildIndex(@NotNull IndexSearcher searcher)
+        throws IOException, InterruptedException {
+      long ret = super.rebuildIndex(searcher);
       IndexUpdaterTest.this.rebuildDone.release();
+      return ret;
     }
   }
 
@@ -86,16 +91,14 @@ public class IndexUpdaterTest extends AbstractBridgedComponentTestCase {
           // IndexWriter writer = openWriter(OpenMode.CREATE);
           Thread.sleep(5000);
           writer.close();
-        } catch (Exception e) {
-        }
+        } catch (Exception e) {}
       } else if (Thread.currentThread().getName().equals("permanentBlocker")) {
         try {
           // IndexWriter writer = openWriter(OpenMode.CREATE_OR_APPEND);
           IndexUpdaterTest.this.writeBlockerAcquiresLock.release();
           IndexUpdaterTest.this.writeBlockerWait.acquireUninterruptibly();
           writer.close();
-        } catch (Exception e) {
-        }
+        } catch (Exception e) {}
       } else {
         super.runInternal();
       }
