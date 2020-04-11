@@ -52,6 +52,7 @@ import org.xwiki.model.reference.WikiReference;
 
 import com.celements.model.access.ContextExecutor;
 import com.celements.model.access.IModelAccessFacade;
+import com.celements.model.access.exception.DocumentLoadException;
 import com.celements.model.access.exception.DocumentNotExistsException;
 import com.celements.model.context.ModelContext;
 import com.celements.model.metadata.DocumentMetaData;
@@ -162,12 +163,12 @@ public class IndexRebuilder {
           long count = rebuildIndex(searcher, filterRef);
           LOGGER.info("Lucene index rebuild finished for [{}]: {}", logRef(filterRef), count);
           future.complete(count);
-        } catch (IOException exc) {
-          LOGGER.error("Error in lucene rebuild thread: {}", exc.getMessage(), exc);
-          future.completeExceptionally(exc);
         } catch (InterruptedException exc) {
           future.completeExceptionally(exc);
           Thread.currentThread().interrupt();
+        } catch (Exception exc) {
+          LOGGER.error("Error in lucene rebuild thread: {}", exc.getMessage(), exc);
+          future.completeExceptionally(exc);
         }
       }
     }, rebuildExecutor);
@@ -248,7 +249,9 @@ public class IndexRebuilder {
         }
       }
     } catch (DocumentNotExistsException exc) {
-      LOGGER.warn("failed to queue doc '{}'", metaData);
+      LOGGER.info("unable to queue inexistent doc '{}'", metaData);
+    } catch (DocumentLoadException exc) {
+      LOGGER.error("failed to queue doc '{}': {}", metaData, exc);
     }
     return retval;
   }
