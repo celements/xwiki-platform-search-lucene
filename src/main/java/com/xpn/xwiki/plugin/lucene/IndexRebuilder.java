@@ -129,11 +129,6 @@ public class IndexRebuilder {
   private final Executor rebuildExecutor = Executors.newSingleThreadExecutor();
   private final AtomicReference<CompletableFuture<Long>> latestFuture = new AtomicReference<>();
 
-  /**
-   * Reference to filter reindex data with.
-   */
-  private AtomicReference<EntityReference> filterRef = new AtomicReference<>();
-
   public IndexRebuilder(IndexUpdater indexUpdater) {
     this.indexUpdater = indexUpdater;
     this.retryInterval = 1000 * (int) getContext().getXWikiContext().getWiki()
@@ -142,28 +137,28 @@ public class IndexRebuilder {
         .ParamAsLong(PROP_MAX_QUEUE_SIZE, 1000);
   }
 
-  public CompletableFuture<Long> startIndexRebuild(EntityReference entityRef) {
-    this.filterRef.set(References.cloneRef(firstNonNull(entityRef, getContext().getWikiRef())));
-    WikiReference wikiRef = References.extractRef(filterRef.get(), WikiReference.class).get();
-    return ContextExecutor.executeInWiki(wikiRef, this::rebuildIndexAsync);
-  }
-
   public Optional<CompletableFuture<Long>> getLatestRebuildFuture() {
     return Optional.ofNullable(latestFuture.get());
   }
 
-  private CompletableFuture<Long> rebuildIndexAsync() {
+  public CompletableFuture<Long> startIndexRebuild(EntityReference entityRef) {
+    final EntityReference filterRef = References.cloneRef(
+        firstNonNull(entityRef, getContext().getWikiRef()));
+    WikiReference wikiRef = References.extractRef(filterRef, WikiReference.class).get();
+    return ContextExecutor.executeInWiki(wikiRef, () -> rebuildIndexAsync(filterRef));
+  }
+
+  private CompletableFuture<Long> rebuildIndexAsync(final EntityReference filterRef) {
     CompletableFuture<Long> future = new CompletableFuture<>();
-    latestFuture.set(future);
     CompletableFuture.runAsync(new AbstractXWikiRunnable(
         XWikiContext.EXECUTIONCONTEXT_KEY, getContext().getXWikiContext().clone()) {
 
       @Override
       protected void runInternal() {
-        LOGGER.info("Lucene index rebuild started for [{}]", filterRef.get());
+        LOGGER.info("Lucene index rebuild started for [{}]", filterRef);
         try (IndexSearcher searcher = new IndexSearcher(indexUpdater.getDirectory(), true)) {
-          long count = rebuildIndex(searcher);
-          LOGGER.info("Lucene index rebuild finished for [{}]: {}", filterRef.get(), count);
+          long count = rebuildIndex(searcher, filterRef);
+          LOGGER.info("Lucene index rebuild finished for [{}]: {}", filterRef, count);
           future.complete(count);
         } catch (IOException exc) {
           LOGGER.error("Error in lucene rebuild thread: {}", exc.getMessage(), exc);
@@ -174,16 +169,17 @@ public class IndexRebuilder {
         }
       }
     }, rebuildExecutor);
+    latestFuture.set(future);
     return future;
 
   }
 
-  protected long rebuildIndex(@NotNull IndexSearcher searcher)
+  protected long rebuildIndex(IndexSearcher searcher, EntityReference filterRef)
       throws IOException, InterruptedException {
     long ret = 0;
     long count = 0;
-    Set<String> docsInIndex = getAllIndexedDocs(filterRef.get(), searcher);
-    Set<DocumentMetaData> docsToIndex = getAllDocMetaData(filterRef.get());
+    Set<String> docsInIndex = getAllIndexedDocs(filterRef, searcher);
+    Set<DocumentMetaData> docsToIndex = getAllDocMetaData(filterRef);
     for (DocumentMetaData metaData : docsToIndex) {
       String docId = getDocId(metaData);
       ret += queueDocument(metaData);
@@ -200,7 +196,7 @@ public class IndexRebuilder {
     return ret;
   }
 
-  private Set<DocumentMetaData> getAllDocMetaData(@NotNull EntityReference ref) {
+  private Set<DocumentMetaData> getAllDocMetaData(@NotNull EntityReference filterRef) {
     MetaDataStoreExtension store;
     if (getContext().getXWikiContext().getWiki().getStore() instanceof MetaDataStoreExtension) {
       store = (MetaDataStoreExtension) getContext().getXWikiContext().getWiki().getStore();
@@ -208,20 +204,20 @@ public class IndexRebuilder {
       store = (MetaDataStoreExtension) Utils.getComponent(XWikiCacheStoreInterface.class,
           DocumentCacheStore.COMPONENT_NAME);
     }
-    return store.listDocumentMetaData(ref);
+    return store.listDocumentMetaData(filterRef);
   }
 
-  public Set<String> getAllIndexedDocs(@NotNull EntityReference ref,
+  public Set<String> getAllIndexedDocs(@NotNull EntityReference filterRef,
       @NotNull IndexSearcher searcher) throws IOException {
     Set<String> ret = new HashSet<>();
-    Query query = getLuceneSearchRefQuery(ref);
+    Query query = getLuceneSearchRefQuery(filterRef);
     TotalHitCountCollector collector = new TotalHitCountCollector();
     searcher.search(query, collector);
     TopDocs topDocs = searcher.search(query, Math.max(1, collector.getTotalHits()));
     for (ScoreDoc scoreDoc : topDocs.scoreDocs) {
       ret.add(searcher.doc(scoreDoc.doc).get(IndexFields.DOCUMENT_ID));
     }
-    LOGGER.info("getAllIndexedDocs: found {} docs in index for ref '{}'", ret.size(), ref);
+    LOGGER.info("getAllIndexedDocs: found {} docs in index for ref '{}'", ret.size(), filterRef);
     return ret;
   }
 
