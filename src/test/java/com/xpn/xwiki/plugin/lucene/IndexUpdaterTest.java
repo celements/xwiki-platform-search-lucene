@@ -24,15 +24,14 @@ import static org.easymock.EasyMock.*;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Date;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Semaphore;
 
-import javax.validation.constraints.NotNull;
-
 import org.apache.lucene.index.IndexWriter;
-import org.apache.lucene.search.IndexSearcher;
 import org.junit.Before;
 import org.junit.Test;
 import org.xwiki.model.reference.DocumentReference;
+import org.xwiki.model.reference.EntityReference;
 import org.xwiki.rendering.syntax.Syntax;
 
 import com.celements.common.test.AbstractBridgedComponentTestCase;
@@ -69,9 +68,8 @@ public class IndexUpdaterTest extends AbstractBridgedComponentTestCase {
     }
 
     @Override
-    protected long rebuildIndex(@NotNull IndexSearcher searcher)
-        throws IOException, InterruptedException {
-      long ret = super.rebuildIndex(searcher);
+    protected CompletableFuture<Long> rebuildIndexAsync(EntityReference filterRef) {
+      CompletableFuture<Long> ret = super.rebuildIndexAsync(filterRef);
       IndexUpdaterTest.this.rebuildDone.release();
       return ret;
     }

@@ -150,7 +150,7 @@ public class IndexRebuilder {
     return ContextExecutor.executeInWiki(wikiRef, () -> rebuildIndexAsync(filterRef));
   }
 
-  private CompletableFuture<Long> rebuildIndexAsync(final EntityReference filterRef) {
+  protected CompletableFuture<Long> rebuildIndexAsync(final EntityReference filterRef) {
     CompletableFuture<Long> future = new CompletableFuture<>();
     CompletableFuture.runAsync(new AbstractXWikiRunnable(
         XWikiContext.EXECUTIONCONTEXT_KEY, getContext().getXWikiContext().clone()) {
@@ -175,7 +175,7 @@ public class IndexRebuilder {
     return future;
   }
 
-  protected long rebuildIndex(IndexSearcher searcher, EntityReference filterRef)
+  private long rebuildIndex(IndexSearcher searcher, EntityReference filterRef)
       throws IOException, InterruptedException {
     long ret = 0;
     long count = 0;
