@@ -23,7 +23,7 @@ import static com.celements.logging.LogUtils.*;
 import static com.google.common.base.MoreObjects.*;
 
 import java.io.IOException;
-import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -67,6 +67,9 @@ import com.xpn.xwiki.doc.XWikiDocument;
 import com.xpn.xwiki.store.XWikiCacheStoreInterface;
 import com.xpn.xwiki.util.AbstractXWikiRunnable;
 import com.xpn.xwiki.web.Utils;
+
+import gnu.trove.set.hash.THashSet;
+import gnu.trove.set.hash.TLinkedHashSet;
 
 /**
  * <p>
@@ -158,16 +161,16 @@ public class IndexRebuilder {
 
       @Override
       protected void runInternal() {
-        LOGGER.info("Lucene index rebuild started for [{}]", logRef(filterRef));
+        LOGGER.info("start - [{}]", logRef(filterRef));
         try (IndexSearcher searcher = new IndexSearcher(indexUpdater.getDirectory(), true)) {
           long count = rebuildIndex(searcher, filterRef);
-          LOGGER.info("Lucene index rebuild finished for [{}]: {}", logRef(filterRef), count);
+          LOGGER.info("finished - [{}]: {}", logRef(filterRef), count);
           future.complete(count);
         } catch (InterruptedException exc) {
           future.completeExceptionally(exc);
           Thread.currentThread().interrupt();
         } catch (Exception exc) {
-          LOGGER.error("Error in lucene rebuild thread: {}", exc.getMessage(), exc);
+          LOGGER.error("failed - [{}]: {}", filterRef, exc.getMessage(), exc);
           future.completeExceptionally(exc);
         }
       }
@@ -180,25 +183,25 @@ public class IndexRebuilder {
       throws IOException, InterruptedException {
     long ret = 0;
     long count = 0;
-    Set<String> docsInIndex = getAllIndexedDocs(filterRef, searcher);
-    Set<DocumentMetaData> docsToIndex = getAllDocMetaData(filterRef);
-    for (DocumentMetaData metaData : docsToIndex) {
+    Set<DocumentMetaData> docsToIndex = getDocsToIndex(filterRef);
+    Set<String> docsDangling = getDocsInIndex(filterRef, searcher);
+    int toIndexCount = docsToIndex.size();
+    for (Iterator<DocumentMetaData> iter = docsToIndex.iterator(); iter.hasNext();) {
+      DocumentMetaData metaData = iter.next();
       String docId = getDocId(metaData);
       ret += queueDocument(metaData);
       LOGGER.trace("indexed {}", docId);
-      if (!docsInIndex.remove(docId)) {
-        LOGGER.debug("couldn't reduce remaining docs for docId '{}'", docId);
-      }
+      iter.remove();
+      docsDangling.remove(docId);
       if ((++count % 500) == 0) {
-        LOGGER.info("indexed docs {}/{}, {} docs remaining", count, docsToIndex.size(),
-            docsInIndex.size());
+        LOGGER.info("indexed {}/{} with {} dangling", count, toIndexCount, docsDangling.size());
       }
     }
-    cleanIndex(docsInIndex);
+    cleanIndex(docsDangling);
     return ret;
   }
 
-  private Set<DocumentMetaData> getAllDocMetaData(@NotNull EntityReference filterRef) {
+  private Set<DocumentMetaData> getDocsToIndex(@NotNull EntityReference ref) {
     MetaDataStoreExtension store;
     if (getContext().getXWikiContext().getWiki().getStore() instanceof MetaDataStoreExtension) {
       store = (MetaDataStoreExtension) getContext().getXWikiContext().getWiki().getStore();
@@ -206,12 +209,14 @@ public class IndexRebuilder {
       store = (MetaDataStoreExtension) Utils.getComponent(XWikiCacheStoreInterface.class,
           DocumentCacheStore.COMPONENT_NAME);
     }
-    return store.listDocumentMetaData(filterRef);
+    Set<DocumentMetaData> ret = new TLinkedHashSet<>(store.listDocumentMetaData(ref));
+    LOGGER.info("getDocsToIndex - {} for [{}]", ret.size(), logRef(ref));
+    return ret;
   }
 
-  public Set<String> getAllIndexedDocs(@NotNull EntityReference ref,
-      @NotNull IndexSearcher searcher) throws IOException {
-    Set<String> ret = new HashSet<>();
+  private Set<String> getDocsInIndex(@NotNull EntityReference ref, @NotNull IndexSearcher searcher)
+      throws IOException {
+    Set<String> ret = new THashSet<>();
     Query query = getLuceneSearchRefQuery(ref);
     TotalHitCountCollector collector = new TotalHitCountCollector();
     searcher.search(query, collector);
@@ -219,12 +224,12 @@ public class IndexRebuilder {
     for (ScoreDoc scoreDoc : topDocs.scoreDocs) {
       ret.add(searcher.doc(scoreDoc.doc).get(IndexFields.DOCUMENT_ID));
     }
-    LOGGER.info("getAllIndexedDocs: found {} docs in index for ref '{}'", ret.size(), logRef(ref));
+    LOGGER.info("getDocsInIndex - {} for [{}]", ret.size(), logRef(ref));
     return ret;
   }
 
   private void cleanIndex(Set<String> danglingDocs) throws InterruptedException {
-    LOGGER.info("cleanIndex: for {} dangling docs", danglingDocs.size());
+    LOGGER.info("cleanIndex - for [{}] dangling docs", danglingDocs.size());
     danglingDocs.remove(null);
     danglingDocs.remove("");
     for (String docId : danglingDocs) {
