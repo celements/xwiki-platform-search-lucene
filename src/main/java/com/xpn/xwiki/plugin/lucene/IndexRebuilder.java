@@ -19,6 +19,7 @@
  */
 package com.xpn.xwiki.plugin.lucene;
 
+import static com.celements.logging.LogUtils.*;
 import static com.google.common.base.MoreObjects.*;
 
 import java.io.IOException;
@@ -29,6 +30,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 
 import javax.validation.constraints.NotNull;
 
@@ -155,10 +157,10 @@ public class IndexRebuilder {
 
       @Override
       protected void runInternal() {
-        LOGGER.info("Lucene index rebuild started for [{}]", filterRef);
+        LOGGER.info("Lucene index rebuild started for [{}]", logRef(filterRef));
         try (IndexSearcher searcher = new IndexSearcher(indexUpdater.getDirectory(), true)) {
           long count = rebuildIndex(searcher, filterRef);
-          LOGGER.info("Lucene index rebuild finished for [{}]: {}", filterRef, count);
+          LOGGER.info("Lucene index rebuild finished for [{}]: {}", logRef(filterRef), count);
           future.complete(count);
         } catch (IOException exc) {
           LOGGER.error("Error in lucene rebuild thread: {}", exc.getMessage(), exc);
@@ -171,7 +173,6 @@ public class IndexRebuilder {
     }, rebuildExecutor);
     latestFuture.set(future);
     return future;
-
   }
 
   protected long rebuildIndex(IndexSearcher searcher, EntityReference filterRef)
@@ -207,17 +208,17 @@ public class IndexRebuilder {
     return store.listDocumentMetaData(filterRef);
   }
 
-  public Set<String> getAllIndexedDocs(@NotNull EntityReference filterRef,
+  public Set<String> getAllIndexedDocs(@NotNull EntityReference ref,
       @NotNull IndexSearcher searcher) throws IOException {
     Set<String> ret = new HashSet<>();
-    Query query = getLuceneSearchRefQuery(filterRef);
+    Query query = getLuceneSearchRefQuery(ref);
     TotalHitCountCollector collector = new TotalHitCountCollector();
     searcher.search(query, collector);
     TopDocs topDocs = searcher.search(query, Math.max(1, collector.getTotalHits()));
     for (ScoreDoc scoreDoc : topDocs.scoreDocs) {
       ret.add(searcher.doc(scoreDoc.doc).get(IndexFields.DOCUMENT_ID));
     }
-    LOGGER.info("getAllIndexedDocs: found {} docs in index for ref '{}'", ret.size(), filterRef);
+    LOGGER.info("getAllIndexedDocs: found {} docs in index for ref '{}'", ret.size(), logRef(ref));
     return ret;
   }
 
@@ -298,6 +299,10 @@ public class IndexRebuilder {
       sb.append("default");
     }
     return sb.toString();
+  }
+
+  private final Supplier<String> logRef(EntityReference ref) {
+    return defer(() -> getModelUtils().serializeRef(ref));
   }
 
   private static IModelAccessFacade getModelAccess() {
