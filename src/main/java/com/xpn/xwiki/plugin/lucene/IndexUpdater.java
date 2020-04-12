@@ -297,7 +297,7 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
   public void commitIndex() throws IOException {
     LOGGER.debug("commitIndex");
     writer.commit();
-    plugin.openSearchers();
+    plugin.closeSearcherProvider();
   }
 
   public void queueDeletion(String docId) {
