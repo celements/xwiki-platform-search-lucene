@@ -62,6 +62,7 @@ import org.xwiki.context.Execution;
 import org.xwiki.observation.ObservationManager;
 
 import com.celements.search.lucene.LuceneDocType;
+import com.celements.search.lucene.index.rebuild.LuceneIndexRebuildService;
 import com.google.common.base.Strings;
 import com.google.common.collect.Iterables;
 import com.xpn.xwiki.XWikiContext;
@@ -659,6 +660,7 @@ public class LucenePlugin extends XWikiDefaultPlugin {
       IndexWriter writer = openWriter(getWriteDirectory(), OpenMode.CREATE_OR_APPEND);
       this.indexUpdater = new IndexUpdater(writer, this, context);
       indexUpdaterExecutor.submit(indexUpdater);
+      getIndexRebuildService().initialize(indexUpdater);
       openSearchers();
       registerIndexUpdater();
       LOGGER.info("Lucene plugin initialized.");
@@ -853,6 +855,10 @@ public class LucenePlugin extends XWikiDefaultPlugin {
 
   private ISearcherProviderRole getSearcherProviderManager() {
     return Utils.getComponent(ISearcherProviderRole.class);
+  }
+
+  private LuceneIndexRebuildService getIndexRebuildService() {
+    return Utils.getComponent(LuceneIndexRebuildService.class);
   }
 
 }
