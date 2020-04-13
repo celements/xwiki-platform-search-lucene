@@ -122,9 +122,8 @@ public class IndexRebuilder implements LuceneIndexRebuildService {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(IndexRebuilder.class);
 
-  static final String PROP_UPDATER_RETRY_INTERVAL = "xwiki.plugins.lucene.updaterRetryInterval";
-
   static final String PROP_MAX_QUEUE_SIZE = "xwiki.plugins.lucene.maxQueueSize";
+  static final String PROP_PAUSE_DURATION = "xwiki.plugins.lucene.pauseDuration";
 
   @Requirement
   private IModelAccessFacade modelAccess;
@@ -136,9 +135,9 @@ public class IndexRebuilder implements LuceneIndexRebuildService {
   private ModelContext context;
 
   /**
-   * seconds to sleep while waiting for the indexing queue to empty.
+   * seconds to pause while waiting for the indexing queue to empty.
    */
-  private AtomicLong retryInterval = new AtomicLong(30);
+  private AtomicLong pauseDuration = new AtomicLong(30);
 
   /**
    * Soft threshold after which no more documents will be added to the indexing queue.
@@ -162,7 +161,7 @@ public class IndexRebuilder implements LuceneIndexRebuildService {
   public void initialize(IndexUpdater indexUpdater) {
     checkState(this.indexUpdater.compareAndSet(null, checkNotNull(indexUpdater)),
         "LuceneIndexRebuildService already initialized");
-    this.retryInterval.set(getXContext().getWiki().ParamAsLong(PROP_UPDATER_RETRY_INTERVAL, 30));
+    this.pauseDuration.set(getXContext().getWiki().ParamAsLong(PROP_PAUSE_DURATION, 30));
     this.maxQueueSize.set(getXContext().getWiki().ParamAsLong(PROP_MAX_QUEUE_SIZE, 1000));
     LOGGER.info("LuceneIndexRebuildService initialized");
   }
@@ -212,16 +211,16 @@ public class IndexRebuilder implements LuceneIndexRebuildService {
 
           @Override
           protected void runInternal() {
-            LOGGER.info("start - [{}]", logRef(filterRef));
+            LOGGER.info("[{}] - started", logRef(filterRef));
             try (IndexSearcher searcher = new IndexSearcher(directory, true)) {
               long count = rebuildIndex(searcher, filterRef);
-              LOGGER.info("finished - [{}]: {}", logRef(filterRef), count);
+              LOGGER.info("[{}] - finished: {}", logRef(filterRef), count);
               future.complete(count);
             } catch (InterruptedException exc) {
               future.completeExceptionally(exc);
               Thread.currentThread().interrupt();
             } catch (Exception exc) {
-              LOGGER.error("failed - [{}]: {}", filterRef, exc.getMessage(), exc);
+              LOGGER.error("[{}] - failed: {}", filterRef, exc.getMessage(), exc);
               future.completeExceptionally(exc);
             }
           }
@@ -252,6 +251,8 @@ public class IndexRebuilder implements LuceneIndexRebuildService {
     Set<DocumentMetaData> docsToIndex = getAllDocMetaData(filterRef);
     Set<String> docsDangling = getAllIndexedDocs(filterRef, searcher);
     int toIndexCount = docsToIndex.size();
+    LOGGER.info("[{}] - indexing {} docs with {} dangling",
+        logRef(filterRef), toIndexCount, docsDangling.size());
     for (Iterator<DocumentMetaData> iter = docsToIndex.iterator(); iter.hasNext();) {
       DocumentMetaData metaData = iter.next();
       String docId = getDocId(metaData);
@@ -259,10 +260,13 @@ public class IndexRebuilder implements LuceneIndexRebuildService {
       LOGGER.trace("indexed {}", docId);
       iter.remove();
       docsDangling.remove(docId);
-      if ((++count % 500) == 0) {
-        LOGGER.info("indexed {}/{} with {} dangling", count, toIndexCount, docsDangling.size());
+      if ((++count % 1000) == 0) {
+        LOGGER.info("[{}] - indexed {}/{} with {} dangling",
+            logRef(filterRef), count, toIndexCount, docsDangling.size());
       }
     }
+    LOGGER.info("[{}] - indexed {} docs with {} dangling",
+        logRef(filterRef), count, docsDangling.size());
     cleanIndex(docsDangling);
     return ret;
   }
@@ -275,14 +279,11 @@ public class IndexRebuilder implements LuceneIndexRebuildService {
       store = (MetaDataStoreExtension) Utils.getComponent(XWikiCacheStoreInterface.class,
           DocumentCacheStore.COMPONENT_NAME);
     }
-    Set<DocumentMetaData> ret = new TLinkedHashSet<>(store.listDocumentMetaData(ref));
-    LOGGER.info("getDocsToIndex - {} for [{}]", ret.size(), logRef(ref));
-    return ret;
+    return new TLinkedHashSet<>(store.listDocumentMetaData(ref));
   }
 
   private Set<String> getAllIndexedDocs(@NotNull EntityReference ref,
-      @NotNull IndexSearcher searcher)
-      throws IOException {
+      @NotNull IndexSearcher searcher) throws IOException {
     Set<String> ret = new THashSet<>();
     Query query = getLuceneSearchRefQuery(ref);
     TotalHitCountCollector collector = new TotalHitCountCollector();
@@ -291,18 +292,17 @@ public class IndexRebuilder implements LuceneIndexRebuildService {
     for (ScoreDoc scoreDoc : topDocs.scoreDocs) {
       ret.add(searcher.doc(scoreDoc.doc).get(IndexFields.DOCUMENT_ID));
     }
-    LOGGER.info("getDocsInIndex - {} for [{}]", ret.size(), logRef(ref));
     return ret;
   }
 
   private void cleanIndex(Set<String> danglingDocs) throws InterruptedException {
-    LOGGER.info("cleanIndex - for [{}] dangling docs", danglingDocs.size());
+    LOGGER.info("cleanIndex for [{}] dangling docs", danglingDocs.size());
     danglingDocs.remove(null);
     danglingDocs.remove("");
     for (String docId : danglingDocs) {
       waitIfPaused();
       queue(new DeleteData(docId));
-      LOGGER.trace("cleanIndex: deleted doc: {}", docId);
+      LOGGER.trace("cleanIndex {}", docId);
     }
   }
 
@@ -334,9 +334,10 @@ public class IndexRebuilder implements LuceneIndexRebuildService {
 
   @Override
   public void pause(Duration duration) {
-    Instant until = Instant.now().plus(Optional.ofNullable(duration).orElse(Duration.ZERO));
+    duration = Optional.ofNullable(duration).orElse(Duration.ZERO);
+    Instant until = Instant.now().plus(duration);
     paused.set(until);
-    LOGGER.info("paused until {}", until.atZone(DateUtil.getDefaultZone()));
+    LOGGER.info("paused for {} until {}", duration, until.atZone(DateUtil.getDefaultZone()));
   }
 
   private void waitIfPaused() throws InterruptedException {
@@ -346,6 +347,7 @@ public class IndexRebuilder implements LuceneIndexRebuildService {
         Duration timeout = Duration.between(Instant.now(), paused.get());
         LOGGER.debug("waiting for {}", timeout);
         paused.wait(Math.max(timeout.toMillis(), 0));
+        LOGGER.debug("waiting ended");
       }
       pauseIfHighQueueSize();
     }
@@ -373,8 +375,8 @@ public class IndexRebuilder implements LuceneIndexRebuildService {
       // Don't leave any database connections open while sleeping
       // This shouldn't be needed, but we never know what bugs might be there
       getXContext().getWiki().getStore().cleanUp(getXContext());
-      LOGGER.debug("pausing for {}s since queue size {} too big", retryInterval.get(), queueSize);
-      paused.set(Instant.now().plusSeconds(retryInterval.get()));
+      LOGGER.debug("pausing for {}s since queue size {} too big", pauseDuration.get(), queueSize);
+      paused.set(Instant.now().plusSeconds(pauseDuration.get()));
     }
   }
 
