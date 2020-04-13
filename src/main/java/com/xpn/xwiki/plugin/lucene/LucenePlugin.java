@@ -27,7 +27,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -175,7 +174,7 @@ public class LucenePlugin extends XWikiDefaultPlugin {
     super.finalize();
   }
 
-  public CompletableFuture<Long> rebuildIndex(EntityReference ref) {
+  public IndexRebuildFuture rebuildIndex(EntityReference ref) {
     return indexRebuilder.startIndexRebuild(ref);
   }
 
