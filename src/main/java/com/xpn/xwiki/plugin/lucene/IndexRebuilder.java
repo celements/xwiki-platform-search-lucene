@@ -21,6 +21,7 @@ package com.xpn.xwiki.plugin.lucene;
 
 import static com.celements.logging.LogUtils.*;
 import static com.google.common.base.Preconditions.*;
+import static com.google.common.base.Predicates.*;
 
 import java.io.IOException;
 import java.util.Iterator;
@@ -31,6 +32,8 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 
 import javax.validation.constraints.NotNull;
@@ -44,8 +47,11 @@ import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.search.TotalHitCountCollector;
+import org.apache.lucene.store.Directory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.xwiki.component.annotation.Component;
+import org.xwiki.component.annotation.Requirement;
 import org.xwiki.model.reference.DocumentReference;
 import org.xwiki.model.reference.EntityReference;
 import org.xwiki.model.reference.SpaceReference;
@@ -59,9 +65,11 @@ import com.celements.model.context.ModelContext;
 import com.celements.model.metadata.DocumentMetaData;
 import com.celements.model.util.ModelUtils;
 import com.celements.model.util.References;
+import com.celements.search.lucene.index.rebuild.LuceneIndexRebuildService;
 import com.celements.store.DocumentCacheStore;
 import com.celements.store.MetaDataStoreExtension;
 import com.google.common.base.Strings;
+import com.google.common.collect.ImmutableList;
 import com.xpn.xwiki.XWikiContext;
 import com.xpn.xwiki.doc.XWikiAttachment;
 import com.xpn.xwiki.doc.XWikiDocument;
@@ -106,7 +114,8 @@ import gnu.trove.set.hash.TLinkedHashSet;
  *
  * @version $Id: 5bb91a92a5990405edd8203dff5b4e24103af5c3 $
  */
-public class IndexRebuilder {
+@Component
+public class IndexRebuilder implements LuceneIndexRebuildService {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(IndexRebuilder.class);
 
@@ -114,10 +123,19 @@ public class IndexRebuilder {
 
   static final String PROP_MAX_QUEUE_SIZE = "xwiki.plugins.lucene.maxQueueSize";
 
+  @Requirement
+  private IModelAccessFacade modelAccess;
+
+  @Requirement
+  private ModelUtils modelUtils;
+
+  @Requirement
+  private ModelContext context;
+
   /**
-   * Amount of time (milliseconds) to sleep while waiting for the indexing queue to empty.
+   * seconds to sleep while waiting for the indexing queue to empty.
    */
-  private final int retryInterval;
+  private AtomicLong retryInterval = new AtomicLong(30);
 
   /**
    * Soft threshold after which no more documents will be added to the indexing queue.
@@ -126,62 +144,78 @@ public class IndexRebuilder {
    * size will get back bellow this threshold. This does not affect normal indexing
    * through wiki updates.
    */
-  private final long maxQueueSize;
+  private final AtomicLong maxQueueSize = new AtomicLong(1000);
 
   /**
    * The actual object/thread that indexes data.
    */
-  private final IndexUpdater indexUpdater;
+  private final AtomicReference<IndexUpdater> indexUpdater = new AtomicReference<>();
 
   private final Executor rebuildExecutor = Executors.newSingleThreadExecutor();
-  private final Queue<IndexRebuildFuture> futureQueue = new LinkedList<>();
+  private final Queue<IndexRebuildFuture> rebuildQueue = new LinkedList<>();
 
-  public IndexRebuilder(IndexUpdater indexUpdater) {
-    this.indexUpdater = indexUpdater;
-    this.retryInterval = 1000 * (int) getXContext().getWiki()
-        .ParamAsLong(PROP_UPDATER_RETRY_INTERVAL, 30);
-    this.maxQueueSize = getXContext().getWiki().ParamAsLong(PROP_MAX_QUEUE_SIZE, 1000);
+  @Override
+  public void initialize(IndexUpdater indexUpdater) {
+    this.indexUpdater.set(checkNotNull(indexUpdater));
+    this.retryInterval.set(getXContext().getWiki().ParamAsLong(PROP_UPDATER_RETRY_INTERVAL, 30));
+    this.maxQueueSize.set(getXContext().getWiki().ParamAsLong(PROP_MAX_QUEUE_SIZE, 1000));
   }
 
-  public synchronized Optional<IndexRebuildFuture> getCurrentRebuildFuture() {
-    futureQueue.removeIf(CompletableFuture::isDone);
-    return Optional.ofNullable(futureQueue.peek());
+  private IndexUpdater expectIndexUpdater() {
+    IndexUpdater ret = indexUpdater.get();
+    checkState(ret != null);
+    return ret;
   }
 
-  public synchronized IndexRebuildFuture startIndexRebuild(EntityReference filterRef) {
-    final EntityReference ref = Optional.ofNullable(filterRef).map(References::cloneRef)
-        .orElseGet(getContext()::getWikiRef);
-    futureQueue.removeIf(CompletableFuture::isDone);
-    Optional<IndexRebuildFuture> queuedFuture = futureQueue.stream()
-        .filter(f -> f.getReference().equals(ref))
-        .findFirst();
-    if (queuedFuture.isPresent()) {
-      return queuedFuture.get();
-    } else {
-      IndexRebuildFuture newFuture = new IndexRebuildFuture(ref);
-      futureQueue.add(newFuture);
-      rebuildIndexAsync(newFuture);
+  @Override
+  public synchronized Optional<IndexRebuildFuture> getRunningRebuild() {
+    return rebuildQueue.stream().filter(not(CompletableFuture::isDone)).findFirst();
+  }
+
+  @Override
+  public synchronized Optional<IndexRebuildFuture> getQueuedRebuild(EntityReference filterRef) {
+    return rebuildQueue.stream().filter(f -> f.getReference().equals(filterRef)).findFirst();
+  }
+
+  @Override
+  public synchronized ImmutableList<IndexRebuildFuture> getQueuedRebuilds() {
+    return ImmutableList.copyOf(rebuildQueue);
+  }
+
+  @Override
+  public synchronized IndexRebuildFuture startIndexRebuild(final EntityReference filterRef) {
+    rebuildQueue.removeIf(CompletableFuture::isDone);
+    return getQueuedRebuild(filterRef).orElseGet(() -> {
+      IndexRebuildFuture newFuture = new IndexRebuildFuture(filterRef);
+      rebuildQueue.add(newFuture);
+      try {
+        rebuildIndexAsync(newFuture);
+      } catch (Exception exc) {
+        newFuture.completeExceptionally(exc);
+      }
       return newFuture;
-    }
+    });
   }
 
   protected void rebuildIndexAsync(final IndexRebuildFuture future) {
-    WikiReference wikiRef = References.extractRef(future.ref, WikiReference.class).get();
+    final EntityReference filterRef = future.getReference();
+    final Directory directory = expectIndexUpdater().getDirectory();
+    WikiReference wikiRef = References.extractRef(filterRef, WikiReference.class).get();
     ContextExecutor.executeInWiki(wikiRef, () -> CompletableFuture.runAsync(
         new AbstractXWikiRunnable(XWikiContext.EXECUTIONCONTEXT_KEY, getXContext().clone()) {
 
           @Override
           protected void runInternal() {
-            LOGGER.info("start - [{}]", logRef(future.ref));
-            try (IndexSearcher searcher = new IndexSearcher(indexUpdater.getDirectory(), true)) {
-              long count = rebuildIndex(searcher, future.ref);
-              LOGGER.info("finished - [{}]: {}", logRef(future.ref), count);
+            LOGGER.info("start - [{}]", logRef(filterRef));
+            try (IndexSearcher searcher = new IndexSearcher(directory, true)) {
+              long count = rebuildIndex(searcher, filterRef);
+              LOGGER.info("finished - [{}]: {}", logRef(filterRef), count);
               future.complete(count);
             } catch (InterruptedException exc) {
               future.completeExceptionally(exc);
               Thread.currentThread().interrupt();
             } catch (Exception exc) {
-              LOGGER.error("failed - [{}]: {}", future.ref, exc.getMessage(), exc);
+              LOGGER.error("failed - [{}]: {}", filterRef, exc.getMessage(), exc);
               future.completeExceptionally(exc);
             }
           }
@@ -251,12 +285,11 @@ public class IndexRebuilder {
   protected int queueDocument(DocumentMetaData metaData) throws InterruptedException {
     int retval = 0;
     try {
-      XWikiDocument doc = getModelAccess().getDocument(metaData.getDocRef(),
-          metaData.getLanguage());
+      XWikiDocument doc = modelAccess.getDocument(metaData.getDocRef(), metaData.getLanguage());
       waitForLowQueueSize();
       queue(new DocumentData(doc, false));
       ++retval;
-      if (!getModelAccess().isTranslation(doc)) {
+      if (!modelAccess.isTranslation(doc)) {
         for (XWikiAttachment att : doc.getAttachmentList()) {
           queue(new AttachmentData(att, false));
           ++retval;
@@ -272,7 +305,7 @@ public class IndexRebuilder {
 
   private void queue(AbstractIndexData data) {
     data.disableObservationEventNotification();
-    indexUpdater.queue(data);
+    expectIndexUpdater().queue(data);
   }
 
   // In order not to load the whole database in memory, we're limiting the number
@@ -283,12 +316,12 @@ public class IndexRebuilder {
   // to limit the index rebuilder thread only, and not the index updater.
   private void waitForLowQueueSize() throws InterruptedException {
     long size;
-    while ((size = indexUpdater.getQueueSize()) > maxQueueSize) {
+    while ((size = expectIndexUpdater().getQueueSize()) > maxQueueSize.get()) {
       // Don't leave any database connections open while sleeping
       // This shouldn't be needed, but we never know what bugs might be there
       getXContext().getWiki().getStore().cleanUp(getXContext());
-      LOGGER.debug("sleeping for {}ms since queue size {} too big", retryInterval, size);
-      Thread.sleep(retryInterval);
+      LOGGER.debug("sleeping for {}ms since queue size {} too big", retryInterval.get(), size);
+      Thread.sleep(retryInterval.get() * 1000);
     }
   }
 
@@ -306,9 +339,9 @@ public class IndexRebuilder {
     return query;
   }
 
-  static String getDocId(DocumentMetaData metaData) {
+  private String getDocId(DocumentMetaData metaData) {
     StringBuilder sb = new StringBuilder();
-    sb.append(getModelUtils().serializeRef(metaData.getDocRef()));
+    sb.append(modelUtils.serializeRef(metaData.getDocRef()));
     sb.append(".");
     if (!Strings.isNullOrEmpty(metaData.getLanguage())) {
       sb.append(metaData.getLanguage());
@@ -319,37 +352,11 @@ public class IndexRebuilder {
   }
 
   private final Supplier<String> logRef(EntityReference ref) {
-    return defer(() -> getModelUtils().serializeRef(ref));
+    return defer(() -> modelUtils.serializeRef(ref));
   }
 
-  private static IModelAccessFacade getModelAccess() {
-    return Utils.getComponent(IModelAccessFacade.class);
-  }
-
-  private static ModelUtils getModelUtils() {
-    return Utils.getComponent(ModelUtils.class);
-  }
-
-  private static ModelContext getContext() {
-    return Utils.getComponent(ModelContext.class);
-  }
-
-  private static XWikiContext getXContext() {
-    return getContext().getXWikiContext();
-  }
-
-  public static final class IndexRebuildFuture extends CompletableFuture<Long> {
-
-    private final EntityReference ref;
-
-    private IndexRebuildFuture(EntityReference ref) {
-      this.ref = checkNotNull(ref);
-    }
-
-    @NotNull
-    public EntityReference getReference() {
-      return References.cloneRef(ref);
-    }
+  private final XWikiContext getXContext() {
+    return context.getXWikiContext();
   }
 
 }

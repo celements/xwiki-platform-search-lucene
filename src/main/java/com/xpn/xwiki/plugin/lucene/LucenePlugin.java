@@ -24,7 +24,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -60,7 +59,6 @@ import org.apache.lucene.util.Version;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.xwiki.context.Execution;
-import org.xwiki.model.reference.EntityReference;
 import org.xwiki.observation.ObservationManager;
 
 import com.celements.search.lucene.LuceneDocType;
@@ -73,7 +71,6 @@ import com.xpn.xwiki.doc.XWikiAttachment;
 import com.xpn.xwiki.doc.XWikiDocument;
 import com.xpn.xwiki.plugin.XWikiDefaultPlugin;
 import com.xpn.xwiki.plugin.XWikiPluginInterface;
-import com.xpn.xwiki.plugin.lucene.IndexRebuilder.IndexRebuildFuture;
 import com.xpn.xwiki.plugin.lucene.searcherProvider.ISearcherProviderRole;
 import com.xpn.xwiki.plugin.lucene.searcherProvider.SearcherProvider;
 import com.xpn.xwiki.web.Utils;
@@ -124,8 +121,6 @@ public class LucenePlugin extends XWikiDefaultPlugin {
    */
   volatile IndexUpdater indexUpdater;
 
-  volatile IndexRebuilder indexRebuilder;
-
   /**
    * The Lucene text analyzer, can be configured in <tt>xwiki.cfg</tt> using the key
    * {@link #PROP_ANALYZER} ( <tt>xwiki.plugins.lucene.analyzer</tt>).
@@ -172,14 +167,6 @@ public class LucenePlugin extends XWikiDefaultPlugin {
       this.indexUpdater.doExit();
     }
     super.finalize();
-  }
-
-  public IndexRebuildFuture rebuildIndex(EntityReference ref) {
-    return indexRebuilder.startIndexRebuild(ref);
-  }
-
-  public Optional<IndexRebuildFuture> getCurrentRebuildFuture() {
-    return indexRebuilder.getCurrentRebuildFuture();
   }
 
   /**
@@ -672,7 +659,6 @@ public class LucenePlugin extends XWikiDefaultPlugin {
       IndexWriter writer = openWriter(getWriteDirectory(), OpenMode.CREATE_OR_APPEND);
       this.indexUpdater = new IndexUpdater(writer, this, context);
       indexUpdaterExecutor.submit(indexUpdater);
-      this.indexRebuilder = new IndexRebuilder(indexUpdater);
       openSearchers();
       registerIndexUpdater();
       LOGGER.info("Lucene plugin initialized.");

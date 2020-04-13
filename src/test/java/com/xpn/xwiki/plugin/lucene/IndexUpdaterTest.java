@@ -62,7 +62,8 @@ public class IndexUpdaterTest extends AbstractBridgedComponentTestCase {
   private class TestIndexRebuilder extends IndexRebuilder {
 
     public TestIndexRebuilder(IndexUpdater indexUpdater) {
-      super(indexUpdater);
+      super();
+      initialize(indexUpdater);
     }
 
     @Override
