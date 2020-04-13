@@ -47,7 +47,7 @@ public interface LuceneIndexRebuildService {
 
     @Override
     public String toString() {
-      return "IndexRebuildFuture [ref=" + ref + ", " + super.toString() + "]";
+      return "[" + super.toString() + ", ref=" + ref + "]";
     }
   }
 
