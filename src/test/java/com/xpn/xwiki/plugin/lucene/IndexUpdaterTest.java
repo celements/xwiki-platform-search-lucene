@@ -130,7 +130,7 @@ public class IndexUpdaterTest extends AbstractBridgedComponentTestCase {
         "").anyTimes();
     expect(mockXWiki.Param(eq(LucenePlugin.PROP_INDEX_DIR))).andReturn(
         IndexUpdaterTest.INDEXDIR).anyTimes();
-    expect(mockXWiki.ParamAsLong(eq(IndexRebuilder.PROP_UPDATER_RETRY_INTERVAL), eq(
+    expect(mockXWiki.ParamAsLong(eq(IndexRebuilder.PROP_PAUSE_DURATION), eq(
         30L))).andReturn(1L).anyTimes();
     expect(mockXWiki.search(anyObject(String.class), anyObject(XWikiContext.class))).andReturn(
         Collections.emptyList()).anyTimes();
