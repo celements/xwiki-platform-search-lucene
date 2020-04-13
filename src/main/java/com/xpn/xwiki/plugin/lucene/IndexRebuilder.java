@@ -156,8 +156,8 @@ public class IndexRebuilder implements LuceneIndexRebuildService {
 
   @Override
   public void initialize(IndexUpdater indexUpdater) {
-    checkState(this.indexUpdater == null, "LuceneIndexRebuildService already initialized");
-    this.indexUpdater.set(checkNotNull(indexUpdater));
+    checkState(this.indexUpdater.compareAndSet(null, checkNotNull(indexUpdater)),
+        "LuceneIndexRebuildService already initialized");
     this.retryInterval.set(getXContext().getWiki().ParamAsLong(PROP_UPDATER_RETRY_INTERVAL, 30));
     this.maxQueueSize.set(getXContext().getWiki().ParamAsLong(PROP_MAX_QUEUE_SIZE, 1000));
     LOGGER.info("LuceneIndexRebuildService initialized");
