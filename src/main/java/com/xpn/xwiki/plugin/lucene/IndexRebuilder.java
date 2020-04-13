@@ -20,16 +20,17 @@
 package com.xpn.xwiki.plugin.lucene;
 
 import static com.celements.logging.LogUtils.*;
-import static com.google.common.base.MoreObjects.*;
+import static com.google.common.base.Preconditions.*;
 
 import java.io.IOException;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.Optional;
+import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 
 import javax.validation.constraints.NotNull;
@@ -133,50 +134,58 @@ public class IndexRebuilder {
   private final IndexUpdater indexUpdater;
 
   private final Executor rebuildExecutor = Executors.newSingleThreadExecutor();
-  private final AtomicReference<CompletableFuture<Long>> latestFuture = new AtomicReference<>();
+  private final Queue<IndexRebuildFuture> futureQueue = new LinkedList<>();
 
   public IndexRebuilder(IndexUpdater indexUpdater) {
     this.indexUpdater = indexUpdater;
-    this.retryInterval = 1000 * (int) getContext().getXWikiContext().getWiki()
+    this.retryInterval = 1000 * (int) getXContext().getWiki()
         .ParamAsLong(PROP_UPDATER_RETRY_INTERVAL, 30);
-    this.maxQueueSize = getContext().getXWikiContext().getWiki()
-        .ParamAsLong(PROP_MAX_QUEUE_SIZE, 1000);
+    this.maxQueueSize = getXContext().getWiki().ParamAsLong(PROP_MAX_QUEUE_SIZE, 1000);
   }
 
-  public Optional<CompletableFuture<Long>> getLatestRebuildFuture() {
-    return Optional.ofNullable(latestFuture.get());
+  public synchronized Optional<IndexRebuildFuture> getCurrentRebuildFuture() {
+    futureQueue.removeIf(CompletableFuture::isDone);
+    return Optional.ofNullable(futureQueue.peek());
   }
 
-  public CompletableFuture<Long> startIndexRebuild(EntityReference entityRef) {
-    final EntityReference filterRef = References.cloneRef(
-        firstNonNull(entityRef, getContext().getWikiRef()));
-    WikiReference wikiRef = References.extractRef(filterRef, WikiReference.class).get();
-    return ContextExecutor.executeInWiki(wikiRef, () -> rebuildIndexAsync(filterRef));
+  public synchronized IndexRebuildFuture startIndexRebuild(EntityReference filterRef) {
+    final EntityReference ref = Optional.ofNullable(filterRef).map(References::cloneRef)
+        .orElseGet(getContext()::getWikiRef);
+    futureQueue.removeIf(CompletableFuture::isDone);
+    Optional<IndexRebuildFuture> queuedFuture = futureQueue.stream()
+        .filter(f -> f.getReference().equals(ref))
+        .findFirst();
+    if (queuedFuture.isPresent()) {
+      return queuedFuture.get();
+    } else {
+      IndexRebuildFuture newFuture = new IndexRebuildFuture(ref);
+      futureQueue.add(newFuture);
+      rebuildIndexAsync(newFuture);
+      return newFuture;
+    }
   }
 
-  protected CompletableFuture<Long> rebuildIndexAsync(final EntityReference filterRef) {
-    CompletableFuture<Long> future = new CompletableFuture<>();
-    CompletableFuture.runAsync(new AbstractXWikiRunnable(
-        XWikiContext.EXECUTIONCONTEXT_KEY, getContext().getXWikiContext().clone()) {
+  protected void rebuildIndexAsync(final IndexRebuildFuture future) {
+    WikiReference wikiRef = References.extractRef(future.ref, WikiReference.class).get();
+    ContextExecutor.executeInWiki(wikiRef, () -> CompletableFuture.runAsync(
+        new AbstractXWikiRunnable(XWikiContext.EXECUTIONCONTEXT_KEY, getXContext().clone()) {
 
-      @Override
-      protected void runInternal() {
-        LOGGER.info("start - [{}]", logRef(filterRef));
-        try (IndexSearcher searcher = new IndexSearcher(indexUpdater.getDirectory(), true)) {
-          long count = rebuildIndex(searcher, filterRef);
-          LOGGER.info("finished - [{}]: {}", logRef(filterRef), count);
-          future.complete(count);
-        } catch (InterruptedException exc) {
-          future.completeExceptionally(exc);
-          Thread.currentThread().interrupt();
-        } catch (Exception exc) {
-          LOGGER.error("failed - [{}]: {}", filterRef, exc.getMessage(), exc);
-          future.completeExceptionally(exc);
-        }
-      }
-    }, rebuildExecutor);
-    latestFuture.set(future);
-    return future;
+          @Override
+          protected void runInternal() {
+            LOGGER.info("start - [{}]", logRef(future.ref));
+            try (IndexSearcher searcher = new IndexSearcher(indexUpdater.getDirectory(), true)) {
+              long count = rebuildIndex(searcher, future.ref);
+              LOGGER.info("finished - [{}]: {}", logRef(future.ref), count);
+              future.complete(count);
+            } catch (InterruptedException exc) {
+              future.completeExceptionally(exc);
+              Thread.currentThread().interrupt();
+            } catch (Exception exc) {
+              LOGGER.error("failed - [{}]: {}", future.ref, exc.getMessage(), exc);
+              future.completeExceptionally(exc);
+            }
+          }
+        }, rebuildExecutor));
   }
 
   private long rebuildIndex(IndexSearcher searcher, EntityReference filterRef)
@@ -203,8 +212,8 @@ public class IndexRebuilder {
 
   private Set<DocumentMetaData> getDocsToIndex(@NotNull EntityReference ref) {
     MetaDataStoreExtension store;
-    if (getContext().getXWikiContext().getWiki().getStore() instanceof MetaDataStoreExtension) {
-      store = (MetaDataStoreExtension) getContext().getXWikiContext().getWiki().getStore();
+    if (getXContext().getWiki().getStore() instanceof MetaDataStoreExtension) {
+      store = (MetaDataStoreExtension) getXContext().getWiki().getStore();
     } else {
       store = (MetaDataStoreExtension) Utils.getComponent(XWikiCacheStoreInterface.class,
           DocumentCacheStore.COMPONENT_NAME);
@@ -277,7 +286,7 @@ public class IndexRebuilder {
     while ((size = indexUpdater.getQueueSize()) > maxQueueSize) {
       // Don't leave any database connections open while sleeping
       // This shouldn't be needed, but we never know what bugs might be there
-      getContext().getXWikiContext().getWiki().getStore().cleanUp(getContext().getXWikiContext());
+      getXContext().getWiki().getStore().cleanUp(getXContext());
       LOGGER.debug("sleeping for {}ms since queue size {} too big", retryInterval, size);
       Thread.sleep(retryInterval);
     }
@@ -323,6 +332,24 @@ public class IndexRebuilder {
 
   private static ModelContext getContext() {
     return Utils.getComponent(ModelContext.class);
+  }
+
+  private static XWikiContext getXContext() {
+    return getContext().getXWikiContext();
+  }
+
+  public static final class IndexRebuildFuture extends CompletableFuture<Long> {
+
+    private final EntityReference ref;
+
+    private IndexRebuildFuture(EntityReference ref) {
+      this.ref = checkNotNull(ref);
+    }
+
+    @NotNull
+    public EntityReference getReference() {
+      return References.cloneRef(ref);
+    }
   }
 
 }

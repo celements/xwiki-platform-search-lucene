@@ -65,7 +65,6 @@ import org.xwiki.model.reference.EntityReference;
 import org.xwiki.observation.ObservationManager;
 
 import com.celements.search.lucene.LuceneDocType;
-import com.google.common.base.Stopwatch;
 import com.google.common.base.Strings;
 import com.google.common.collect.Iterables;
 import com.xpn.xwiki.XWikiContext;
@@ -75,6 +74,7 @@ import com.xpn.xwiki.doc.XWikiAttachment;
 import com.xpn.xwiki.doc.XWikiDocument;
 import com.xpn.xwiki.plugin.XWikiDefaultPlugin;
 import com.xpn.xwiki.plugin.XWikiPluginInterface;
+import com.xpn.xwiki.plugin.lucene.IndexRebuilder.IndexRebuildFuture;
 import com.xpn.xwiki.plugin.lucene.searcherProvider.ISearcherProviderRole;
 import com.xpn.xwiki.plugin.lucene.searcherProvider.SearcherProvider;
 import com.xpn.xwiki.web.Utils;
@@ -179,8 +179,8 @@ public class LucenePlugin extends XWikiDefaultPlugin {
     return indexRebuilder.startIndexRebuild(ref);
   }
 
-  public Optional<CompletableFuture<Long>> getLatestRebuildFuture() {
-    return indexRebuilder.getLatestRebuildFuture();
+  public Optional<IndexRebuildFuture> getCurrentRebuildFuture() {
+    return indexRebuilder.getCurrentRebuildFuture();
   }
 
   /**
