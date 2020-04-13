@@ -202,7 +202,7 @@ public class IndexRebuilder implements LuceneIndexRebuildService {
     final Directory directory = expectIndexUpdater().getDirectory();
     WikiReference wikiRef = References.extractRef(filterRef, WikiReference.class).get();
     ContextExecutor.executeInWiki(wikiRef, () -> CompletableFuture.runAsync(
-        new AbstractXWikiRunnable(XWikiContext.EXECUTIONCONTEXT_KEY, getXContext().clone()) {
+        new AbstractXWikiRunnable(XWikiContext.EXECUTIONCONTEXT_KEY, createJobContext()) {
 
           @Override
           protected void runInternal() {
@@ -222,12 +222,29 @@ public class IndexRebuilder implements LuceneIndexRebuildService {
         }, rebuildExecutor));
   }
 
+  /**
+   * creates a new XWikiContext instance for an async job. use ModelContextBuilder when
+   * [CELDEV-534] is complete.
+   */
+  private XWikiContext createJobContext() {
+    XWikiContext ctx = new XWikiContext();
+    ctx.setEngineContext(getXContext().getEngineContext());
+    ctx.setDatabase(getXContext().getDatabase());
+    ctx.setLanguage(getXContext().getLanguage());
+    ctx.setMainXWiki(getXContext().getMainXWiki());
+    ctx.setWiki(getXContext().getWiki());
+    ctx.getWiki().getStore().cleanUp(ctx);
+    ctx.flushClassCache();
+    ctx.flushArchiveCache();
+    return ctx;
+  }
+
   private long rebuildIndex(IndexSearcher searcher, EntityReference filterRef)
       throws IOException, InterruptedException {
     long ret = 0;
     long count = 0;
-    Set<DocumentMetaData> docsToIndex = getDocsToIndex(filterRef);
-    Set<String> docsDangling = getDocsInIndex(filterRef, searcher);
+    Set<DocumentMetaData> docsToIndex = getAllDocMetaData(filterRef);
+    Set<String> docsDangling = getAllIndexedDocs(filterRef, searcher);
     int toIndexCount = docsToIndex.size();
     for (Iterator<DocumentMetaData> iter = docsToIndex.iterator(); iter.hasNext();) {
       DocumentMetaData metaData = iter.next();
@@ -244,7 +261,7 @@ public class IndexRebuilder implements LuceneIndexRebuildService {
     return ret;
   }
 
-  private Set<DocumentMetaData> getDocsToIndex(@NotNull EntityReference ref) {
+  private Set<DocumentMetaData> getAllDocMetaData(@NotNull EntityReference ref) {
     MetaDataStoreExtension store;
     if (getXContext().getWiki().getStore() instanceof MetaDataStoreExtension) {
       store = (MetaDataStoreExtension) getXContext().getWiki().getStore();
@@ -257,7 +274,8 @@ public class IndexRebuilder implements LuceneIndexRebuildService {
     return ret;
   }
 
-  private Set<String> getDocsInIndex(@NotNull EntityReference ref, @NotNull IndexSearcher searcher)
+  private Set<String> getAllIndexedDocs(@NotNull EntityReference ref,
+      @NotNull IndexSearcher searcher)
       throws IOException {
     Set<String> ret = new THashSet<>();
     Query query = getLuceneSearchRefQuery(ref);
