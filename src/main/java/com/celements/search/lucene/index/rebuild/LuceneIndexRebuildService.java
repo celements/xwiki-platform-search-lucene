@@ -2,6 +2,7 @@ package com.celements.search.lucene.index.rebuild;
 
 import static com.google.common.base.Preconditions.*;
 
+import java.time.Duration;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
@@ -31,6 +32,10 @@ public interface LuceneIndexRebuildService {
 
   @NotNull
   IndexRebuildFuture startIndexRebuild(@NotNull EntityReference filterRef);
+
+  void pause(@Nullable Duration duration);
+
+  void unpause();
 
   public class IndexRebuildFuture extends CompletableFuture<Long> {
 

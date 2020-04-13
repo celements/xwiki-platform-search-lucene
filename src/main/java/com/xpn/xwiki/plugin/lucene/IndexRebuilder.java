@@ -24,6 +24,8 @@ import static com.google.common.base.Preconditions.*;
 import static com.google.common.base.Predicates.*;
 
 import java.io.IOException;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Optional;
@@ -57,6 +59,7 @@ import org.xwiki.model.reference.EntityReference;
 import org.xwiki.model.reference.SpaceReference;
 import org.xwiki.model.reference.WikiReference;
 
+import com.celements.common.date.DateUtil;
 import com.celements.model.access.ContextExecutor;
 import com.celements.model.access.IModelAccessFacade;
 import com.celements.model.access.exception.DocumentLoadException;
@@ -153,6 +156,7 @@ public class IndexRebuilder implements LuceneIndexRebuildService {
 
   private final Executor rebuildExecutor = Executors.newSingleThreadExecutor();
   private final Queue<IndexRebuildFuture> rebuildQueue = new LinkedList<>();
+  private final AtomicReference<Instant> paused = new AtomicReference<>(Instant.MIN);
 
   @Override
   public void initialize(IndexUpdater indexUpdater) {
@@ -296,7 +300,7 @@ public class IndexRebuilder implements LuceneIndexRebuildService {
     danglingDocs.remove(null);
     danglingDocs.remove("");
     for (String docId : danglingDocs) {
-      waitForLowQueueSize();
+      waitIfPaused();
       queue(new DeleteData(docId));
       LOGGER.trace("cleanIndex: deleted doc: {}", docId);
     }
@@ -305,8 +309,8 @@ public class IndexRebuilder implements LuceneIndexRebuildService {
   protected int queueDocument(DocumentMetaData metaData) throws InterruptedException {
     int retval = 0;
     try {
+      waitIfPaused();
       XWikiDocument doc = modelAccess.getDocument(metaData.getDocRef(), metaData.getLanguage());
-      waitForLowQueueSize();
       queue(new DocumentData(doc, false));
       ++retval;
       if (!modelAccess.isTranslation(doc)) {
@@ -328,20 +332,49 @@ public class IndexRebuilder implements LuceneIndexRebuildService {
     expectIndexUpdater().queue(data);
   }
 
+  @Override
+  public void pause(Duration duration) {
+    Instant until = Instant.now().plus(Optional.ofNullable(duration).orElse(Duration.ZERO));
+    paused.set(until);
+    LOGGER.info("paused until {}", until.atZone(DateUtil.getDefaultZone()));
+  }
+
+  private void waitIfPaused() throws InterruptedException {
+    pauseIfHighQueueSize();
+    while (paused.get().isAfter(Instant.now())) {
+      synchronized (paused) {
+        Duration timeout = Duration.between(Instant.now(), paused.get());
+        LOGGER.debug("waiting for {}", timeout);
+        paused.wait(Math.max(timeout.toMillis(), 0));
+      }
+      pauseIfHighQueueSize();
+    }
+  }
+
+  @Override
+  public void unpause() {
+    if (paused.getAndSet(Instant.now()).isAfter(Instant.now())) {
+      synchronized (paused) {
+        paused.notifyAll();
+      }
+      LOGGER.info("unpaused");
+    }
+  }
+
   // In order not to load the whole database in memory, we're limiting the number
   // of documents that are in the processing queue at a moment. We could use a
   // Bounded Queue in the index updater, but that would generate exceptions in the
   // rest of the platform, as the index rebuilder could fill the queue, and then a
   // user trying to save a document would cause an exception. Thus, it is better
   // to limit the index rebuilder thread only, and not the index updater.
-  private void waitForLowQueueSize() throws InterruptedException {
-    long size;
-    while ((size = expectIndexUpdater().getQueueSize()) > maxQueueSize.get()) {
+  private void pauseIfHighQueueSize() {
+    long queueSize = expectIndexUpdater().getQueueSize();
+    if (queueSize >= maxQueueSize.get()) {
       // Don't leave any database connections open while sleeping
       // This shouldn't be needed, but we never know what bugs might be there
       getXContext().getWiki().getStore().cleanUp(getXContext());
-      LOGGER.debug("sleeping for {}ms since queue size {} too big", retryInterval.get(), size);
-      Thread.sleep(retryInterval.get() * 1000);
+      LOGGER.debug("pausing for {}s since queue size {} too big", retryInterval.get(), queueSize);
+      paused.set(Instant.now().plusSeconds(retryInterval.get()));
     }
   }
 
