@@ -137,7 +137,7 @@ public class IndexRebuilder implements LuceneIndexRebuildService {
   /**
    * seconds to pause while waiting for the indexing queue to empty.
    */
-  private AtomicLong pauseDuration = new AtomicLong(30);
+  private AtomicLong pauseDuration = new AtomicLong(10);
 
   /**
    * Soft threshold after which no more documents will be added to the indexing queue.
@@ -161,8 +161,8 @@ public class IndexRebuilder implements LuceneIndexRebuildService {
   public void initialize(IndexUpdater indexUpdater) {
     checkState(this.indexUpdater.compareAndSet(null, checkNotNull(indexUpdater)),
         "LuceneIndexRebuildService already initialized");
-    this.pauseDuration.set(getXContext().getWiki().ParamAsLong(PROP_PAUSE_DURATION, 30));
     this.maxQueueSize.set(getXContext().getWiki().ParamAsLong(PROP_MAX_QUEUE_SIZE, 1000));
+    this.pauseDuration.set(getXContext().getWiki().ParamAsLong(PROP_PAUSE_DURATION, 10));
     LOGGER.info("LuceneIndexRebuildService initialized");
   }
 
