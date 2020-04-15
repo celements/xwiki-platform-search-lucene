@@ -135,7 +135,7 @@ public abstract class AbstractDocumentData extends IndexData {
         Field.Index.NOT_ANALYZED, ID_BOOST, luceneDoc);
 
     addFieldToDocument(IndexFields.DOCUMENT_LANGUAGE, getLanguage(), Field.Store.YES,
-        Field.Index.ANALYZED, LANGUAGE_BOOST, luceneDoc);
+        Field.Index.NOT_ANALYZED, LANGUAGE_BOOST, luceneDoc);
 
     addFieldToDocument(IndexFields.DOCUMENT_WIKI, getWikiRef().getName(), Field.Store.YES,
         Field.Index.NOT_ANALYZED, WIKI_BOOST, luceneDoc);
@@ -168,6 +168,8 @@ public abstract class AbstractDocumentData extends IndexData {
     if (StringUtils.isNotBlank(this.documentTitle)) {
       addFieldToDocument(IndexFields.DOCUMENT_TITLE, this.documentTitle, Field.Store.YES,
           Field.Index.ANALYZED, TITLE_BOOST, luceneDoc);
+      addFieldToDocument(IndexFields.DOCUMENT_TITLE_SORT, this.documentTitle, Field.Store.YES,
+          Field.Index.NOT_ANALYZED, 0.1f, luceneDoc);
     }
     addFieldToDocument(IndexFields.DOCUMENT_NAME, getDocumentName(), Field.Store.YES,
         Field.Index.ANALYZED, NAME_BOOST, luceneDoc);
@@ -181,7 +183,7 @@ public abstract class AbstractDocumentData extends IndexData {
         Field.Index.NOT_ANALYZED, 0.1f, luceneDoc);
 
     addFieldToDocument(IndexFields.DOCUMENT_FULLNAME, getDocumentFullName(), Field.Store.YES,
-        Field.Index.ANALYZED, FULL_NAME_BOOST, luceneDoc);
+        Field.Index.NOT_ANALYZED, FULL_NAME_BOOST, luceneDoc);
 
     addFieldToDocument(IndexFields.DOCUMENT_HIDDEN, doc.isHidden().toString(), Field.Store.YES,
         Field.Index.NOT_ANALYZED, HIDDEN_BOOST, luceneDoc);

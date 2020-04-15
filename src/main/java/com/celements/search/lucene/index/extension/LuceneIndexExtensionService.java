@@ -1,5 +1,8 @@
 package com.celements.search.lucene.index.extension;
 
+import static com.google.common.base.Strings.*;
+import static java.util.Objects.*;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
@@ -7,6 +10,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 import javax.inject.Singleton;
 
@@ -79,14 +84,23 @@ public class LuceneIndexExtensionService implements ILuceneIndexExtensionService
   public IndexExtensionField createField(String name, String value, Index indexType,
       ExtensionType extensionType) {
     try {
-      value = plainTextCmd.convertHtmlToPlainText(value);
+      value = Strings.nullToEmpty(value);
+      value = plainTextCmd.convertHtmlToPlainText(value).toLowerCase();
     } catch (ConvertToPlainTextException exc) {
-      LOGGER.warn("createField - failed to convert html to plaintext for field '{}': '{}'", name,
-          value);
+      LOGGER.warn("createField: failed converting value plaintext for field [{}]", name, exc);
     }
-    value = value.toLowerCase();
+    indexType = Optional.ofNullable(indexType).orElseGet(() -> guessIndexType(name));
     return new IndexExtensionField(extensionType, new Field(name, value, Field.Store.YES,
         indexType));
+  }
+
+  private Index guessIndexType(String name) {
+    name = name.toLowerCase();
+    if (name.endsWith("_s") ||
+        name.endsWith("_fullname")) {
+      return Index.NOT_ANALYZED;
+    }
+    return Index.ANALYZED;
   }
 
   @Override
@@ -98,24 +112,20 @@ public class LuceneIndexExtensionService implements ILuceneIndexExtensionService
   @Override
   public Collection<IndexExtensionField> createFields(String name, Object value,
       ExtensionType defaultExtType) throws IllegalArgumentException {
-    Objects.requireNonNull(Strings.emptyToNull(name));
-    value = (value != null ? value : "");
+    Objects.requireNonNull(emptyToNull(name));
     Collection<IndexExtensionField> ret = new ArrayList<>();
-    if (value instanceof Collection) {
-      Iterator<?> iter = ((Collection<?>) value).iterator();
-      while (iter.hasNext()) {
-        Object nextVal = iter.next();
-        if (nextVal != null) {
-          ret.addAll(createFields(name, nextVal, ExtensionType.ADD));
-        }
-      }
+    if (value instanceof IndexExtensionField) {
+      ret.add((IndexExtensionField) value);
+    } else if (value instanceof Collection) {
+      ((Collection<?>) value).stream().filter(Objects::nonNull)
+          .forEach(val -> ret.addAll(createFields(name, val, ExtensionType.ADD)));
     } else if (value instanceof Number) {
       ret.add(createField(name, (Number) value, defaultExtType));
     } else if (value instanceof Date) {
       ret.add(createField(name, IndexFields.dateToString((Date) value), Index.NOT_ANALYZED,
           defaultExtType));
     } else {
-      ret.add(createField(name, value.toString(), Index.ANALYZED, defaultExtType));
+      ret.add(createField(name, Objects.toString(value, ""), null, defaultExtType));
     }
     return ret;
   }
@@ -123,16 +133,12 @@ public class LuceneIndexExtensionService implements ILuceneIndexExtensionService
   @Override
   public Collection<IndexExtensionField> createFields(Map<String, Object> fieldMap,
       ExtensionType defaultExtType) throws IllegalArgumentException {
-    Collection<IndexExtensionField> ret = new ArrayList<>();
-    for (String name : fieldMap.keySet()) {
-      if (Strings.emptyToNull(name) != null) {
-        Object value = fieldMap.get(name);
-        if (value != null) {
-          ret.addAll(createFields(name, value, defaultExtType));
-        }
-      }
-    }
-    return ret;
+    return fieldMap.entrySet().stream()
+        .filter(Objects::nonNull)
+        .filter(entry -> nonNull(emptyToNull(entry.getKey())))
+        .filter(entry -> nonNull(entry.getValue()))
+        .flatMap(entry -> createFields(entry.getKey(), entry.getValue(), defaultExtType).stream())
+        .collect(Collectors.toList());
   }
 
   @Override

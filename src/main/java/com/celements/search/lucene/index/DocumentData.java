@@ -22,6 +22,7 @@ package com.celements.search.lucene.index;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.lucene.document.Document;
@@ -62,7 +63,7 @@ public class DocumentData extends AbstractDocumentData {
   /** The importance of an object property. **/
   private static final float OBJECT_PROPERTY_BOOST = 0.75f;
 
-  private PlainTextCommand plainTextCmd = new PlainTextCommand();
+  private final PlainTextCommand plainTextCmd = new PlainTextCommand();
 
   public DocumentData(XWikiDocument doc, boolean deleted) {
     super(LuceneDocType.wikipage, doc.getDocumentReference(), doc, deleted);
@@ -141,6 +142,9 @@ public class DocumentData extends AbstractDocumentData {
 
   @Override
   protected void addAdditionalData(Document luceneDoc, XWikiDocument doc) {
+    addFieldToDocument(IndexFields.DOCUMENT_PARENT, Optional.ofNullable(doc.getParentReference())
+        .map(getModelUtils()::serializeRef).orElse(""),
+        Field.Store.YES, Field.Index.NOT_ANALYZED, 0.01f, luceneDoc);
     for (List<BaseObject> objects : doc.getXObjects().values()) {
       for (BaseObject obj : objects) {
         if (obj != null) {
