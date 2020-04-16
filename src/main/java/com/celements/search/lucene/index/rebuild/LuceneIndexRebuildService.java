@@ -54,7 +54,8 @@ public interface LuceneIndexRebuildService {
 
     @Override
     public String toString() {
-      return "[" + super.toString() + ", ref=" + ref + "]";
+      String str = super.toString();
+      return str.substring(str.indexOf('$') + 1) + ", ref = [" + ref + "]";
     }
   }
 
