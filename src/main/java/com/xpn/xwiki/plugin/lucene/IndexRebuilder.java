@@ -341,13 +341,13 @@ public class IndexRebuilder implements LuceneIndexRebuildService {
   }
 
   @Override
-  public boolean isPaused() {
-    return paused.get().isAfter(Instant.now());
+  public Optional<Instant> isPaused() {
+    return Optional.ofNullable(paused.get()).filter(i -> i.isAfter(Instant.now()));
   }
 
   private void waitIfPaused() throws InterruptedException {
     pauseIfHighQueueSize();
-    while (isPaused()) {
+    while (isPaused().isPresent()) {
       synchronized (paused) {
         Duration timeout = Duration.between(Instant.now(), paused.get());
         LOGGER.debug("waiting for {}", timeout);

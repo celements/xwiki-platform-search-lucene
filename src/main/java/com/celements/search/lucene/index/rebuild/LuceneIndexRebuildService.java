@@ -3,6 +3,7 @@ package com.celements.search.lucene.index.rebuild;
 import static com.google.common.base.Preconditions.*;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
@@ -35,7 +36,7 @@ public interface LuceneIndexRebuildService {
 
   void pause(@Nullable Duration duration);
 
-  boolean isPaused();
+  Optional<Instant> isPaused();
 
   void unpause();
 
