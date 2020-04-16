@@ -340,9 +340,14 @@ public class IndexRebuilder implements LuceneIndexRebuildService {
     LOGGER.info("paused for {} until {}", duration, until.atZone(DateUtil.getDefaultZone()));
   }
 
+  @Override
+  public boolean isPaused() {
+    return paused.get().isAfter(Instant.now());
+  }
+
   private void waitIfPaused() throws InterruptedException {
     pauseIfHighQueueSize();
-    while (paused.get().isAfter(Instant.now())) {
+    while (isPaused()) {
       synchronized (paused) {
         Duration timeout = Duration.between(Instant.now(), paused.get());
         LOGGER.debug("waiting for {}", timeout);

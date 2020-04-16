@@ -35,6 +35,8 @@ public interface LuceneIndexRebuildService {
 
   void pause(@Nullable Duration duration);
 
+  boolean isPaused();
+
   void unpause();
 
   public class IndexRebuildFuture extends CompletableFuture<Long> {
