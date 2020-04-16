@@ -14,6 +14,7 @@ import java.util.stream.Collectors;
 
 import javax.inject.Singleton;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.Field.Index;
@@ -96,7 +97,8 @@ public class LuceneIndexExtensionService implements ILuceneIndexExtensionService
   private Index guessIndexType(String name) {
     name = name.toLowerCase();
     if (name.endsWith("_s") ||
-        name.endsWith("_fullname")) {
+        name.endsWith("_fullname") ||
+        StringUtils.isNumeric(name)) {
       return Index.NOT_ANALYZED;
     }
     return Index.ANALYZED;
