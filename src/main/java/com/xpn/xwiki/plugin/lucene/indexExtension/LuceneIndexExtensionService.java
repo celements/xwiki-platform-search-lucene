@@ -1,8 +1,10 @@
 package com.xpn.xwiki.plugin.lucene.indexExtension;
 
+import static com.celements.common.date.DateFormat.*;
 import static com.google.common.base.Strings.*;
 import static java.util.Objects.*;
 
+import java.time.temporal.Temporal;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
@@ -125,6 +127,9 @@ public class LuceneIndexExtensionService implements ILuceneIndexExtensionService
     } else if (value instanceof Date) {
       ret.add(createField(name, IndexFields.dateToString((Date) value), Index.NOT_ANALYZED,
           defaultExtType));
+    } else if (value instanceof Temporal) {
+      ret.add(createField(name, formatter(IndexFields.DATE_FORMAT).apply((Temporal) value),
+          Index.NOT_ANALYZED, defaultExtType));
     } else {
       ret.add(createField(name, Objects.toString(value, ""), null, defaultExtType));
     }
