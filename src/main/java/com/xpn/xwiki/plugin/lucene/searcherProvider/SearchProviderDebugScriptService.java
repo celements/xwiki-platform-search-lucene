@@ -20,7 +20,7 @@ public class SearchProviderDebugScriptService implements ScriptService {
   @Requirement
   private ISearcherProviderRole searchProvider;
 
-  public void writeDebuggingInfosToLog() {
+  public void logState() {
     if (rightsAccess.isSuperAdmin()) {
       searchProvider.logState(LOGGER);
     }

@@ -94,6 +94,7 @@ public class SearcherProviderManager implements ISearcherProviderRole {
 
   @Override
   public void logState(Logger log) {
+    log.info("logState - {} search providers", getAllSearcherProviders().size());
     getAllSearcherProviders().stream().filter(SearcherProvider::isMarkedToClose)
         .forEach(searchProvider -> searchProvider.logState(log));
   }
