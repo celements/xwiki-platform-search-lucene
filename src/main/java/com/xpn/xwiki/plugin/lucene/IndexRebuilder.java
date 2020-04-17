@@ -351,7 +351,7 @@ public class IndexRebuilder implements LuceneIndexRebuildService {
       synchronized (paused) {
         Duration timeout = Duration.between(Instant.now(), paused.get());
         LOGGER.debug("waiting for {}", timeout);
-        paused.wait(Math.max(timeout.toMillis(), 0));
+        paused.wait(Math.max(timeout.toMillis(), 1));
         LOGGER.debug("waiting ended");
       }
       pauseIfHighQueueSize();
