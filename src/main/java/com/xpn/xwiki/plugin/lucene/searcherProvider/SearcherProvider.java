@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 import org.apache.lucene.search.IndexSearcher;
@@ -53,7 +54,7 @@ public class SearcherProvider implements AutoCloseable {
 
   final ConcurrentMap<Thread, Set<SearchResults>> connectedSearchResults = new ConcurrentHashMap<>();
 
-  private boolean markToClose = false;
+  private AtomicBoolean markToClose = new AtomicBoolean(false);
 
   SearcherProvider(List<IndexSearcher> searchers, DisconnectToken token) {
     this.backedSearchers = searchers;
@@ -104,13 +105,12 @@ public class SearcherProvider implements AutoCloseable {
     disconnect();
   }
 
-  public synchronized boolean isMarkedToClose() {
-    return markToClose;
+  public boolean isMarkedToClose() {
+    return markToClose.get();
   }
 
-  public synchronized void markToClose() throws IOException {
-    if (!markToClose) {
-      markToClose = true;
+  public void markToClose() throws IOException {
+    if (markToClose.compareAndSet(false, true)) {
       LOGGER.debug("markToClose {}", this);
       tryClose();
     }
