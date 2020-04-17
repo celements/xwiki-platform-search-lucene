@@ -54,7 +54,7 @@ public class SearcherProvider implements AutoCloseable {
 
   final ConcurrentMap<Thread, Set<SearchResults>> connectedSearchResults = new ConcurrentHashMap<>();
 
-  private AtomicBoolean markToClose = new AtomicBoolean(false);
+  private final AtomicBoolean markToClose = new AtomicBoolean(false);
 
   SearcherProvider(List<IndexSearcher> searchers, DisconnectToken token) {
     this.backedSearchers = searchers;
