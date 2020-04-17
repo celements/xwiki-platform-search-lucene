@@ -29,7 +29,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import org.apache.lucene.search.IndexSearcher;
 import org.slf4j.Logger;
@@ -122,14 +121,8 @@ public class SearcherProvider implements AutoCloseable {
    */
   synchronized void tryClose() throws IOException {
     removeOrphanedThreads();
-    if (isMarkedToClose()) {
-      if (isIdle()) {
-        closeSearchers();
-      } else {
-        Stream.concat(connectedThreads.stream(), connectedSearchResults.keySet().stream())
-            .distinct().forEach(thread -> LOGGER.info("thread [{}] still connected in state [{}]",
-                thread, thread.getState()));
-      }
+    if (isMarkedToClose() && isIdle()) {
+      closeSearchers();
     }
   }
 
