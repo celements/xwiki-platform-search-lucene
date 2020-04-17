@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 
 import javax.inject.Singleton;
 
@@ -94,9 +95,10 @@ public class SearcherProviderManager implements ISearcherProviderRole {
 
   @Override
   public void logState(Logger log) {
-    log.info("logState - {} search providers", getAllSearcherProviders().size());
-    getAllSearcherProviders().stream().filter(SearcherProvider::isMarkedToClose)
-        .forEach(searchProvider -> searchProvider.logState(log));
+    List<SearcherProvider> providersToClose = getAllSearcherProviders().stream()
+        .filter(SearcherProvider::isMarkedToClose).collect(Collectors.toList());
+    log.info("logState - {} open search providers marked to close", providersToClose.size());
+    providersToClose.forEach(searchProvider -> searchProvider.logState(log));
   }
 
   class DisconnectToken {
