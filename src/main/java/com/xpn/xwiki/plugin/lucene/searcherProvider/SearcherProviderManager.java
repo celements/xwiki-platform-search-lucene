@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 
 import javax.inject.Singleton;
 
@@ -46,17 +47,13 @@ public class SearcherProviderManager implements ISearcherProviderRole {
   @Override
   public void closeAllForCurrentThread() {
     int numSearchProviders = getAllSearcherProviders().size();
-    LOGGER.debug("closeAllForCurrentThread start in manager [{}]: remaining [{}] searchProviders.",
-        System.identityHashCode(this), numSearchProviders);
+    LOGGER.debug("closeAllForCurrentThread - start with {} remaining searchProviders",
+        numSearchProviders);
     List<SearcherProvider> searcherProviderToRemove = new ArrayList<>(numSearchProviders);
     for (SearcherProvider searcherProvider : getAllSearcherProviders()) {
       try {
-        LOGGER.trace("before cleanup for searchProvider [" + System.identityHashCode(
-            searcherProvider) + "], isIdle [" + searcherProvider.isIdle() + "].");
         searcherProvider.disconnect();
         searcherProvider.cleanUpAllSearchResultsForThread();
-        LOGGER.trace("after cleanup for searchProvider [" + System.identityHashCode(
-            searcherProvider) + "], isIdle [" + searcherProvider.isIdle() + "].");
       } catch (IOException exp) {
         LOGGER.error("Failed to disconnect searcherProvider from thread.", exp);
       }
@@ -65,9 +62,8 @@ public class SearcherProviderManager implements ISearcherProviderRole {
       }
     }
     getAllSearcherProviders().removeAll(searcherProviderToRemove);
-    LOGGER.info("closeAllForCurrentThread finish in manager [{}]: remaining [{}] searchProviders."
-        + " removed [{}].", System.identityHashCode(this), getAllSearcherProviders().size(),
-        searcherProviderToRemove.size());
+    LOGGER.info("closeAllForCurrentThread - finish with {} remaining, {} removed",
+        getAllSearcherProviders().size(), (numSearchProviders - getAllSearcherProviders().size()));
   }
 
   Set<SearcherProvider> getAllSearcherProviders() {
@@ -76,30 +72,33 @@ public class SearcherProviderManager implements ISearcherProviderRole {
 
   private boolean removeSearchProvider(SearcherProvider searchProvider) {
     boolean ret = getAllSearcherProviders().remove(searchProvider);
-    LOGGER.debug("removed searchProvider [{}] {}, {} remaining", System.identityHashCode(
-        searchProvider), ret, getAllSearcherProviders().size());
+    LOGGER.debug("removeSearchProvider - {}: {}, {} remaining", searchProvider, ret,
+        getAllSearcherProviders().size());
     return ret;
   }
 
+  /*
+   * createSearchProvider must be synchronized to ensure that all threads will see a fully
+   * initialized SearcherProvider object
+   */
   @Override
-  synchronized public SearcherProvider createSearchProvider(List<IndexSearcher> theSearchers) {
-    /*
-     * createSearchProvider must be synchronized to ensure that all threads will see a fully
-     * initialized SearcherProvider object
-     */
+  public synchronized SearcherProvider createSearchProvider(List<IndexSearcher> theSearchers) {
     SearcherProvider newSearcherProvider = new SearcherProvider(theSearchers,
         new DisconnectToken());
     getAllSearcherProviders().add(newSearcherProvider);
-    LOGGER.debug("createSearchProvider in manager [{}]: returning new SearchProvider and added to"
-        + " list [{}].", System.identityHashCode(this), getAllSearcherProviders().size());
+    LOGGER.debug("createSearchProvider - {}", newSearcherProvider);
     if (getAllSearcherProviders().size() > 20) {
-      LOGGER.warn("createSearchProvider in manager [{}]: list increased to size [{}]. Looks like "
-          + "a memory leak?", System.identityHashCode(this), getAllSearcherProviders().size());
-    } else if (getAllSearcherProviders().size() > 10) {
-      LOGGER.info("createSearchProvider in manager [{}]: list increased to size [{}].",
-          System.identityHashCode(this), getAllSearcherProviders().size());
+      LOGGER.warn("createSearchProvider - list increased to {}", getAllSearcherProviders().size());
     }
     return newSearcherProvider;
+  }
+
+  @Override
+  public void logState(Logger log) {
+    List<SearcherProvider> providersToClose = getAllSearcherProviders().stream()
+        .filter(SearcherProvider::isMarkedToClose).collect(Collectors.toList());
+    log.info("logState - {} open search providers marked to close", providersToClose.size());
+    providersToClose.forEach(searchProvider -> searchProvider.logState(log));
   }
 
   class DisconnectToken {

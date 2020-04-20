@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import org.apache.lucene.search.Query;
 import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.Searcher;
 import org.apache.lucene.search.TopDocs;
@@ -59,6 +60,8 @@ public class SearchResults extends Api {
 
   private final SearcherProvider searcherProvider;
 
+  private final Query query;
+
   private final TopDocsCollector<? extends ScoreDoc> results;
 
   private final boolean skipChecks;
@@ -78,10 +81,10 @@ public class SearchResults extends Api {
    * @param xwiki
    *          xwiki instance for access rights checking
    */
-  SearchResults(TopDocsCollector<? extends ScoreDoc> results, Searcher searcher,
+  SearchResults(Query query, TopDocsCollector<? extends ScoreDoc> results, Searcher searcher,
       SearcherProvider theSearcherProvider, boolean skipChecks, XWiki xwiki, XWikiContext context) {
     super(context);
-
+    this.query = query;
     this.results = results;
     this.searcher = searcher;
     this.searcherProvider = theSearcherProvider;
@@ -92,7 +95,7 @@ public class SearchResults extends Api {
 
   private List<SearchResult> getRelevantResults() {
     if (this.relevantResults == null) {
-      this.relevantResults = new ArrayList<SearchResult>();
+      this.relevantResults = new ArrayList<>();
       try {
         TopDocs docs = this.results.topDocs();
         LOGGER.debug("getRelevantResults: checking access to scoreDocs [" + docs.scoreDocs.length
@@ -262,6 +265,11 @@ public class SearchResults extends Api {
       rightsAccess = Utils.getComponent(IRightsAccessFacadeRole.class);
     }
     return rightsAccess;
+  }
+
+  @Override
+  public String toString() {
+    return "SearchResults [query=" + query + ", hitcount=" + getTotalHitcount() + "]";
   }
 
 }
