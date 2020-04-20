@@ -65,6 +65,7 @@ import com.celements.search.lucene.LuceneDocType;
 import com.celements.search.lucene.index.rebuild.LuceneIndexRebuildService;
 import com.google.common.base.Strings;
 import com.google.common.collect.Iterables;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.xpn.xwiki.XWikiContext;
 import com.xpn.xwiki.api.Api;
 import com.xpn.xwiki.api.XWiki;
@@ -148,7 +149,8 @@ public class LucenePlugin extends XWikiDefaultPlugin {
 
   public LucenePlugin(String name, String className, XWikiContext context) {
     super(name, className, context);
-    indexUpdaterExecutor = Executors.newSingleThreadExecutor();
+    indexUpdaterExecutor = Executors.newSingleThreadExecutor(
+        new ThreadFactoryBuilder().setNameFormat("IndexUpdater-%d").build());
   }
 
   @Override
@@ -535,7 +537,7 @@ public class LucenePlugin extends XWikiDefaultPlugin {
           + System.identityHashCode(results) + "].", q, results.getTotalHits());
 
       // Transform the raw Lucene search results into XWiki-aware results
-      return new SearchResults(results, searcher, theSearcherProvider, skipChecks, new XWiki(
+      return new SearchResults(q, results, searcher, theSearcherProvider, skipChecks, new XWiki(
           context.getWiki(), context), context);
     } finally {
       theSearcherProvider.disconnect();
