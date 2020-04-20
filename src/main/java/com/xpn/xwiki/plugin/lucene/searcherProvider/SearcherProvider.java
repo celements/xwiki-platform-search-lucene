@@ -20,8 +20,10 @@
 package com.xpn.xwiki.plugin.lucene.searcherProvider;
 
 import static com.google.common.base.Preconditions.*;
+import static java.util.stream.Collectors.*;
 
 import java.io.IOException;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -208,6 +210,17 @@ public class SearcherProvider implements AutoCloseable {
         tryClose();
       }
     }
+  }
+
+  public void logState(Logger log) {
+    log.info("logState - {}", this);
+    log.info("logState - {} connected threads: {}", connectedThreads.size(), connectedThreads);
+    log.info("logState - {} connected search results for {} threads",
+        connectedSearchResults.values().stream().flatMap(Collection::stream).collect(counting()),
+        connectedSearchResults.size());
+    connectedSearchResults.forEach((thread, searchResults) -> log.info(
+        "logState - {} has {} connected search results: {}",
+        thread, searchResults.size(), searchResults));
   }
 
   @Override

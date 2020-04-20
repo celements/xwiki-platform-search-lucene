@@ -22,13 +22,16 @@ package com.xpn.xwiki.plugin.lucene.searcherProvider;
 import java.util.List;
 
 import org.apache.lucene.search.IndexSearcher;
+import org.slf4j.Logger;
 import org.xwiki.component.annotation.ComponentRole;
 
 @ComponentRole
 public interface ISearcherProviderRole {
 
-  public SearcherProvider createSearchProvider(List<IndexSearcher> createSearchers);
+  SearcherProvider createSearchProvider(List<IndexSearcher> createSearchers);
 
-  public void closeAllForCurrentThread();
+  void closeAllForCurrentThread();
+
+  void logState(Logger log);
 
 }
