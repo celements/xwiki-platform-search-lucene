@@ -196,7 +196,7 @@ public class IndexRebuilder implements LuceneIndexRebuildService {
       try {
         rebuildIndexAsync(newFuture);
       } catch (Exception exc) {
-        LOGGER.error("[{}] - failed to run rebuild async: {}", filterRef, exc.getMessage(), exc);
+        LOGGER.error("[{}] - failed to run rebuild async", filterRef, exc);
         newFuture.completeExceptionally(exc);
       }
       return newFuture;
@@ -218,11 +218,11 @@ public class IndexRebuilder implements LuceneIndexRebuildService {
               LOGGER.info("[{}] - finished: {}", logRef(filterRef), count);
               future.complete(count);
             } catch (InterruptedException exc) {
-              LOGGER.error("[{}] - interrupted: {}", filterRef, exc.getMessage(), exc);
+              LOGGER.error("[{}] - interrupted", filterRef, exc);
               future.completeExceptionally(exc);
               Thread.currentThread().interrupt();
             } catch (Exception exc) {
-              LOGGER.error("[{}] - failed: {}", filterRef, exc.getMessage(), exc);
+              LOGGER.error("[{}] - failed", filterRef, exc);
               future.completeExceptionally(exc);
             }
           }
@@ -324,7 +324,7 @@ public class IndexRebuilder implements LuceneIndexRebuildService {
     } catch (DocumentNotExistsException exc) {
       LOGGER.info("unable to queue inexistent doc '{}'", metaData);
     } catch (DocumentLoadException exc) {
-      LOGGER.error("failed to queue doc '{}': {}", metaData, exc);
+      LOGGER.error("failed to queue doc '{}'", metaData, exc);
     }
     return retval;
   }
