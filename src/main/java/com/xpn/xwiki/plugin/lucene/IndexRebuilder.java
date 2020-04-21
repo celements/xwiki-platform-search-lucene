@@ -137,7 +137,7 @@ public class IndexRebuilder implements LuceneIndexRebuildService {
   /**
    * seconds to pause while waiting for the indexing queue to empty.
    */
-  private AtomicLong pauseDuration = new AtomicLong(10);
+  private final AtomicLong pauseDuration = new AtomicLong(10);
 
   /**
    * Soft threshold after which no more documents will be added to the indexing queue.
@@ -196,6 +196,7 @@ public class IndexRebuilder implements LuceneIndexRebuildService {
       try {
         rebuildIndexAsync(newFuture);
       } catch (Exception exc) {
+        LOGGER.error("[{}] - failed to run rebuild async: {}", filterRef, exc.getMessage(), exc);
         newFuture.completeExceptionally(exc);
       }
       return newFuture;
@@ -217,6 +218,7 @@ public class IndexRebuilder implements LuceneIndexRebuildService {
               LOGGER.info("[{}] - finished: {}", logRef(filterRef), count);
               future.complete(count);
             } catch (InterruptedException exc) {
+              LOGGER.error("[{}] - interrupted: {}", filterRef, exc.getMessage(), exc);
               future.completeExceptionally(exc);
               Thread.currentThread().interrupt();
             } catch (Exception exc) {
@@ -349,6 +351,7 @@ public class IndexRebuilder implements LuceneIndexRebuildService {
     pauseIfHighQueueSize();
     while (isPaused().isPresent()) {
       synchronized (paused) {
+        // wait must be in synchronized block
         Duration timeout = Duration.between(Instant.now(), paused.get());
         LOGGER.debug("waiting for {}", timeout);
         paused.wait(Math.max(timeout.toMillis(), 1));
@@ -360,8 +363,10 @@ public class IndexRebuilder implements LuceneIndexRebuildService {
 
   @Override
   public void unpause() {
-    if (paused.getAndSet(Instant.now()).isAfter(Instant.now())) {
+    Instant now = Instant.now();
+    if (paused.getAndSet(now).isAfter(now)) {
       synchronized (paused) {
+        // notify must be in synchronized block
         paused.notifyAll();
       }
       LOGGER.info("unpaused");
