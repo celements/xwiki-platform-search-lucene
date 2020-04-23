@@ -61,13 +61,13 @@ public class IndexUpdaterTest extends AbstractBridgedComponentTestCase {
 
   private class TestIndexRebuilder extends IndexRebuilder {
 
-    public TestIndexRebuilder(IndexUpdater indexUpdater, XWikiContext context) {
-      super(indexUpdater, context);
+    public TestIndexRebuilder(IndexUpdater indexUpdater) {
+      super();
+      initialize(indexUpdater);
     }
 
     @Override
-    protected void runInternal() {
-      super.runInternal();
+    protected void rebuildIndexAsync(IndexRebuildFuture future) {
       IndexUpdaterTest.this.rebuildDone.release();
     }
   }
@@ -86,16 +86,14 @@ public class IndexUpdaterTest extends AbstractBridgedComponentTestCase {
           // IndexWriter writer = openWriter(OpenMode.CREATE);
           Thread.sleep(5000);
           writer.close();
-        } catch (Exception e) {
-        }
+        } catch (Exception e) {}
       } else if (Thread.currentThread().getName().equals("permanentBlocker")) {
         try {
           // IndexWriter writer = openWriter(OpenMode.CREATE_OR_APPEND);
           IndexUpdaterTest.this.writeBlockerAcquiresLock.release();
           IndexUpdaterTest.this.writeBlockerWait.acquireUninterruptibly();
           writer.close();
-        } catch (Exception e) {
-        }
+        } catch (Exception e) {}
       } else {
         super.runInternal();
       }
@@ -132,7 +130,7 @@ public class IndexUpdaterTest extends AbstractBridgedComponentTestCase {
         "").anyTimes();
     expect(mockXWiki.Param(eq(LucenePlugin.PROP_INDEX_DIR))).andReturn(
         IndexUpdaterTest.INDEXDIR).anyTimes();
-    expect(mockXWiki.ParamAsLong(eq(IndexRebuilder.PROP_UPDATER_RETRY_INTERVAL), eq(
+    expect(mockXWiki.ParamAsLong(eq(IndexRebuilder.PROP_PAUSE_DURATION), eq(
         30L))).andReturn(1L).anyTimes();
     expect(mockXWiki.search(anyObject(String.class), anyObject(XWikiContext.class))).andReturn(
         Collections.emptyList()).anyTimes();

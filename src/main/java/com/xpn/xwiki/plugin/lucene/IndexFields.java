@@ -163,7 +163,6 @@ public class IndexFields {
     } catch (Exception e) {
       // silently ignore
     }
-
     return null;
   }
 

@@ -214,18 +214,18 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
   }
 
   private void updateIndex() throws IOException {
-    LOGGER.info("updateIndex started");
+    LOGGER.debug("updateIndex started");
     boolean hasUncommitedWrites = false;
     long lastCommitTime = System.currentTimeMillis();
     while (!queue.isEmpty()) {
       AbstractIndexData data = queue.remove();
       try {
-        LOGGER.debug("updateIndex start document '{}'", data.getEntityReference());
+        LOGGER.trace("updateIndex start document '{}'", data.getEntityReference());
         indexData(data);
         hasUncommitedWrites = true;
-        LOGGER.debug("updateIndex successfully finished document '{}'", data.getEntityReference());
+        LOGGER.trace("updateIndex successfully finished document '{}'", data.getEntityReference());
       } catch (Exception exc) {
-        LOGGER.error("error indexing document '{}'", data.getEntityReference(), exc);
+        LOGGER.warn("error indexing document '{}'", data.getEntityReference(), exc);
       }
       if ((System.currentTimeMillis() - lastCommitTime) >= commitInterval) {
         commitIndex();
@@ -237,7 +237,7 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
     if (hasUncommitedWrites) {
       commitIndex();
     }
-    LOGGER.info("updateIndex finished");
+    LOGGER.debug("updateIndex finished");
   }
 
   /**
