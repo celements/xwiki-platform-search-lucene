@@ -42,19 +42,24 @@
       <artifactId>commons-collections</artifactId>
     </dependency>
     <dependency>
+      <groupId>net.sf.trove4j</groupId>
+      <artifactId>trove4j</artifactId>
+      <version>3.0.3</version>
+    </dependency>
+    <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-log4j12</artifactId>
     </dependency>
     <dependency>
       <groupId>com.celements</groupId>
       <artifactId>celements-model</artifactId>
-      <version>4.2</version>
+      <version>4.3-SNAPSHOT</version>
       <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>com.celements</groupId>
       <artifactId>celements-core</artifactId>
-      <version>4.3</version>
+      <version>4.4</version>
       <scope>provided</scope>
     </dependency>
     <dependency>

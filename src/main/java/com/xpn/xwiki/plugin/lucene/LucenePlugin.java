@@ -62,13 +62,10 @@ import org.apache.lucene.util.Version;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.xwiki.context.Execution;
-import org.xwiki.model.reference.EntityReference;
-import org.xwiki.model.reference.WikiReference;
 import org.xwiki.observation.ObservationManager;
 
-import com.celements.model.util.References;
 import com.celements.search.lucene.LuceneDocType;
-import com.google.common.base.Optional;
+import com.celements.search.lucene.index.rebuild.LuceneIndexRebuildService;
 import com.google.common.base.Strings;
 import com.google.common.collect.Iterables;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -129,8 +126,6 @@ public class LucenePlugin extends XWikiDefaultPlugin {
    */
   volatile IndexUpdater indexUpdater;
 
-  volatile IndexRebuilder indexRebuilder;
-
   /**
    * The Lucene text analyzer, can be configured in <tt>xwiki.cfg</tt> using the key
    * {@link #PROP_ANALYZER} ( <tt>xwiki.plugins.lucene.analyzer</tt>).
@@ -155,8 +150,6 @@ public class LucenePlugin extends XWikiDefaultPlugin {
    */
   private volatile List<Directory> indexDirs;
 
-  private volatile boolean doRebuild = false;
-
   public LucenePlugin(String name, String className, XWikiContext context) {
     super(name, className, context);
     indexUpdaterExecutor = Executors.newSingleThreadExecutor(
@@ -180,32 +173,6 @@ public class LucenePlugin extends XWikiDefaultPlugin {
       this.indexUpdater.doExit();
     }
     super.finalize();
-  }
-
-  /**
-   * @deprecated instead use rebuildIndex()
-   */
-  @Deprecated
-  public int rebuildIndex(XWikiContext context) {
-    return rebuildIndex() ? 0 : LucenePluginApi.REBUILD_IN_PROGRESS;
-  }
-
-  public boolean rebuildIndex() {
-    return indexRebuilder.startIndexRebuild(null, Optional.<EntityReference>absent(), false);
-  }
-
-  public boolean rebuildIndex(EntityReference entityRef, boolean onlyNew) {
-    Optional<WikiReference> wikiRef = References.extractRef(entityRef, WikiReference.class);
-    List<WikiReference> wikis = wikiRef.isPresent() ? Arrays.asList(wikiRef.get()) : null;
-    return indexRebuilder.startIndexRebuild(wikis, Optional.fromNullable(entityRef), onlyNew);
-  }
-
-  public boolean rebuildIndex(List<WikiReference> wikis, boolean onlyNew) {
-    return indexRebuilder.startIndexRebuild(wikis, Optional.<EntityReference>absent(), onlyNew);
-  }
-
-  public boolean rebuildIndexWithWipe(List<WikiReference> wikis, boolean onlyNew) {
-    return indexRebuilder.startIndexRebuildWithWipe(wikis, onlyNew);
   }
 
   /**
@@ -582,12 +549,8 @@ public class LucenePlugin extends XWikiDefaultPlugin {
       IndexWriter writer = openWriter(getWriteDirectory(), OpenMode.CREATE_OR_APPEND);
       this.indexUpdater = new IndexUpdater(writer, this, context);
       indexUpdaterExecutor.submit(indexUpdater);
-      this.indexRebuilder = new IndexRebuilder(indexUpdater, context);
+      getIndexRebuildService().initialize(indexUpdater);
       registerIndexUpdater();
-      if (doRebuild) {
-        rebuildIndex();
-        LOGGER.info("Launched initial lucene indexing");
-      }
       LOGGER.info("Lucene plugin initialized.");
     } catch (IOException exc) {
       LOGGER.error("Failed to open the index directory: ", exc);
@@ -609,10 +572,6 @@ public class LucenePlugin extends XWikiDefaultPlugin {
       if (!IndexReader.indexExists(dir)) {
         // If there's no index create an empty one
         openWriter(dir, OpenMode.CREATE_OR_APPEND).close();
-        if (indexDirs.startsWith(path)) {
-          // writeIndex didn't exist, do a rebuild
-          doRebuild = true;
-        }
       }
       ret.add(FSDirectory.open(file));
     }
@@ -771,13 +730,6 @@ public class LucenePlugin extends XWikiDefaultPlugin {
     return ret;
   }
 
-  /**
-   * Handle a corrupt index by clearing it and rebuilding from scratch.
-   */
-  void handleCorruptIndex() throws IOException {
-    rebuildIndex();
-  }
-
   private XWikiContext getContext() {
     return (XWikiContext) Utils.getComponent(Execution.class).getContext().getProperty(
         XWikiContext.EXECUTIONCONTEXT_KEY);
@@ -785,6 +737,10 @@ public class LucenePlugin extends XWikiDefaultPlugin {
 
   private ISearcherProviderRole getSearcherProviderManager() {
     return Utils.getComponent(ISearcherProviderRole.class);
+  }
+
+  private LuceneIndexRebuildService getIndexRebuildService() {
+    return Utils.getComponent(LuceneIndexRebuildService.class);
   }
 
 }
