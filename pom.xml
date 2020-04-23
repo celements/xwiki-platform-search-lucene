@@ -4,11 +4,11 @@
   <parent>
       <groupId>com.celements</groupId>
       <artifactId>celements</artifactId>
-      <version>4.1</version>
+      <version>4.2</version>
   </parent>
   <artifactId>xwiki-platform-search-lucene</artifactId>
   <name>XWiki Platform - Search - Lucene</name>
-  <version>4.3-SNAPSHOT</version>
+  <version>4.4-SNAPSHOT</version>
   <description>XWiki Platform - Search - Lucene</description>
   <scm>
     <connection>scm:git:git://github.com/celements/xwiki-platform-search-lucene.git</connection>
@@ -53,13 +53,13 @@
     <dependency>
       <groupId>com.celements</groupId>
       <artifactId>celements-model</artifactId>
-      <version>4.3-SNAPSHOT</version>
+      <version>4.3</version>
       <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>com.celements</groupId>
       <artifactId>celements-core</artifactId>
-      <version>4.4</version>
+      <version>4.5</version>
       <scope>provided</scope>
     </dependency>
     <dependency>
