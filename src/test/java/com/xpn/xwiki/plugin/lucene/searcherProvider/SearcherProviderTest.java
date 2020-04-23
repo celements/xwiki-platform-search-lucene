@@ -4,15 +4,23 @@ import static com.celements.common.test.CelementsTestUtils.*;
 import static org.easymock.EasyMock.*;
 import static org.junit.Assert.*;
 
+import java.lang.Thread.State;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.lucene.search.IndexSearcher;
 import org.junit.Before;
 import org.junit.Test;
 
 import com.celements.common.test.AbstractComponentTest;
+import com.google.common.base.Stopwatch;
 import com.xpn.xwiki.plugin.lucene.SearchResults;
 import com.xpn.xwiki.plugin.lucene.searcherProvider.SearcherProviderManager.DisconnectToken;
 
@@ -21,6 +29,8 @@ public class SearcherProviderTest extends AbstractComponentTest {
   private IndexSearcher theMockSearcher;
   private DisconnectToken tokenMock;
   private SearcherProvider searcherProvider;
+
+  private ExecutorService threadPool = Executors.newFixedThreadPool(1);
 
   @Before
   public void setUp_SearcherProviderTest() throws Exception {
@@ -32,17 +42,17 @@ public class SearcherProviderTest extends AbstractComponentTest {
   }
 
   @Test
-  public void testSearcherProvider() {
+  public void test_SearcherProvider() {
     replayDefault();
     assertNotNull(searcherProvider);
     assertFalse(searcherProvider.isMarkedToClose());
-    assertNotNull(searcherProvider.internal_getConnectedThreads());
-    assertTrue(searcherProvider.internal_getConnectedThreads().isEmpty());
+    assertNotNull(searcherProvider.connectedThreads);
+    assertTrue(searcherProvider.connectedThreads.isEmpty());
     verifyDefault();
   }
 
   @Test
-  public void testIsMarkedToClose_markClose() throws Exception {
+  public void test_IsMarkedToClose_markClose() throws Exception {
     theMockSearcher.close();
     expectLastCall().once();
     expect(tokenMock.use(same(searcherProvider))).andReturn(true).once();
@@ -56,8 +66,8 @@ public class SearcherProviderTest extends AbstractComponentTest {
   }
 
   @Test
-  public void testConnect_connectAconnectedThreadAfterMarkToClose() throws Exception {
-    assertTrue(searcherProvider.internal_getConnectedThreads().isEmpty());
+  public void test_Connect_connectAconnectedThreadAfterMarkToClose() throws Exception {
+    assertTrue(searcherProvider.connectedThreads.isEmpty());
     searcherProvider.connect();
     searcherProvider.markToClose();
     replayDefault();
@@ -71,17 +81,17 @@ public class SearcherProviderTest extends AbstractComponentTest {
   }
 
   @Test
-  public void testConnect() {
+  public void test_Connect() {
     replayDefault();
-    assertTrue(searcherProvider.internal_getConnectedThreads().isEmpty());
+    assertTrue(searcherProvider.connectedThreads.isEmpty());
     searcherProvider.connect();
-    assertFalse(searcherProvider.internal_getConnectedThreads().isEmpty());
-    assertTrue(searcherProvider.internal_getConnectedThreads().contains(Thread.currentThread()));
+    assertFalse(searcherProvider.connectedThreads.isEmpty());
+    assertTrue(searcherProvider.connectedThreads.contains(Thread.currentThread()));
     verifyDefault();
   }
 
   @Test
-  public void testConnect_onMarkClose_illegalState() throws Exception {
+  public void test_Connect_onMarkClose_illegalState() throws Exception {
     theMockSearcher.close();
     expectLastCall().once();
     expect(tokenMock.use(same(searcherProvider))).andReturn(true).once();
@@ -97,7 +107,7 @@ public class SearcherProviderTest extends AbstractComponentTest {
   }
 
   @Test
-  public void testGetSearchers_illegalState() {
+  public void test_GetSearchers_illegalState() {
     replayDefault();
     try {
       assertNotNull(searcherProvider.getSearchers());
@@ -110,7 +120,7 @@ public class SearcherProviderTest extends AbstractComponentTest {
   }
 
   @Test
-  public void testGetSearchers() {
+  public void test_GetSearchers() {
     replayDefault();
     searcherProvider.connect();
     assertNotNull(searcherProvider.getSearchers());
@@ -119,195 +129,195 @@ public class SearcherProviderTest extends AbstractComponentTest {
   }
 
   @Test
-  public void testDisconnect_withoutClose() throws Exception {
+  public void test_Disconnect_withoutClose() throws Exception {
     replayDefault();
-    assertTrue(searcherProvider.internal_getConnectedThreads().isEmpty());
-    searcherProvider.internal_getConnectedThreads().add(Thread.currentThread());
-    assertFalse(searcherProvider.internal_getConnectedThreads().isEmpty());
+    assertTrue(searcherProvider.connectedThreads.isEmpty());
+    searcherProvider.connectedThreads.add(Thread.currentThread());
+    assertFalse(searcherProvider.connectedThreads.isEmpty());
     searcherProvider.disconnect();
-    assertTrue(searcherProvider.internal_getConnectedThreads().isEmpty());
+    assertTrue(searcherProvider.connectedThreads.isEmpty());
     searcherProvider.disconnect();
-    assertTrue(searcherProvider.internal_getConnectedThreads().isEmpty());
+    assertTrue(searcherProvider.connectedThreads.isEmpty());
     verifyDefault();
   }
 
   @Test
-  public void testDisconnect_withClose() throws Exception {
+  public void test_Disconnect_withClose() throws Exception {
     theMockSearcher.close();
     expectLastCall().once();
     expect(tokenMock.use(same(searcherProvider))).andReturn(true).once();
     replayDefault();
-    assertTrue(searcherProvider.internal_getConnectedThreads().isEmpty());
-    searcherProvider.internal_getConnectedThreads().add(Thread.currentThread());
-    assertFalse(searcherProvider.internal_getConnectedThreads().isEmpty());
+    assertTrue(searcherProvider.connectedThreads.isEmpty());
+    searcherProvider.connectedThreads.add(Thread.currentThread());
+    assertFalse(searcherProvider.connectedThreads.isEmpty());
     searcherProvider.markToClose();
     searcherProvider.disconnect();
-    assertTrue(searcherProvider.internal_getConnectedThreads().isEmpty());
+    assertTrue(searcherProvider.connectedThreads.isEmpty());
     searcherProvider.disconnect();
-    assertTrue(searcherProvider.internal_getConnectedThreads().isEmpty());
+    assertTrue(searcherProvider.connectedThreads.isEmpty());
     verifyDefault();
   }
 
   @Test
-  public void testDisconnect_withoutClose_beforeLast() throws Exception {
+  public void test_Disconnect_withoutClose_beforeLast() throws Exception {
     replayDefault();
-    assertTrue(searcherProvider.internal_getConnectedThreads().isEmpty());
+    assertTrue(searcherProvider.connectedThreads.isEmpty());
+    Lock lock = new ReentrantLock();
+    lock.lock();
     searcherProvider.connect();
-    Thread testThread = new Thread(new Runnable() {
-
-      @Override
-      public void run() {
-        try {
-          Thread.sleep(10000L);
-        } catch (InterruptedException e) {
-        }
-      }
+    Thread testThread = new Thread(() -> {
+      try {
+        Thread.sleep(10000L);
+      } catch (InterruptedException e) {}
     });
     testThread.start();
-    searcherProvider.internal_getConnectedThreads().add(testThread);
-    assertEquals(2, searcherProvider.internal_getConnectedThreads().size());
+    waitForState(testThread, State.TIMED_WAITING);
+    searcherProvider.connectedThreads.add(testThread);
+    assertEquals(2, searcherProvider.connectedThreads.size());
     searcherProvider.markToClose();
     assertTrue(testThread.isAlive());
     searcherProvider.disconnect();
-    assertFalse(searcherProvider.internal_getConnectedThreads().isEmpty());
+    assertFalse(searcherProvider.connectedThreads.isEmpty());
     verifyDefault();
     testThread.interrupt();
   }
 
   @Test
-  public void testDisconnect_withClose_onLast() throws Exception {
+  public void test_Disconnect_withClose_onLast() throws Exception {
     theMockSearcher.close();
     expectLastCall().once();
     expect(tokenMock.use(same(searcherProvider))).andReturn(true).once();
     replayDefault();
-    assertTrue(searcherProvider.internal_getConnectedThreads().isEmpty());
+    assertTrue(searcherProvider.connectedThreads.isEmpty());
     searcherProvider.connect();
     final Thread testThread = new Thread();
-    searcherProvider.internal_getConnectedThreads().add(testThread);
-    assertEquals(2, searcherProvider.internal_getConnectedThreads().size());
+    searcherProvider.connectedThreads.add(testThread);
+    assertEquals(2, searcherProvider.connectedThreads.size());
     searcherProvider.markToClose();
-    searcherProvider.internal_getConnectedThreads().remove(testThread);
+    searcherProvider.connectedThreads.remove(testThread);
     searcherProvider.disconnect();
-    assertTrue(searcherProvider.internal_getConnectedThreads().isEmpty());
+    assertTrue(searcherProvider.connectedThreads.isEmpty());
     verifyDefault();
   }
 
   @Test
-  public void testIsIdle_connectedThread() throws Exception {
+  public void test_IsIdle_connectedThread() throws Exception {
     replayDefault();
     searcherProvider.connect();
     searcherProvider.markToClose();
     assertTrue(searcherProvider.isMarkedToClose());
-    assertFalse(searcherProvider.internal_getConnectedThreads().isEmpty());
-    assertTrue(searcherProvider.internal_getConnectedSearchResults().isEmpty());
-    assertFalse(searcherProvider.canBeClosed());
+    assertFalse(searcherProvider.connectedThreads.isEmpty());
+    assertTrue(searcherProvider.connectedSearchResults.isEmpty());
+    assertFalse(searcherProvider.isIdle());
     verifyDefault();
   }
 
   @Test
-  public void testIsIdle_notMarkedClose() throws Exception {
+  public void test_IsIdle_notMarkedClose() throws Exception {
     replayDefault();
-    assertTrue(searcherProvider.internal_getConnectedThreads().isEmpty());
-    assertTrue(searcherProvider.internal_getConnectedSearchResults().isEmpty());
+    assertTrue(searcherProvider.connectedThreads.isEmpty());
+    assertTrue(searcherProvider.connectedSearchResults.isEmpty());
     assertFalse(searcherProvider.isMarkedToClose());
-    assertFalse(searcherProvider.canBeClosed());
-    verifyDefault();
-  }
-
-  @Test
-  public void testIsIdle_connectedResultSet() throws Exception {
-    SearchResults searchResults = createMockAndAddToDefault(SearchResults.class);
-    replayDefault();
-    searcherProvider.connect();
-    searcherProvider.connectSearchResults(searchResults);
-    searcherProvider.disconnect();
-    searcherProvider.markToClose();
-    assertTrue(searcherProvider.internal_getConnectedThreads().isEmpty());
-    assertTrue(searcherProvider.isMarkedToClose());
-    assertFalse(searcherProvider.internal_getConnectedSearchResults().isEmpty());
-    assertFalse(searcherProvider.canBeClosed());
-    verifyDefault();
-  }
-
-  @Test
-  public void testIsIdle_true() throws Exception {
-    theMockSearcher.close();
-    expectLastCall().once();
-    expect(tokenMock.use(same(searcherProvider))).andReturn(true).once();
-    replayDefault();
-    searcherProvider.markToClose();
-    assertTrue(searcherProvider.internal_getConnectedThreads().isEmpty());
-    assertTrue(searcherProvider.isMarkedToClose());
-    assertTrue(searcherProvider.internal_getConnectedSearchResults().isEmpty());
-    assertTrue(searcherProvider.canBeClosed());
-    verifyDefault();
-  }
-
-  @Test
-  public void testConnectSearchResults_withoutClose() throws Exception {
-    SearchResults searchResults = createMockAndAddToDefault(SearchResults.class);
-    replayDefault();
-    assertTrue(searcherProvider.internal_getConnectedThreads().isEmpty());
-    searcherProvider.connect();
-    searcherProvider.connectSearchResults(searchResults);
-    searcherProvider.disconnect();
-    assertTrue(searcherProvider.internal_getConnectedThreads().isEmpty());
-    searcherProvider.markToClose();
-    searcherProvider.disconnect();
-    assertTrue(searcherProvider.internal_getConnectedThreads().isEmpty());
+    assertTrue(searcherProvider.isIdle());
+    searcherProvider.tryClose();
     assertFalse(searcherProvider.isClosed());
-    assertFalse(searcherProvider.internal_getConnectedSearchResults().isEmpty());
     verifyDefault();
   }
 
   @Test
-  public void testConnectSearchResults_withClose() throws Exception {
+  public void test_IsIdle_connectedResultSet() throws Exception {
+    SearchResults searchResults = createMockAndAddToDefault(SearchResults.class);
+    replayDefault();
+    searcherProvider.connect();
+    searcherProvider.connectSearchResults(searchResults);
+    searcherProvider.disconnect();
+    searcherProvider.markToClose();
+    assertTrue(searcherProvider.connectedThreads.isEmpty());
+    assertTrue(searcherProvider.isMarkedToClose());
+    assertFalse(searcherProvider.connectedSearchResults.isEmpty());
+    assertFalse(searcherProvider.isIdle());
+    verifyDefault();
+  }
+
+  @Test
+  public void test_IsIdle_true() throws Exception {
+    theMockSearcher.close();
+    expectLastCall().once();
+    expect(tokenMock.use(same(searcherProvider))).andReturn(true).once();
+    replayDefault();
+    searcherProvider.markToClose();
+    assertTrue(searcherProvider.connectedThreads.isEmpty());
+    assertTrue(searcherProvider.isMarkedToClose());
+    assertTrue(searcherProvider.connectedSearchResults.isEmpty());
+    assertTrue(searcherProvider.isIdle());
+    verifyDefault();
+  }
+
+  @Test
+  public void test_ConnectSearchResults_withoutClose() throws Exception {
+    SearchResults searchResults = createMockAndAddToDefault(SearchResults.class);
+    replayDefault();
+    assertTrue(searcherProvider.connectedThreads.isEmpty());
+    searcherProvider.connect();
+    searcherProvider.connectSearchResults(searchResults);
+    searcherProvider.disconnect();
+    assertTrue(searcherProvider.connectedThreads.isEmpty());
+    searcherProvider.markToClose();
+    searcherProvider.disconnect();
+    assertTrue(searcherProvider.connectedThreads.isEmpty());
+    assertFalse(searcherProvider.isClosed());
+    assertFalse(searcherProvider.connectedSearchResults.isEmpty());
+    verifyDefault();
+  }
+
+  @Test
+  public void test_ConnectSearchResults_withClose() throws Exception {
     theMockSearcher.close();
     expectLastCall().once();
     expect(tokenMock.use(same(searcherProvider))).andReturn(true).once();
     SearchResults searchResults = createMockAndAddToDefault(SearchResults.class);
     replayDefault();
-    assertTrue(searcherProvider.internal_getConnectedThreads().isEmpty());
+    assertTrue(searcherProvider.connectedThreads.isEmpty());
     searcherProvider.connect();
     searcherProvider.connectSearchResults(searchResults);
     searcherProvider.disconnect();
-    assertTrue(searcherProvider.internal_getConnectedThreads().isEmpty());
+    assertTrue(searcherProvider.connectedThreads.isEmpty());
     searcherProvider.markToClose();
     searcherProvider.disconnect();
-    assertTrue(searcherProvider.internal_getConnectedThreads().isEmpty());
+    assertTrue(searcherProvider.connectedThreads.isEmpty());
     assertFalse(searcherProvider.isClosed());
     searcherProvider.cleanUpSearchResults(searchResults);
-    assertTrue(searcherProvider.internal_getConnectedSearchResults().isEmpty());
+    assertTrue(searcherProvider.connectedSearchResults.isEmpty());
     // assertTrue(searcherProvider.isClosed());
     verifyDefault();
   }
 
   @Test
-  public void testCleanUpAllSearchResultsForThread() throws Exception {
+  public void test_CleanUpAllSearchResultsForThread() throws Exception {
     theMockSearcher.close();
     expectLastCall().once();
     expect(tokenMock.use(same(searcherProvider))).andReturn(true).once();
     SearchResults searchResults = createMockAndAddToDefault(SearchResults.class);
     SearchResults searchResults2 = createMockAndAddToDefault(SearchResults.class);
     replayDefault();
-    assertTrue(searcherProvider.internal_getConnectedThreads().isEmpty());
+    assertTrue(searcherProvider.connectedThreads.isEmpty());
     searcherProvider.connect();
     searcherProvider.connectSearchResults(searchResults);
     searcherProvider.connectSearchResults(searchResults2);
     searcherProvider.disconnect();
-    assertTrue(searcherProvider.internal_getConnectedThreads().isEmpty());
+    assertTrue(searcherProvider.connectedThreads.isEmpty());
     searcherProvider.markToClose();
     searcherProvider.disconnect();
-    assertTrue(searcherProvider.internal_getConnectedThreads().isEmpty());
+    assertTrue(searcherProvider.connectedThreads.isEmpty());
     assertFalse(searcherProvider.isClosed());
     searcherProvider.cleanUpAllSearchResultsForThread();
-    assertTrue(searcherProvider.internal_getConnectedSearchResults().isEmpty());
+    assertTrue(searcherProvider.connectedSearchResults.isEmpty());
     // assertTrue(searcherProvider.isClosed());
     verifyDefault();
   }
 
   @Test
-  public void testConnectSearchResult_illegalState() throws Exception {
+  public void test_ConnectSearchResult_illegalState() throws Exception {
     SearchResults searchResults = createMockAndAddToDefault(SearchResults.class);
     replayDefault();
     try {
@@ -321,71 +331,101 @@ public class SearcherProviderTest extends AbstractComponentTest {
   }
 
   @Test
-  public void test_closeIfIdle_retainActivThread() throws Exception {
-    assertTrue(searcherProvider.internal_getConnectedThreads().isEmpty());
+  public void test_tryClose_retainActivThread() throws Exception {
+    assertTrue(searcherProvider.connectedThreads.isEmpty());
     Thread testThread = new Thread();
     replayDefault();
-    searcherProvider.internal_getConnectedThreads().add(testThread);
-    assertFalse(searcherProvider.internal_getConnectedThreads().isEmpty());
+    searcherProvider.connectedThreads.add(testThread);
+    assertFalse(searcherProvider.connectedThreads.isEmpty());
     testThread.start();
     assertTrue(testThread.isAlive());
-    searcherProvider.closeIfIdle();
-    assertFalse(searcherProvider.internal_getConnectedThreads().isEmpty());
+    searcherProvider.tryClose();
+    assertFalse(searcherProvider.connectedThreads.isEmpty());
     testThread.join();
     assertFalse(testThread.isAlive());
-    searcherProvider.closeIfIdle();
+    searcherProvider.tryClose();
     verifyDefault();
-    assertTrue(searcherProvider.internal_getConnectedThreads().isEmpty());
+    assertTrue(searcherProvider.connectedThreads.isEmpty());
   }
 
   @Test
-  public void test_closeIfIdle_removeStaleThread() throws Exception {
-    assertTrue(searcherProvider.internal_getConnectedThreads().isEmpty());
+  public void test_tryClose_removeOrphanedThread() throws Exception {
+    assertTrue(searcherProvider.connectedThreads.isEmpty());
     Thread testThread = new Thread();
-    searcherProvider.internal_getConnectedThreads().add(testThread);
-    assertFalse(searcherProvider.internal_getConnectedThreads().isEmpty());
+    searcherProvider.connectedThreads.add(testThread);
+    assertFalse(searcherProvider.connectedThreads.isEmpty());
     replayDefault();
-    searcherProvider.closeIfIdle();
+    searcherProvider.tryClose();
     verifyDefault();
-    assertTrue(searcherProvider.internal_getConnectedThreads().isEmpty());
+    assertTrue(searcherProvider.connectedThreads.isEmpty());
   }
 
   @Test
-  public void test_closeIfIdle_removeLeftOverSearchResult_connectedStaleThread() throws Exception {
-    assertTrue(searcherProvider.internal_getConnectedThreads().isEmpty());
-    assertTrue(searcherProvider.internal_getConnectedSearchResults().isEmpty());
-    Thread testThread = new Thread();
+  public void test_tryClose_removeOrphanedThread_threadPool() throws Exception {
+    assertTrue(searcherProvider.connectedThreads.isEmpty());
+    Thread testThread = getWaitingThreadFromPool();
+    searcherProvider.connectedThreads.add(testThread);
+    assertFalse(searcherProvider.connectedThreads.isEmpty());
+    replayDefault();
+    searcherProvider.tryClose();
+    verifyDefault();
+    assertTrue(searcherProvider.connectedThreads.isEmpty());
+  }
+
+  @Test
+  public void test_tryClose_removeLeftOverSearchResult_connectedOrphanedThread() throws Exception {
+    assertTrue(searcherProvider.connectedThreads.isEmpty());
+    assertTrue(searcherProvider.connectedSearchResults.isEmpty());
+    Thread testThread = getWaitingThreadFromPool();
     SearchResults searchResults = createMockAndAddToDefault(SearchResults.class);
-    searcherProvider.internal_getConnectedThreads().add(testThread);
-    searcherProvider.internal_getConnectedSearchResults().putIfAbsent(testThread,
-        new HashSet<SearchResults>());
-    searcherProvider.internal_getConnectedSearchResults().get(testThread).add(searchResults);
-    assertFalse(searcherProvider.internal_getConnectedThreads().isEmpty());
-    assertFalse(searcherProvider.internal_getConnectedSearchResults().isEmpty());
+    searcherProvider.connectedThreads.add(testThread);
+    searcherProvider.connectedSearchResults.putIfAbsent(testThread, new HashSet<SearchResults>());
+    searcherProvider.connectedSearchResults.get(testThread).add(searchResults);
+    assertFalse(searcherProvider.connectedThreads.isEmpty());
+    assertFalse(searcherProvider.connectedSearchResults.isEmpty());
     replayDefault();
-    searcherProvider.closeIfIdle();
+    searcherProvider.tryClose();
     verifyDefault();
-    assertTrue(searcherProvider.internal_getConnectedThreads().isEmpty());
-    assertTrue(searcherProvider.internal_getConnectedSearchResults().isEmpty());
+    assertTrue(searcherProvider.connectedThreads.isEmpty());
+    assertTrue(searcherProvider.connectedSearchResults.isEmpty());
   }
 
   @Test
-  public void test_closeIfIdle_removeLeftOverSearchResult_disConnectedStaleThread()
+  public void test_tryClose_removeLeftOverSearchResult_disconnectedOrphanedThread()
       throws Exception {
-    assertTrue(searcherProvider.internal_getConnectedThreads().isEmpty());
-    assertTrue(searcherProvider.internal_getConnectedSearchResults().isEmpty());
-    Thread testThread = new Thread();
+    assertTrue(searcherProvider.connectedThreads.isEmpty());
+    assertTrue(searcherProvider.connectedSearchResults.isEmpty());
+    Thread testThread = getWaitingThreadFromPool();
     SearchResults searchResults = createMockAndAddToDefault(SearchResults.class);
-    searcherProvider.internal_getConnectedSearchResults().putIfAbsent(testThread,
-        new HashSet<SearchResults>());
-    searcherProvider.internal_getConnectedSearchResults().get(testThread).add(searchResults);
-    assertTrue(searcherProvider.internal_getConnectedThreads().isEmpty());
-    assertFalse(searcherProvider.internal_getConnectedSearchResults().isEmpty());
+    searcherProvider.connectedSearchResults.putIfAbsent(testThread, new HashSet<SearchResults>());
+    searcherProvider.connectedSearchResults.get(testThread).add(searchResults);
+    assertTrue(searcherProvider.connectedThreads.isEmpty());
+    assertFalse(searcherProvider.connectedSearchResults.isEmpty());
     replayDefault();
-    searcherProvider.closeIfIdle();
+    searcherProvider.tryClose();
     verifyDefault();
-    assertTrue(searcherProvider.internal_getConnectedThreads().isEmpty());
-    assertTrue(searcherProvider.internal_getConnectedSearchResults().isEmpty());
+    assertTrue(searcherProvider.connectedThreads.isEmpty());
+    assertTrue(searcherProvider.connectedSearchResults.isEmpty());
+  }
+
+  private Thread getWaitingThreadFromPool()
+      throws InterruptedException, ExecutionException {
+    AtomicReference<Thread> thread = new AtomicReference<>();
+    threadPool.submit(() -> thread.set(Thread.currentThread())).get();
+    waitForState(thread.get(), Thread.State.WAITING);
+    assertTrue(thread.get().isAlive());
+    return thread.get();
+  }
+
+  private void waitForState(Thread thread, Thread.State state) throws InterruptedException {
+    Stopwatch watch = Stopwatch.createStarted();
+    while (thread.getState() != state) {
+      Thread.sleep(1);
+      if (watch.elapsed().getSeconds() > 5) {
+        thread.interrupt();
+        throw new RuntimeException("waitForState timed out");
+      }
+    }
   }
 
 }

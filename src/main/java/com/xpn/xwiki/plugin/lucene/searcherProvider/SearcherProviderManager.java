@@ -20,8 +20,7 @@
 package com.xpn.xwiki.plugin.lucene.searcherProvider;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -41,16 +40,15 @@ public class SearcherProviderManager implements ISearcherProviderRole {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SearcherProviderManager.class);
 
-  private Set<SearcherProvider> allSearcherProviderSet = Collections.newSetFromMap(
-      new ConcurrentHashMap<SearcherProvider, Boolean>());
+  private Set<SearcherProvider> allSearcherProviderSet = ConcurrentHashMap.newKeySet();
 
   @Override
   public void closeAllForCurrentThread() {
     int numSearchProviders = getAllSearcherProviders().size();
     LOGGER.debug("closeAllForCurrentThread - start with {} remaining searchProviders",
         numSearchProviders);
-    List<SearcherProvider> searcherProviderToRemove = new ArrayList<>(numSearchProviders);
-    for (SearcherProvider searcherProvider : getAllSearcherProviders()) {
+    for (Iterator<SearcherProvider> iter = getAllSearcherProviders().iterator(); iter.hasNext();) {
+      SearcherProvider searcherProvider = iter.next();
       try {
         searcherProvider.disconnect();
         searcherProvider.cleanUpAllSearchResultsForThread();
@@ -58,10 +56,9 @@ public class SearcherProviderManager implements ISearcherProviderRole {
         LOGGER.error("Failed to disconnect searcherProvider from thread.", exp);
       }
       if (searcherProvider.isClosed()) {
-        searcherProviderToRemove.add(searcherProvider);
+        iter.remove();
       }
     }
-    getAllSearcherProviders().removeAll(searcherProviderToRemove);
     LOGGER.info("closeAllForCurrentThread - finish with {} remaining, {} removed",
         getAllSearcherProviders().size(), (numSearchProviders - getAllSearcherProviders().size()));
   }

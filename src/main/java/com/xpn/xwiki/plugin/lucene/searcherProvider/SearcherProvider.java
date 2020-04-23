@@ -24,21 +24,23 @@ import static java.util.stream.Collectors.*;
 
 import java.io.IOException;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 
 import org.apache.lucene.search.IndexSearcher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.collect.ImmutableSet;
 import com.xpn.xwiki.plugin.lucene.SearchResults;
 import com.xpn.xwiki.plugin.lucene.searcherProvider.SearcherProviderManager.DisconnectToken;
 
-public class SearcherProvider {
+public class SearcherProvider implements AutoCloseable {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SearcherProvider.class);
 
@@ -48,29 +50,18 @@ public class SearcherProvider {
    */
   private final List<IndexSearcher> backedSearchers;
 
-  private volatile boolean markToClose;
-
   private final DisconnectToken token;
 
-  private final Set<Thread> connectedThreads;
+  final Set<Thread> connectedThreads = ConcurrentHashMap.newKeySet();
 
-  private final ConcurrentMap<Thread, Set<SearchResults>> connectedSearchResults;
+  final ConcurrentMap<Thread, Set<SearchResults>> connectedSearchResults = new ConcurrentHashMap<>();
+
+  private final AtomicBoolean markToClose = new AtomicBoolean(false);
 
   SearcherProvider(List<IndexSearcher> searchers, DisconnectToken token) {
     this.backedSearchers = searchers;
-    this.markToClose = false;
-    this.connectedThreads = Collections.newSetFromMap(new ConcurrentHashMap<Thread, Boolean>());
-    this.connectedSearchResults = new ConcurrentHashMap<>();
     this.token = token;
     LOGGER.debug("create {}", this);
-  }
-
-  ConcurrentMap<Thread, Set<SearchResults>> internal_getConnectedSearchResults() {
-    return connectedSearchResults;
-  }
-
-  Set<Thread> internal_getConnectedThreads() {
-    return connectedThreads;
   }
 
   /**
@@ -79,14 +70,15 @@ public class SearcherProvider {
    * finished with theirs SearcherResults and disconnected AND that no thread can connect after
    * marking a SearchProvider for closing.
    */
-  public void connect() {
+  public SearcherProvider connect() {
     if (!checkConnected()) {
       synchronized (this) {
-        checkState(!isMarkedToClose(), "you connected to a SearchProvider marked to close.");
+        checkState(!isMarkedToClose(), "provider already marked to close");
         LOGGER.debug("connect {} to [{}]", this, getThreadKey());
         connectedThreads.add(getThreadKey());
       }
     }
+    return this;
   }
 
   public boolean isClosed() {
@@ -94,9 +86,8 @@ public class SearcherProvider {
   }
 
   public List<IndexSearcher> getSearchers() {
-    checkState(!isClosed(), "Getting searchers failed: provider is closed.");
-    checkState(checkConnected(), "you must connect to the searcher provider before you can get"
-        + " any searchers");
+    checkState(!isClosed(), "provider already closed");
+    checkState(checkConnected(), "calling thread not connected");
     return backedSearchers;
   }
 
@@ -107,43 +98,63 @@ public class SearcherProvider {
   public void disconnect() throws IOException {
     if (connectedThreads.remove(getThreadKey())) {
       LOGGER.debug("disconnect {} to [{}]", this, getThreadKey());
-      closeIfIdle();
+      tryClose();
     }
+  }
+
+  @Override
+  public void close() throws IOException {
+    disconnect();
   }
 
   public boolean isMarkedToClose() {
-    return markToClose;
+    return markToClose.get();
   }
 
-  public synchronized void markToClose() throws IOException {
-    if (!markToClose) {
-      markToClose = true;
+  public void markToClose() throws IOException {
+    if (markToClose.compareAndSet(false, true)) {
       LOGGER.debug("markToClose {}", this);
-      closeIfIdle();
+      tryClose();
     }
   }
 
-  synchronized void closeIfIdle() throws IOException {
-    for (Thread thread : connectedThreads) {
-      if (!thread.isAlive()) {
-        connectedThreads.remove(thread);
-        LOGGER.info("remove stale thread from connectedThreads set '{}'.", thread.getName());
-      }
-    }
-    for (Thread thread : connectedSearchResults.keySet()) {
-      if (!thread.isAlive()) {
-        connectedSearchResults.remove(thread);
-        LOGGER.info("remove search results from connectedSearchResultsMap for stale thread '{}'.",
-            thread.getName());
-      }
-    }
-    if (canBeClosed()) {
+  /**
+   * close if is marked and idle, else does nothing
+   */
+  synchronized void tryClose() throws IOException {
+    removeOrphanedThreads();
+    if (isMarkedToClose() && isIdle()) {
       closeSearchers();
     }
   }
 
-  boolean canBeClosed() {
-    return isMarkedToClose() && isIdle();
+  private synchronized void removeOrphanedThreads() {
+    long size = connectedThreads.size();
+    if (connectedThreads.removeIf(thread -> !isRunning(thread))) {
+      LOGGER.warn("cleanOrphanedThreads - {} connected threads removed",
+          (size - connectedThreads.size()));
+    }
+    size = getConnectedSearchResultCount();
+    if (connectedSearchResults.keySet().removeIf(thread -> !isRunning(thread))) {
+      LOGGER.warn("cleanOrphanedThreads - {} connected search results removed",
+          (size - getConnectedSearchResultCount()));
+    }
+  }
+
+  private static final Set<Thread.State> RUNNING_STATES = ImmutableSet.of(
+      Thread.State.RUNNABLE, Thread.State.BLOCKED, Thread.State.TIMED_WAITING);
+
+  private boolean isRunning(Thread thread) {
+    boolean running = thread.isAlive() && RUNNING_STATES.contains(thread.getState());
+    if (!running) {
+      LOGGER.info("thread [{}] not running in state [{}]", thread, thread.getState());
+    }
+    return running;
+  }
+
+  private long getConnectedSearchResultCount() {
+    return connectedSearchResults.values().stream().flatMap(Set::stream)
+        .collect(Collectors.counting());
   }
 
   public boolean isIdle() {
@@ -166,8 +177,7 @@ public class SearcherProvider {
   }
 
   public void connectSearchResults(SearchResults searchResults) {
-    checkState(checkConnected(), "you may not connect a searchResult to a SearchProvider from"
-        + " a not connected thread.");
+    checkState(checkConnected(), "searchResult may not be connected for an unconnected thread");
     getConnectedSearchResultsForCurrentThread().add(searchResults);
   }
 
@@ -182,7 +192,7 @@ public class SearcherProvider {
 
   public void cleanUpAllSearchResultsForThread() throws IOException {
     if (connectedSearchResults.remove(getThreadKey()) != null) {
-      closeIfIdle();
+      tryClose();
     }
   }
 
@@ -197,7 +207,7 @@ public class SearcherProvider {
         if (currentThreadSet.isEmpty()) {
           connectedSearchResults.remove(getThreadKey());
         }
-        closeIfIdle();
+        tryClose();
       }
     }
   }
