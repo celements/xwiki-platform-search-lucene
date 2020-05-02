@@ -59,7 +59,7 @@ public class SearcherProviderManager implements ISearcherProviderRole {
         iter.remove();
       }
     }
-    LOGGER.info("closeAllForCurrentThread - finish with {} remaining, {} removed",
+    LOGGER.debug("closeAllForCurrentThread - finish with {} remaining, {} removed",
         getAllSearcherProviders().size(), (numSearchProviders - getAllSearcherProviders().size()));
   }
 

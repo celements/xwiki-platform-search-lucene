@@ -24,7 +24,6 @@ import static java.util.stream.Collectors.*;
 
 import java.io.IOException;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -182,8 +181,8 @@ public class SearcherProvider implements AutoCloseable {
   }
 
   Set<SearchResults> getConnectedSearchResultsForCurrentThread() {
-    connectedSearchResults.putIfAbsent(getThreadKey(), new HashSet<SearchResults>());
-    return connectedSearchResults.get(getThreadKey());
+    return connectedSearchResults.computeIfAbsent(getThreadKey(),
+        key -> ConcurrentHashMap.newKeySet(1));
   }
 
   public boolean hasSearchResultsForCurrentThread() {
