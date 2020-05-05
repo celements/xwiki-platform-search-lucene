@@ -8,7 +8,7 @@
   </parent>
   <artifactId>xwiki-platform-search-lucene</artifactId>
   <name>XWiki Platform - Search - Lucene</name>
-  <version>4.4-SNAPSHOT</version>
+  <version>4.5-SNAPSHOT</version>
   <description>XWiki Platform - Search - Lucene</description>
   <scm>
     <connection>scm:git:git://github.com/celements/xwiki-platform-search-lucene.git</connection>
