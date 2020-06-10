@@ -74,6 +74,11 @@
           <groupId>org.apache.cxf</groupId>
           <artifactId>cxf-rt-rs-client</artifactId>
         </exclusion>
+        <exclusion>
+          <!--  exclude quartz since we're already including it in xwiki-plugin-scheduler -->
+          <groupId>org.quartz-scheduler</groupId>
+          <artifactId>quartz</artifactId>
+        </exclusion>
       </exclusions>
     </dependency>
     <dependency>
