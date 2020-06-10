@@ -41,6 +41,8 @@ import org.xwiki.bridge.event.DocumentCreatedEvent;
 import org.xwiki.bridge.event.DocumentDeletedEvent;
 import org.xwiki.bridge.event.DocumentUpdatedEvent;
 import org.xwiki.bridge.event.WikiDeletedEvent;
+import org.xwiki.context.Execution;
+import org.xwiki.context.ExecutionContext;
 import org.xwiki.model.reference.EntityReference;
 import org.xwiki.model.reference.WikiReference;
 import org.xwiki.observation.EventListener;
@@ -333,10 +335,18 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
   public void queue(AbstractIndexData data) {
     if (!isExit()) {
       LOGGER.debug("queue{}: '{}'", (data.isDeleted() ? " delete" : ""), data.getId());
+      if (isObservationEventNotificationDisabled()) {
+        data.disableObservationEventNotification();
+      }
       queue.add(data);
     } else {
       throw new IllegalStateException("IndexUpdater has been shut down");
     }
+  }
+
+  private boolean isObservationEventNotificationDisabled() {
+    return Boolean.TRUE.equals(getExecContext().getProperty(
+        LucenePlugin.EXEC_DISABLE_EVENT_NOTIFICATION));
   }
 
   @Override
@@ -414,6 +424,10 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
 
   private ILuceneIndexExtensionServiceRole getLuceneExtensionService() {
     return Utils.getComponent(ILuceneIndexExtensionServiceRole.class);
+  }
+
+  private ExecutionContext getExecContext() {
+    return Utils.getComponent(Execution.class).getContext();
   }
 
   private ModelUtils getModelUtils() {
