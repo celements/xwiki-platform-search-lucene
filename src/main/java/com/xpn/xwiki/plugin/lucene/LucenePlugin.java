@@ -120,6 +120,8 @@ public class LucenePlugin extends XWikiDefaultPlugin {
 
   static final String PROP_WRITER_BUFFER_SIZE = "xwiki.plugins.lucene.writerBufferSize";
 
+  public static final String EXEC_DISABLE_EVENT_NOTIFICATION = "lucene.index.disableObservationEventNotification";
+
   /**
    * Lucene index updater. Listens for changes and indexes wiki documents in a separate
    * thread.
