@@ -19,7 +19,6 @@
  */
 package com.xpn.xwiki.plugin.lucene.searcherProvider;
 
-import java.util.Arrays;
 import java.util.List;
 
 import javax.inject.Singleton;
@@ -31,6 +30,8 @@ import org.xwiki.component.annotation.Requirement;
 import org.xwiki.observation.EventListener;
 import org.xwiki.observation.event.ActionExecutionEvent;
 import org.xwiki.observation.event.Event;
+
+import com.google.common.collect.ImmutableList;
 
 @Component("SearcherProviderManager")
 @Singleton
@@ -48,9 +49,12 @@ public class ActionExecutionEventListener implements EventListener {
 
   @Override
   public List<Event> getEvents() {
-    return Arrays.asList((Event) new ActionExecutionEvent("view"), (Event) new ActionExecutionEvent(
-        "edit"), (Event) new ActionExecutionEvent("admin"), (Event) new ActionExecutionEvent(
-            "import"));
+    return ImmutableList.of(
+        new ActionExecutionEvent("view"),
+        new ActionExecutionEvent("inline"),
+        new ActionExecutionEvent("edit"),
+        new ActionExecutionEvent("admin"),
+        new ActionExecutionEvent("import"));
   }
 
   @Override
