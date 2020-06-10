@@ -38,7 +38,7 @@ import com.google.common.collect.ImmutableList;
 public class ActionExecutionEventListener implements EventListener {
 
   @Requirement
-  ISearcherProviderRole searchProviderManager;
+  private ISearcherProviderRole searchProviderManager;
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ActionExecutionEventListener.class);
 
