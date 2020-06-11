@@ -19,7 +19,11 @@
  */
 package com.xpn.xwiki.plugin.lucene;
 
+import static com.google.common.base.MoreObjects.*;
 import static com.google.common.base.Preconditions.*;
+
+import javax.annotation.Nullable;
+import javax.validation.constraints.NotNull;
 
 import org.apache.lucene.document.Document;
 import org.apache.lucene.index.Term;
@@ -30,6 +34,7 @@ import org.xwiki.model.reference.EntityReferenceSerializer;
 import com.celements.model.context.ModelContext;
 import com.celements.model.util.ModelUtils;
 import com.celements.search.lucene.LuceneDocType;
+import com.celements.search.lucene.index.queue.IndexQueuePriority;
 import com.xpn.xwiki.XWikiException;
 import com.xpn.xwiki.web.Utils;
 
@@ -46,6 +51,7 @@ public abstract class AbstractIndexData {
   private EntityReference entityReference;
 
   private boolean notifyObservationEvents = true;
+  private IndexQueuePriority priority = IndexQueuePriority.DEFAULT;
 
   public AbstractIndexData(LuceneDocType type, EntityReference entityReference, boolean deleted) {
     this.type = checkNotNull(type);
@@ -122,8 +128,18 @@ public abstract class AbstractIndexData {
     return notifyObservationEvents;
   }
 
-  public void disableObservationEventNotification() {
-    this.notifyObservationEvents = false;
+  public AbstractIndexData disableObservationEventNotification(boolean disable) {
+    this.notifyObservationEvents = !disable;
+    return this;
+  }
+
+  public @NotNull IndexQueuePriority getPriority() {
+    return priority;
+  }
+
+  public AbstractIndexData setPriority(@Nullable IndexQueuePriority priority) {
+    this.priority = firstNonNull(priority, IndexQueuePriority.DEFAULT);
+    return this;
   }
 
   protected String getEntityName(EntityType type) {

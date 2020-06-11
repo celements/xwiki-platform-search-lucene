@@ -32,6 +32,8 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import javax.validation.constraints.NotNull;
+
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.lucene.analysis.Analyzer;
@@ -65,6 +67,7 @@ import org.xwiki.context.Execution;
 import org.xwiki.observation.ObservationManager;
 
 import com.celements.search.lucene.LuceneDocType;
+import com.celements.search.lucene.index.queue.IndexQueuePriority;
 import com.celements.search.lucene.index.rebuild.LuceneIndexRebuildService;
 import com.google.common.base.Strings;
 import com.google.common.collect.Iterables;
@@ -119,8 +122,6 @@ public class LucenePlugin extends XWikiDefaultPlugin {
   private static final String DEFAULT_ANALYZER = "org.apache.lucene.analysis.standard.StandardAnalyzer";
 
   static final String PROP_WRITER_BUFFER_SIZE = "xwiki.plugins.lucene.writerBufferSize";
-
-  public static final String EXEC_DISABLE_EVENT_NOTIFICATION = "lucene.index.disableObservationEventNotification";
 
   /**
    * Lucene index updater. Listens for changes and indexes wiki documents in a separate
@@ -685,14 +686,25 @@ public class LucenePlugin extends XWikiDefaultPlugin {
     return this.indexUpdater.getQueueSize();
   }
 
+  public long getQueueSize(@NotNull IndexQueuePriority priority) {
+    return this.indexUpdater.getQueueSize(priority);
+  }
+
+  public void queue(@NotNull AbstractIndexData data) {
+    this.indexUpdater.queue(data);
+  }
+
+  @Deprecated
   public void queueDocument(XWikiDocument doc, XWikiContext context) {
     this.indexUpdater.queueDocument(doc, false);
   }
 
+  @Deprecated
   public void queueAttachment(XWikiDocument doc, XWikiAttachment attach, XWikiContext context) {
     this.indexUpdater.queueAttachment(attach, false);
   }
 
+  @Deprecated
   public void queueAttachment(XWikiDocument doc, XWikiContext context) {
     this.indexUpdater.queueAttachments(doc);
   }
