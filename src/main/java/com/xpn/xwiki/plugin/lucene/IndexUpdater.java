@@ -19,13 +19,11 @@
  */
 package com.xpn.xwiki.plugin.lucene;
 
-import static com.google.common.base.Preconditions.*;
 import static com.google.common.collect.ImmutableMap.*;
 
 import java.io.IOException;
 import java.util.Collections;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -41,32 +39,19 @@ import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.store.Directory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.xwiki.bridge.event.DocumentCreatedEvent;
-import org.xwiki.bridge.event.DocumentDeletedEvent;
-import org.xwiki.bridge.event.DocumentUpdatedEvent;
-import org.xwiki.bridge.event.WikiDeletedEvent;
 import org.xwiki.model.reference.EntityReference;
 import org.xwiki.model.reference.WikiReference;
-import org.xwiki.observation.EventListener;
 import org.xwiki.observation.ObservationManager;
-import org.xwiki.observation.event.Event;
 
 import com.celements.common.observation.event.AbstractEntityEvent;
 import com.celements.model.context.ModelContext;
 import com.celements.model.util.ModelUtils;
 import com.celements.model.util.References;
 import com.celements.search.lucene.index.queue.IndexQueuePriority;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Ordering;
 import com.xpn.xwiki.XWikiContext;
 import com.xpn.xwiki.XWikiException;
-import com.xpn.xwiki.doc.XWikiAttachment;
-import com.xpn.xwiki.doc.XWikiDocument;
-import com.xpn.xwiki.internal.event.AbstractAttachmentEvent;
-import com.xpn.xwiki.internal.event.AttachmentAddedEvent;
-import com.xpn.xwiki.internal.event.AttachmentDeletedEvent;
-import com.xpn.xwiki.internal.event.AttachmentUpdatedEvent;
 import com.xpn.xwiki.plugin.lucene.indexExtension.ILuceneIndexExtensionServiceRole;
 import com.xpn.xwiki.plugin.lucene.observation.event.LuceneDocumentDeletedEvent;
 import com.xpn.xwiki.plugin.lucene.observation.event.LuceneDocumentDeletingEvent;
@@ -78,7 +63,7 @@ import com.xpn.xwiki.web.Utils;
 /**
  * @version $Id: ced4ee86b2d2cf5830598a4a3aefcea8394d60e6 $
  */
-public class IndexUpdater extends AbstractXWikiRunnable implements EventListener {
+public class IndexUpdater extends AbstractXWikiRunnable {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(IndexUpdater.class);
 
@@ -86,17 +71,11 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
 
   static final String PROP_COMMIT_INTERVAL = "xwiki.plugins.lucene.commitinterval";
 
-  public static final String NAME = "lucene";
-
   /**
    * The maximum number of milliseconds we have to wait before this thread is safely
    * closed.
    */
   private static final long EXIT_INTERVAL = 3000;
-
-  private static final List<Event> EVENTS = ImmutableList.<Event>of(new DocumentUpdatedEvent(),
-      new DocumentCreatedEvent(), new DocumentDeletedEvent(), new AttachmentAddedEvent(),
-      new AttachmentDeletedEvent(), new AttachmentUpdatedEvent());
 
   /**
    * Collecting all the fields for using up in search
@@ -312,86 +291,12 @@ public class IndexUpdater extends AbstractXWikiRunnable implements EventListener
     plugin.closeSearcherProvider();
   }
 
-  @Deprecated
-  public void queueDeletion(String docId) {
-    queue(new DeleteData(docId));
-  }
-
-  @Deprecated
-  public void queueDocument(XWikiDocument document, boolean deleted) {
-    queue(new DocumentData(document, deleted));
-  }
-
-  @Deprecated
-  public void queueAttachment(XWikiAttachment attachment, boolean deleted) {
-    queue(new AttachmentData(attachment, deleted));
-  }
-
-  @Deprecated
-  public void queueAttachment(XWikiDocument document, String attachmentName, boolean deleted) {
-    queue(new AttachmentData(document, attachmentName, deleted));
-  }
-
-  @Deprecated
-  public int queueAttachments(XWikiDocument document) {
-    int ret = 0;
-    checkNotNull(document);
-    for (XWikiAttachment attachment : document.getAttachmentList()) {
-      queueAttachment(attachment, false);
-      ret++;
-    }
-    return ret;
-  }
-
-  @Deprecated
-  public void queueWiki(WikiReference wikiRef, boolean deleted) {
-    queue(new WikiData(wikiRef, deleted));
-  }
-
   public void queue(AbstractIndexData data) {
     if (!isExit()) {
       LOGGER.debug("queue{}: '{}'", (data.isDeleted() ? " delete" : ""), data.getId());
       queues.get(data.getPriority()).add(data);
     } else {
       throw new IllegalStateException("IndexUpdater has been shut down");
-    }
-  }
-
-  @Override
-  public String getName() {
-    return NAME;
-  }
-
-  @Override
-  public List<Event> getEvents() {
-    return EVENTS;
-  }
-
-  @Override
-  public void onEvent(Event event, Object source, Object data) {
-    LOGGER.debug("onEvent: for '{}' on '{}'", event.getClass(), source);
-    try {
-      queueFromEvent(event, source);
-    } catch (IllegalStateException ise) {
-      LOGGER.error("failed to queue '{}': " + ise.getMessage(), source);
-    }
-  }
-
-  private void queueFromEvent(Event event, Object source) {
-    if (source == null) {
-      LOGGER.error("onEvent: received null source");
-    } else if ((event instanceof DocumentUpdatedEvent) || (event instanceof DocumentCreatedEvent)) {
-      queueDocument((XWikiDocument) source, false);
-    } else if (event instanceof DocumentDeletedEvent) {
-      queueDocument((XWikiDocument) source, true);
-    } else if ((event instanceof AttachmentUpdatedEvent)
-        || (event instanceof AttachmentAddedEvent)) {
-      queueAttachment(((XWikiDocument) source).getAttachment(
-          ((AbstractAttachmentEvent) event).getName()), false);
-    } else if (event instanceof AttachmentDeletedEvent) {
-      queueAttachment((XWikiDocument) source, ((AbstractAttachmentEvent) event).getName(), true);
-    } else if (event instanceof WikiDeletedEvent) {
-      queueWiki(getModelUtils().resolveRef((String) source, WikiReference.class), true);
     }
   }
 
