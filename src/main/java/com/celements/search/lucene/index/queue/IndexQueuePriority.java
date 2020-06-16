@@ -2,6 +2,6 @@ package com.celements.search.lucene.index.queue;
 
 public enum IndexQueuePriority {
 
-  LOW, DEFAULT, HIGH;
+  LOWEST, LOW, DEFAULT, HIGH, HIGHEST;
 
 }

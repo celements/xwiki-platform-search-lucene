@@ -336,7 +336,7 @@ public class IndexRebuilder implements LuceneIndexRebuildService {
   }
 
   private void queue(AbstractIndexData data) {
-    data.setPriority(IndexQueuePriority.LOW);
+    data.setPriority(IndexQueuePriority.LOWEST);
     data.disableObservationEventNotification(true);
     expectIndexUpdater().queue(data);
   }
