@@ -247,7 +247,7 @@ public class IndexUpdater extends AbstractXWikiRunnable {
       }
       LOGGER.trace("updateIndex successfully finished document [{}]", data.getEntityReference());
     } catch (Exception exc) {
-      LOGGER.warn("error indexing document '{}'", data.getEntityReference(), exc);
+      LOGGER.warn("error indexing [{}], {}: {}", data, exc.getClass(), exc.getMessage(), exc);
     }
   }
 
