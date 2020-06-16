@@ -173,7 +173,8 @@ public abstract class AbstractIndexData {
   @Override
   public String toString() {
     return this.getClass().getSimpleName() + " [id=" + getId() + ", deleted=" + deleted + ", type="
-        + type + "]";
+        + type + ", priority=" + priority + ", notifyObservationEvents=" + notifyObservationEvents
+        + "]";
   }
 
   protected ModelContext getContext() {
