@@ -128,7 +128,7 @@ public abstract class AbstractIndexData {
     return notifyObservationEvents;
   }
 
-  public AbstractIndexData disableObservationEventNotification(boolean disable) {
+  public @NotNull AbstractIndexData setDisableObservationEventNotification(boolean disable) {
     this.notifyObservationEvents = !disable;
     return this;
   }
@@ -137,7 +137,7 @@ public abstract class AbstractIndexData {
     return priority;
   }
 
-  public AbstractIndexData setPriority(@Nullable IndexQueuePriority priority) {
+  public @NotNull AbstractIndexData setPriority(@Nullable IndexQueuePriority priority) {
     this.priority = firstNonNull(priority, IndexQueuePriority.DEFAULT);
     return this;
   }

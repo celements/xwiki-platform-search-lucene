@@ -176,11 +176,7 @@ public class IndexRebuilder implements LuceneIndexRebuildService {
 
   @Override
   public synchronized Optional<IndexRebuildFuture> getRunningRebuild() {
-    return getRunningRebuilds().findFirst();
-  }
-
-  public synchronized Stream<IndexRebuildFuture> getRunningRebuilds() {
-    return rebuildQueue.stream().filter(not(CompletableFuture::isDone));
+    return rebuildQueue.stream().filter(not(CompletableFuture::isDone)).findFirst();
   }
 
   @Override
@@ -337,7 +333,7 @@ public class IndexRebuilder implements LuceneIndexRebuildService {
 
   private void queue(AbstractIndexData data) {
     data.setPriority(IndexQueuePriority.LOWEST);
-    data.disableObservationEventNotification(true);
+    data.setDisableObservationEventNotification(true);
     expectIndexUpdater().queue(data);
   }
 
