@@ -32,6 +32,8 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import javax.validation.constraints.NotNull;
+
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.lucene.analysis.Analyzer;
@@ -62,9 +64,9 @@ import org.apache.lucene.util.Version;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.xwiki.context.Execution;
-import org.xwiki.observation.ObservationManager;
 
 import com.celements.search.lucene.LuceneDocType;
+import com.celements.search.lucene.index.queue.IndexQueuePriority;
 import com.celements.search.lucene.index.rebuild.LuceneIndexRebuildService;
 import com.google.common.base.Strings;
 import com.google.common.collect.Iterables;
@@ -72,8 +74,6 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.xpn.xwiki.XWikiContext;
 import com.xpn.xwiki.api.Api;
 import com.xpn.xwiki.api.XWiki;
-import com.xpn.xwiki.doc.XWikiAttachment;
-import com.xpn.xwiki.doc.XWikiDocument;
 import com.xpn.xwiki.plugin.XWikiDefaultPlugin;
 import com.xpn.xwiki.plugin.XWikiPluginInterface;
 import com.xpn.xwiki.plugin.lucene.searcherProvider.ISearcherProviderRole;
@@ -119,8 +119,6 @@ public class LucenePlugin extends XWikiDefaultPlugin {
   private static final String DEFAULT_ANALYZER = "org.apache.lucene.analysis.standard.StandardAnalyzer";
 
   static final String PROP_WRITER_BUFFER_SIZE = "xwiki.plugins.lucene.writerBufferSize";
-
-  public static final String EXEC_DISABLE_EVENT_NOTIFICATION = "lucene.index.disableObservationEventNotification";
 
   /**
    * Lucene index updater. Listens for changes and indexes wiki documents in a separate
@@ -552,7 +550,6 @@ public class LucenePlugin extends XWikiDefaultPlugin {
       this.indexUpdater = new IndexUpdater(writer, this, context);
       indexUpdaterExecutor.submit(indexUpdater);
       getIndexRebuildService().initialize(indexUpdater);
-      registerIndexUpdater();
       LOGGER.info("Lucene plugin initialized.");
     } catch (IOException exc) {
       LOGGER.error("Failed to open the index directory: ", exc);
@@ -622,18 +619,6 @@ public class LucenePlugin extends XWikiDefaultPlugin {
     return ret;
   }
 
-  /**
-   * Register the Index Updater as an Event Listener so that modified documents/attachments are
-   * added to the Lucene indexing queue.
-   * If the Index Updater is already registered don't do anything.
-   */
-  private void registerIndexUpdater() {
-    ObservationManager observationManager = Utils.getComponent(ObservationManager.class);
-    if (observationManager.getListener(indexUpdater.getName()) == null) {
-      observationManager.addListener(indexUpdater);
-    }
-  }
-
   @Override
   public void flushCache(XWikiContext context) {
     LOGGER.warn("flushing cache not supported");
@@ -685,16 +670,12 @@ public class LucenePlugin extends XWikiDefaultPlugin {
     return this.indexUpdater.getQueueSize();
   }
 
-  public void queueDocument(XWikiDocument doc, XWikiContext context) {
-    this.indexUpdater.queueDocument(doc, false);
+  public long getQueueSize(@NotNull IndexQueuePriority priority) {
+    return this.indexUpdater.getQueueSize(priority);
   }
 
-  public void queueAttachment(XWikiDocument doc, XWikiAttachment attach, XWikiContext context) {
-    this.indexUpdater.queueAttachment(attach, false);
-  }
-
-  public void queueAttachment(XWikiDocument doc, XWikiContext context) {
-    this.indexUpdater.queueAttachments(doc);
+  public void queue(@NotNull AbstractIndexData data) {
+    this.indexUpdater.queue(data);
   }
 
   /**

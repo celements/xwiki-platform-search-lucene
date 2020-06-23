@@ -37,6 +37,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
+import java.util.stream.Stream;
 
 import javax.validation.constraints.NotNull;
 
@@ -68,6 +69,7 @@ import com.celements.model.context.ModelContext;
 import com.celements.model.metadata.DocumentMetaData;
 import com.celements.model.util.ModelUtils;
 import com.celements.model.util.References;
+import com.celements.search.lucene.index.queue.IndexQueuePriority;
 import com.celements.search.lucene.index.rebuild.LuceneIndexRebuildService;
 import com.celements.store.DocumentCacheStore;
 import com.celements.store.MetaDataStoreExtension;
@@ -330,7 +332,8 @@ public class IndexRebuilder implements LuceneIndexRebuildService {
   }
 
   private void queue(AbstractIndexData data) {
-    data.disableObservationEventNotification();
+    data.setPriority(IndexQueuePriority.LOWEST);
+    data.setDisableObservationEventNotification(true);
     expectIndexUpdater().queue(data);
   }
 
