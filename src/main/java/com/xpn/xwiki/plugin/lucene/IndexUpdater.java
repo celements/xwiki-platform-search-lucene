@@ -34,7 +34,6 @@ import javax.validation.constraints.NotNull;
 
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Fieldable;
-import org.apache.lucene.index.CorruptIndexException;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.store.Directory;
 import org.slf4j.Logger;
@@ -278,7 +277,7 @@ public class IndexUpdater extends AbstractXWikiRunnable {
     }
   }
 
-  private void removeFromIndex(AbstractIndexData data) throws CorruptIndexException, IOException {
+  private void removeFromIndex(AbstractIndexData data) throws IOException {
     LOGGER.debug("removeFromIndex: '{}'", data);
     EntityReference ref = data.getEntityReference();
     if (ref != null) {
