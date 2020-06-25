@@ -56,6 +56,7 @@ public class IndexFields {
    * Name of the document
    */
   public static final String DOCUMENT_NAME = "name";
+  public static final String DOCUMENT_NAME_S = "name_s";
 
   /**
    * Name of the web the document belongs to
@@ -67,6 +68,7 @@ public class IndexFields {
    * Name of the space the document belongs to
    */
   public static final String DOCUMENT_SPACE = "space";
+  public static final String DOCUMENT_SPACE_S = "space_s";
 
   /**
    * FullName of the document (example : Main.WebHome)

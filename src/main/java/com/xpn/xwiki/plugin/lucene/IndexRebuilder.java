@@ -396,10 +396,10 @@ public class IndexRebuilder implements LuceneIndexRebuildService {
   private BooleanQuery getLuceneSearchRefQuery(@NotNull EntityReference ref) {
     BooleanQuery query = new BooleanQuery();
     References.extractRef(ref, DocumentReference.class).toJavaUtil()
-        .ifPresent(docRef -> query.add(new TermQuery(new Term(IndexFields.DOCUMENT_NAME,
+        .ifPresent(docRef -> query.add(new TermQuery(new Term(IndexFields.DOCUMENT_NAME_S,
             docRef.getName().toLowerCase())), BooleanClause.Occur.MUST));
     References.extractRef(ref, SpaceReference.class).toJavaUtil()
-        .ifPresent(spaceRef -> query.add(new TermQuery(new Term(IndexFields.DOCUMENT_SPACE,
+        .ifPresent(spaceRef -> query.add(new TermQuery(new Term(IndexFields.DOCUMENT_SPACE_S,
             spaceRef.getName().toLowerCase())), BooleanClause.Occur.MUST));
     WikiReference wikiRef = References.extractRef(ref, WikiReference.class).get();
     query.add(new TermQuery(new Term(IndexFields.DOCUMENT_WIKI, wikiRef.getName().toLowerCase())),

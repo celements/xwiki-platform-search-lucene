@@ -169,9 +169,13 @@ public abstract class AbstractDocumentData extends AbstractIndexData {
           Field.Index.NOT_ANALYZED, 0.1f, luceneDoc);
     }
     addFieldToDocument(IndexFields.DOCUMENT_NAME, getDocumentName(), Field.Store.YES,
+        Field.Index.ANALYZED, NAME_BOOST, luceneDoc);
+    addFieldToDocument(IndexFields.DOCUMENT_NAME_S, getDocumentName(), Field.Store.YES,
         Field.Index.NOT_ANALYZED, NAME_BOOST, luceneDoc);
 
     addFieldToDocument(IndexFields.DOCUMENT_SPACE, getDocumentSpace(), Field.Store.YES,
+        Field.Index.ANALYZED, SPACE_BOOST, luceneDoc);
+    addFieldToDocument(IndexFields.DOCUMENT_SPACE_S, getDocumentSpace(), Field.Store.YES,
         Field.Index.NOT_ANALYZED, SPACE_BOOST, luceneDoc);
 
     // Old alias for the Space, reduce the importance so that a space hit
