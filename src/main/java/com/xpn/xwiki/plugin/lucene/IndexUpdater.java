@@ -44,7 +44,6 @@ import org.xwiki.model.reference.WikiReference;
 import org.xwiki.observation.ObservationManager;
 
 import com.celements.common.observation.event.AbstractEntityEvent;
-import com.celements.model.access.exception.DocumentAccessException;
 import com.celements.model.access.exception.DocumentNotExistsException;
 import com.celements.model.context.ModelContext;
 import com.celements.model.util.ModelUtils;
@@ -257,7 +256,7 @@ public class IndexUpdater extends AbstractXWikiRunnable {
     }
   }
 
-  private void addToIndex(AbstractIndexData data) throws IOException, DocumentAccessException {
+  private void addToIndex(AbstractIndexData data) throws IOException, DocumentNotExistsException {
     LOGGER.debug("addToIndex: '{}'", data);
     EntityReference ref = data.getEntityReference();
     notify(data, new LuceneDocumentIndexingEvent(ref));
