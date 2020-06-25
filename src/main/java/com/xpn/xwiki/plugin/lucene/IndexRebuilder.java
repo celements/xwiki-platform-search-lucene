@@ -37,6 +37,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
+import java.util.stream.Stream;
 
 import javax.validation.constraints.NotNull;
 
@@ -399,8 +400,9 @@ public class IndexRebuilder implements LuceneIndexRebuildService {
         .ifPresent(docRef -> query.add(new TermQuery(new Term(IndexFields.DOCUMENT_NAME,
             docRef.getName().toLowerCase())), BooleanClause.Occur.MUST));
     References.extractRef(ref, SpaceReference.class).toJavaUtil()
-        .ifPresent(spaceRef -> query.add(new TermQuery(new Term(IndexFields.DOCUMENT_SPACE,
-            spaceRef.getName().toLowerCase())), BooleanClause.Occur.MUST));
+        .ifPresent(spaceRef -> Stream.of(spaceRef.getName().toLowerCase().split("-"))
+            .forEach(part -> query.add(new TermQuery(new Term(IndexFields.DOCUMENT_SPACE, part)),
+                BooleanClause.Occur.MUST)));
     WikiReference wikiRef = References.extractRef(ref, WikiReference.class).get();
     query.add(new TermQuery(new Term(IndexFields.DOCUMENT_WIKI, wikiRef.getName().toLowerCase())),
         BooleanClause.Occur.MUST);
