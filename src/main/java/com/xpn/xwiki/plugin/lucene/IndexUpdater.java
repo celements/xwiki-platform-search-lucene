@@ -265,7 +265,7 @@ public class IndexUpdater extends AbstractXWikiRunnable {
     collectFields(luceneDoc);
     writer.updateDocument(data.getTerm(), luceneDoc);
     notify(data, new LuceneDocumentIndexedEvent(ref));
-    LOGGER.info("addToIndex: [{}] - {}", data.getTerm(), luceneDoc);
+    LOGGER.trace("addToIndex: [{}] - {}", data.getTerm(), luceneDoc);
   }
 
   // collecting all the fields for using up in search
