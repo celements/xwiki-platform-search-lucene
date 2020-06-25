@@ -44,6 +44,8 @@ import org.xwiki.model.reference.WikiReference;
 import org.xwiki.observation.ObservationManager;
 
 import com.celements.common.observation.event.AbstractEntityEvent;
+import com.celements.model.access.exception.DocumentAccessException;
+import com.celements.model.access.exception.DocumentNotExistsException;
 import com.celements.model.context.ModelContext;
 import com.celements.model.util.ModelUtils;
 import com.celements.model.util.References;
@@ -51,7 +53,6 @@ import com.celements.search.lucene.index.queue.IndexQueuePriority;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Ordering;
 import com.xpn.xwiki.XWikiContext;
-import com.xpn.xwiki.XWikiException;
 import com.xpn.xwiki.plugin.lucene.indexExtension.ILuceneIndexExtensionServiceRole;
 import com.xpn.xwiki.plugin.lucene.observation.event.LuceneDocumentDeletedEvent;
 import com.xpn.xwiki.plugin.lucene.observation.event.LuceneDocumentDeletingEvent;
@@ -237,21 +238,26 @@ public class IndexUpdater extends AbstractXWikiRunnable {
 
   private void indexData(AbstractIndexData data) {
     try {
-      LOGGER.trace("updateIndex start document [{}]", data.getEntityReference());
+      LOGGER.trace("indexData: start [{}]", data.getEntityReference());
       getContext().setWikiRef(References.extractRef(data.getEntityReference(),
           WikiReference.class).or(getContext().getWikiRef()));
       if (data.isDeleted()) {
         removeFromIndex(data);
       } else {
-        addToIndex(data);
+        try {
+          addToIndex(data);
+        } catch (DocumentNotExistsException dne) {
+          LOGGER.info("indexData: removing inexistent [{}]", data.getEntityReference(), dne);
+          removeFromIndex(data);
+        }
       }
-      LOGGER.trace("updateIndex successfully finished document [{}]", data.getEntityReference());
+      LOGGER.trace("indexData: finished [{}]", data.getEntityReference());
     } catch (Exception exc) {
-      LOGGER.warn("error indexing [{}], {}: {}", data, exc.getClass(), exc.getMessage(), exc);
+      LOGGER.warn("indexData: error [{}], {}: {}", data, exc.getClass(), exc.getMessage(), exc);
     }
   }
 
-  private void addToIndex(AbstractIndexData data) throws IOException, XWikiException {
+  private void addToIndex(AbstractIndexData data) throws IOException, DocumentAccessException {
     LOGGER.debug("addToIndex: '{}'", data);
     EntityReference ref = data.getEntityReference();
     notify(data, new LuceneDocumentIndexingEvent(ref));

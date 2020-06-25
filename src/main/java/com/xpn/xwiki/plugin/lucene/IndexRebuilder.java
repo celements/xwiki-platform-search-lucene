@@ -37,7 +37,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
-import java.util.stream.Stream;
 
 import javax.validation.constraints.NotNull;
 
@@ -296,6 +295,7 @@ public class IndexRebuilder implements LuceneIndexRebuildService {
     for (ScoreDoc scoreDoc : topDocs.scoreDocs) {
       ret.add(searcher.doc(scoreDoc.doc).get(IndexFields.DOCUMENT_ID));
     }
+    LOGGER.info("getAllIndexedDocs: [{}] for query [{}]", topDocs.scoreDocs.length, query);
     return ret;
   }
 

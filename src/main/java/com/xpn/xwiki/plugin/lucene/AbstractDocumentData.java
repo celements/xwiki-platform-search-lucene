@@ -36,7 +36,6 @@ import org.xwiki.rendering.syntax.Syntax;
 import com.celements.model.access.IModelAccessFacade;
 import com.celements.model.access.exception.DocumentNotExistsException;
 import com.celements.search.lucene.LuceneDocType;
-import com.xpn.xwiki.XWikiException;
 import com.xpn.xwiki.doc.XWikiDocument;
 import com.xpn.xwiki.web.Utils;
 
@@ -113,14 +112,10 @@ public abstract class AbstractDocumentData extends AbstractIndexData {
   }
 
   @Override
-  public void addDataToLuceneDocument(Document luceneDoc) throws XWikiException {
-    try {
-      XWikiDocument doc = getModelAccess().getDocument(getDocumentReference(), getLanguage());
-      addDocumentData(luceneDoc, doc);
-      addAdditionalData(luceneDoc, doc);
-    } catch (DocumentNotExistsException exc) {
-      throw new XWikiException(0, 0, "failed to load doc", exc);
-    }
+  public void addDataToLuceneDocument(Document luceneDoc) throws DocumentNotExistsException {
+    XWikiDocument doc = getModelAccess().getDocument(getDocumentReference(), getLanguage());
+    addDocumentData(luceneDoc, doc);
+    addAdditionalData(luceneDoc, doc);
   }
 
   protected abstract void addAdditionalData(Document luceneDoc, XWikiDocument doc);

@@ -21,11 +21,8 @@ package com.xpn.xwiki.plugin.lucene;
 
 import static com.google.common.base.Preconditions.*;
 
-import org.apache.lucene.document.Document;
-
 import com.celements.search.lucene.LuceneDocType;
 import com.google.common.base.Strings;
-import com.xpn.xwiki.XWikiException;
 
 public class DeleteData extends AbstractIndexData {
 
@@ -39,10 +36,6 @@ public class DeleteData extends AbstractIndexData {
   @Override
   public String getId() {
     return docId;
-  }
-
-  @Override
-  public void addDataToLuceneDocument(Document luceneDoc) throws XWikiException {
   }
 
 }

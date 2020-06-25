@@ -21,12 +21,10 @@ package com.xpn.xwiki.plugin.lucene;
 
 import static com.google.common.base.Preconditions.*;
 
-import org.apache.lucene.document.Document;
 import org.apache.lucene.index.Term;
 import org.xwiki.model.reference.WikiReference;
 
 import com.celements.search.lucene.LuceneDocType;
-import com.xpn.xwiki.XWikiException;
 
 /**
  * Holds all data but the content of a wiki page to be indexed. The content is retrieved
@@ -49,10 +47,6 @@ public class WikiData extends AbstractIndexData {
   @Override
   public Term getTerm() {
     return new Term(IndexFields.DOCUMENT_WIKI, getWiki());
-  }
-
-  @Override
-  public void addDataToLuceneDocument(Document luceneDoc) throws XWikiException {
   }
 
 }
