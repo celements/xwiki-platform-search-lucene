@@ -37,7 +37,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
-import java.util.stream.Stream;
 
 import javax.validation.constraints.NotNull;
 
@@ -296,6 +295,7 @@ public class IndexRebuilder implements LuceneIndexRebuildService {
     for (ScoreDoc scoreDoc : topDocs.scoreDocs) {
       ret.add(searcher.doc(scoreDoc.doc).get(IndexFields.DOCUMENT_ID));
     }
+    LOGGER.info("getAllIndexedDocs: [{}] for query [{}]", topDocs.scoreDocs.length, query);
     return ret;
   }
 
@@ -396,10 +396,10 @@ public class IndexRebuilder implements LuceneIndexRebuildService {
   private BooleanQuery getLuceneSearchRefQuery(@NotNull EntityReference ref) {
     BooleanQuery query = new BooleanQuery();
     References.extractRef(ref, DocumentReference.class).toJavaUtil()
-        .ifPresent(docRef -> query.add(new TermQuery(new Term(IndexFields.DOCUMENT_NAME,
+        .ifPresent(docRef -> query.add(new TermQuery(new Term(IndexFields.DOCUMENT_NAME_S,
             docRef.getName().toLowerCase())), BooleanClause.Occur.MUST));
     References.extractRef(ref, SpaceReference.class).toJavaUtil()
-        .ifPresent(spaceRef -> query.add(new TermQuery(new Term(IndexFields.DOCUMENT_SPACE,
+        .ifPresent(spaceRef -> query.add(new TermQuery(new Term(IndexFields.DOCUMENT_SPACE_S,
             spaceRef.getName().toLowerCase())), BooleanClause.Occur.MUST));
     WikiReference wikiRef = References.extractRef(ref, WikiReference.class).get();
     query.add(new TermQuery(new Term(IndexFields.DOCUMENT_WIKI, wikiRef.getName().toLowerCase())),

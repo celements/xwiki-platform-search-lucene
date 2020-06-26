@@ -31,11 +31,11 @@ import org.xwiki.model.EntityType;
 import org.xwiki.model.reference.EntityReference;
 import org.xwiki.model.reference.EntityReferenceSerializer;
 
+import com.celements.model.access.exception.DocumentNotExistsException;
 import com.celements.model.context.ModelContext;
 import com.celements.model.util.ModelUtils;
 import com.celements.search.lucene.LuceneDocType;
 import com.celements.search.lucene.index.queue.IndexQueuePriority;
-import com.xpn.xwiki.XWikiException;
 import com.xpn.xwiki.web.Utils;
 
 /**
@@ -87,7 +87,8 @@ public abstract class AbstractIndexData {
    *          if not null, this controls which translated version of the content will be
    *          indexed. If null, the content in the default language will be used.
    */
-  public abstract void addDataToLuceneDocument(Document luceneDoc) throws XWikiException;
+  public void addDataToLuceneDocument(Document luceneDoc)
+      throws DocumentNotExistsException {}
 
   /**
    * @return string unique to this document across all languages and virtual wikis

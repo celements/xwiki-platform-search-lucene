@@ -36,7 +36,6 @@ import org.xwiki.rendering.syntax.Syntax;
 import com.celements.model.access.IModelAccessFacade;
 import com.celements.model.access.exception.DocumentNotExistsException;
 import com.celements.search.lucene.LuceneDocType;
-import com.xpn.xwiki.XWikiException;
 import com.xpn.xwiki.doc.XWikiDocument;
 import com.xpn.xwiki.web.Utils;
 
@@ -113,14 +112,10 @@ public abstract class AbstractDocumentData extends AbstractIndexData {
   }
 
   @Override
-  public void addDataToLuceneDocument(Document luceneDoc) throws XWikiException {
-    try {
-      XWikiDocument doc = getModelAccess().getDocument(getDocumentReference(), getLanguage());
-      addDocumentData(luceneDoc, doc);
-      addAdditionalData(luceneDoc, doc);
-    } catch (DocumentNotExistsException exc) {
-      throw new XWikiException(0, 0, "failed to load doc", exc);
-    }
+  public void addDataToLuceneDocument(Document luceneDoc) throws DocumentNotExistsException {
+    XWikiDocument doc = getModelAccess().getDocument(getDocumentReference(), getLanguage());
+    addDocumentData(luceneDoc, doc);
+    addAdditionalData(luceneDoc, doc);
   }
 
   protected abstract void addAdditionalData(Document luceneDoc, XWikiDocument doc);
@@ -133,8 +128,8 @@ public abstract class AbstractDocumentData extends AbstractIndexData {
         getDocumentSpace(), getFullName(), doc.isHidden());
 
     // Keyword fields: stored and indexed, but not tokenized
-    addFieldToDocument(IndexFields.DOCUMENT_ID, getId(), Field.Store.YES, Field.Index.NOT_ANALYZED,
-        ID_BOOST, luceneDoc);
+    addFieldToDocument(IndexFields.DOCUMENT_ID, getId(), Field.Store.YES,
+        Field.Index.NOT_ANALYZED, ID_BOOST, luceneDoc);
 
     addFieldToDocument(IndexFields.DOCUMENT_LANGUAGE, getLanguage(), Field.Store.YES,
         Field.Index.NOT_ANALYZED, LANGUAGE_BOOST, luceneDoc);
@@ -144,12 +139,12 @@ public abstract class AbstractDocumentData extends AbstractIndexData {
 
     if (StringUtils.isNotBlank(this.author)) {
       addFieldToDocument(IndexFields.DOCUMENT_AUTHOR, this.author, Field.Store.YES,
-          Field.Index.ANALYZED, AUTHOR_BOOST, luceneDoc);
+          Field.Index.NOT_ANALYZED, AUTHOR_BOOST, luceneDoc);
     }
 
     if (StringUtils.isNotBlank(this.creator)) {
       addFieldToDocument(IndexFields.DOCUMENT_CREATOR, this.creator, Field.Store.YES,
-          Field.Index.ANALYZED, CREATOR_BOOST, luceneDoc);
+          Field.Index.NOT_ANALYZED, CREATOR_BOOST, luceneDoc);
     }
 
     if (getType() != null) {
@@ -175,9 +170,13 @@ public abstract class AbstractDocumentData extends AbstractIndexData {
     }
     addFieldToDocument(IndexFields.DOCUMENT_NAME, getDocumentName(), Field.Store.YES,
         Field.Index.ANALYZED, NAME_BOOST, luceneDoc);
+    addFieldToDocument(IndexFields.DOCUMENT_NAME_S, getDocumentName(), Field.Store.YES,
+        Field.Index.NOT_ANALYZED, NAME_BOOST, luceneDoc);
 
     addFieldToDocument(IndexFields.DOCUMENT_SPACE, getDocumentSpace(), Field.Store.YES,
         Field.Index.ANALYZED, SPACE_BOOST, luceneDoc);
+    addFieldToDocument(IndexFields.DOCUMENT_SPACE_S, getDocumentSpace(), Field.Store.YES,
+        Field.Index.NOT_ANALYZED, SPACE_BOOST, luceneDoc);
 
     // Old alias for the Space, reduce the importance so that a space hit
     // doesn't score double

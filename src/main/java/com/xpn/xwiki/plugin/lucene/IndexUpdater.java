@@ -34,7 +34,6 @@ import javax.validation.constraints.NotNull;
 
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Fieldable;
-import org.apache.lucene.index.CorruptIndexException;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.store.Directory;
 import org.slf4j.Logger;
@@ -44,6 +43,7 @@ import org.xwiki.model.reference.WikiReference;
 import org.xwiki.observation.ObservationManager;
 
 import com.celements.common.observation.event.AbstractEntityEvent;
+import com.celements.model.access.exception.DocumentNotExistsException;
 import com.celements.model.context.ModelContext;
 import com.celements.model.util.ModelUtils;
 import com.celements.model.util.References;
@@ -51,7 +51,6 @@ import com.celements.search.lucene.index.queue.IndexQueuePriority;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Ordering;
 import com.xpn.xwiki.XWikiContext;
-import com.xpn.xwiki.XWikiException;
 import com.xpn.xwiki.plugin.lucene.indexExtension.ILuceneIndexExtensionServiceRole;
 import com.xpn.xwiki.plugin.lucene.observation.event.LuceneDocumentDeletedEvent;
 import com.xpn.xwiki.plugin.lucene.observation.event.LuceneDocumentDeletingEvent;
@@ -237,21 +236,26 @@ public class IndexUpdater extends AbstractXWikiRunnable {
 
   private void indexData(AbstractIndexData data) {
     try {
-      LOGGER.trace("updateIndex start document [{}]", data.getEntityReference());
+      LOGGER.trace("indexData: start [{}]", data.getEntityReference());
       getContext().setWikiRef(References.extractRef(data.getEntityReference(),
           WikiReference.class).or(getContext().getWikiRef()));
       if (data.isDeleted()) {
         removeFromIndex(data);
       } else {
-        addToIndex(data);
+        try {
+          addToIndex(data);
+        } catch (DocumentNotExistsException dne) {
+          LOGGER.info("indexData: removing inexistent [{}]", data.getEntityReference(), dne);
+          removeFromIndex(data);
+        }
       }
-      LOGGER.trace("updateIndex successfully finished document [{}]", data.getEntityReference());
+      LOGGER.trace("indexData: finished [{}]", data.getEntityReference());
     } catch (Exception exc) {
-      LOGGER.warn("error indexing [{}], {}: {}", data, exc.getClass(), exc.getMessage(), exc);
+      LOGGER.warn("indexData: error [{}], {}: {}", data, exc.getClass(), exc.getMessage(), exc);
     }
   }
 
-  private void addToIndex(AbstractIndexData data) throws IOException, XWikiException {
+  private void addToIndex(AbstractIndexData data) throws IOException, DocumentNotExistsException {
     LOGGER.debug("addToIndex: '{}'", data);
     EntityReference ref = data.getEntityReference();
     notify(data, new LuceneDocumentIndexingEvent(ref));
@@ -261,6 +265,7 @@ public class IndexUpdater extends AbstractXWikiRunnable {
     collectFields(luceneDoc);
     writer.updateDocument(data.getTerm(), luceneDoc);
     notify(data, new LuceneDocumentIndexedEvent(ref));
+    LOGGER.trace("addToIndex: [{}] - {}", data.getTerm(), luceneDoc);
   }
 
   // collecting all the fields for using up in search
@@ -273,7 +278,7 @@ public class IndexUpdater extends AbstractXWikiRunnable {
     }
   }
 
-  private void removeFromIndex(AbstractIndexData data) throws CorruptIndexException, IOException {
+  private void removeFromIndex(AbstractIndexData data) throws IOException {
     LOGGER.debug("removeFromIndex: '{}'", data);
     EntityReference ref = data.getEntityReference();
     if (ref != null) {

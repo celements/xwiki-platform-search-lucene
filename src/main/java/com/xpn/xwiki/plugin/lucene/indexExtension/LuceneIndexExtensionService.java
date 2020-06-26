@@ -69,7 +69,7 @@ public class LuceneIndexExtensionService implements ILuceneIndexExtensionService
                   luceneDoc.removeFields(extField.getName());
                   break;
               }
-              LOGGER.debug("extendend field '{}' by extender '{}' for data '{}' ", extField,
+              LOGGER.trace("extendend field '{}' by extender '{}' for data '{}' ", extField,
                   ext.getName(), data);
             }
           }
