@@ -93,6 +93,12 @@
       <artifactId>servlet-api</artifactId>
       <scope>test</scope>
     </dependency>
+    <dependency>
+      <groupId>org.apache.xmlgraphics</groupId>
+      <artifactId>batik-ext</artifactId>
+      <version>1.8</version>
+    </dependency>
+    
   </dependencies>
   <build>
     <plugins>
