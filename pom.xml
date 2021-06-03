@@ -18,6 +18,24 @@
   </scm>
   <dependencies>
     <dependency>
+      <groupId>com.celements</groupId>
+      <artifactId>celements-shared-tests-deprecated</artifactId>
+      <version>5.0-SNAPSHOT</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.celements</groupId>
+      <artifactId>celements-model</artifactId>
+      <version>5.1-SNAPSHOT</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.celements</groupId>
+      <artifactId>celements-core</artifactId>
+      <version>5.1-SNAPSHOT</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
       <groupId>org.apache.lucene</groupId>
       <artifactId>lucene-core</artifactId>
       <version>3.4.0</version>
@@ -49,18 +67,6 @@
     <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-log4j12</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.celements</groupId>
-      <artifactId>celements-model</artifactId>
-      <version>5.1-SNAPSHOT</version>
-      <scope>provided</scope>
-    </dependency>
-    <dependency>
-      <groupId>com.celements</groupId>
-      <artifactId>celements-core</artifactId>
-      <version>5.1-SNAPSHOT</version>
-      <scope>provided</scope>
     </dependency>
     <dependency>
       <!-- IMPORTANT: includes transitive dependency 'poi-ooxml-4.0.1'
