@@ -20,9 +20,7 @@
  * 02110-1301 USA, or see the FSF site: http://www.fsf.org.
  *
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <groupId>com.celements</groupId>
@@ -31,12 +29,13 @@
   </parent>
   <artifactId>xwiki-platform-search-lucene</artifactId>
   <name>XWiki Platform - Search - Lucene</name>
-  <version>5.1-SNAPSHOT</version>
+  <version>5.1</version>
   <description>XWiki Platform - Search - Lucene</description>
   <scm>
     <connection>scm:git:git://github.com/celements/xwiki-platform-search-lucene.git</connection>
     <developerConnection>scm:git:git@github.com:celements/xwiki-platform-search-lucene.git</developerConnection>
     <url>https://github.com/celements/xwiki-platform-search-lucene</url>
+    <tag>xwiki-platform-search-lucene-5.1</tag>
   </scm>
   <dependencies>
     <dependency>
