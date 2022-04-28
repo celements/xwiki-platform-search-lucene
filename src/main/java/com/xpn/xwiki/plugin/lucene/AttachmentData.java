@@ -194,6 +194,11 @@ public class AttachmentData extends AbstractDocumentData {
     } catch (XWikiException | IOException | TikaException ex) {
       LOGGER.error("error getting content of attachment [{}] for document [{}]", this.filename,
           doc.getDocumentReference(), ex);
+    } catch (LinkageError linkError) {
+      // Tika parsing is prone to throwing these Errors when one of its countless dependencies are
+      // messed up. This causes the whole indexer to die if we don't catch it here.
+      LOGGER.error("IMPORTANT LinkageError on doc [{}] file [{}]: {}", doc.getDocumentReference(),
+          filename, linkError.getMessage(), linkError);
     }
     return contentText;
   }

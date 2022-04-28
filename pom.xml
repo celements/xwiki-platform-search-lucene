@@ -76,14 +76,10 @@
       <artifactId>commons-collections</artifactId>
     </dependency>
     <dependency>
-      <!-- IMPORTANT: includes transitive dependency 'poi-ooxml-4.0.1'
+      <!-- IMPORTANT: includes transitive dependency 'asm' and 'poi-ooxml'
         on tika upgrade match other existing versions accordingly -->
       <groupId>org.apache.tika</groupId>
       <artifactId>tika-parsers</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>asm</groupId>
-      <artifactId>asm</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.pdfbox</groupId>
