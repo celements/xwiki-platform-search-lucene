@@ -223,8 +223,9 @@ public class SearchResults extends Api {
     int listStartIndex = Math.max(beginIndex - 1, 0);
     int listEndIndex = listStartIndex + items;
     int resultcount = getRelevantResults().size();
-    getBenchService().bench("SearchResults.getResults after getRelevantResults");
     listEndIndex = listEndIndex < resultcount ? listEndIndex : resultcount;
+    getBenchService().bench("SearchResults.getResults after getRelevantResults size:"
+        + resultcount + " startIndex: " + listStartIndex + " endIndex: " + listEndIndex);
     if (listStartIndex <= listEndIndex) {
       return getRelevantResults().subList(listStartIndex, listEndIndex);
     } else {
