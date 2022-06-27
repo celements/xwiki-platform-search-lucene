@@ -106,6 +106,7 @@ public class SearchResults extends Api {
         LOGGER.debug("getRelevantResults: checking access to scoreDocs [{}] for results ["
             + "{}] with class [{}] and id-Hash [{}].", docs.scoreDocs.length,
             results.getTotalHits(), results.getClass(), System.identityHashCode(results));
+        getBenchService().bench("SearchResults.getRelevantResults before 'for docs.scoreDocs'");
         for (ScoreDoc scoreDoc : docs.scoreDocs) {
           try {
             SearchResult result = new SearchResult(searcher.doc(scoreDoc.doc), scoreDoc.score,
