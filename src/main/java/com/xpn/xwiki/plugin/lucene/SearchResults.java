@@ -73,6 +73,8 @@ public class SearchResults extends Api {
 
   private IRightsAccessFacadeRole rightsAccess;
 
+  private BenchmarkRole benchService;
+
   /**
    * @param results
    *          Lucene search results
