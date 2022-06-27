@@ -21,7 +21,6 @@ package com.xpn.xwiki.plugin.lucene;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 import org.apache.lucene.search.Query;
@@ -94,13 +93,17 @@ public class SearchResults extends Api {
   }
 
   private List<SearchResult> getRelevantResults() {
+    return getRelevantResults(null, null);
+  }
+
+  private List<SearchResult> getRelevantResults(Integer offset, Integer limit) {
     if (this.relevantResults == null) {
       this.relevantResults = new ArrayList<>();
       try {
-        TopDocs docs = this.results.topDocs();
-        LOGGER.debug("getRelevantResults: checking access to scoreDocs [" + docs.scoreDocs.length
-            + "] for results [" + results.getTotalHits() + "] with class [" + results.getClass()
-            + "] and id-Hash [" + System.identityHashCode(results) + "].");
+        TopDocs docs = getTopDocs(offset, limit);
+        LOGGER.debug("getRelevantResults: checking access to scoreDocs [{}] for results ["
+            + "{}] with class [{}] and id-Hash [{}].", docs.scoreDocs.length,
+            results.getTotalHits(), results.getClass(), System.identityHashCode(results));
         for (ScoreDoc scoreDoc : docs.scoreDocs) {
           try {
             SearchResult result = new SearchResult(searcher.doc(scoreDoc.doc), scoreDoc.score,
@@ -110,18 +113,18 @@ public class SearchResults extends Api {
                 if (skipChecks || check(result.getDocumentReference())) {
                   this.relevantResults.add(result);
                 } else {
-                  LOGGER.debug("getRelevantResults: skipping because checks failed for "
-                      + "result [" + result.getDocumentReference() + "].");
+                  LOGGER.debug("getRelevantResults: skipping because checks failed for result {}].",
+                      result.getDocumentReference());
                 }
               } catch (XWikiException xwe) {
-                LOGGER.error("Error checking result: " + result.getFullName(), xwe);
+                LOGGER.error("Error checking result: {}", result.getFullName(), xwe);
               }
             } else {
               LOGGER.debug("getRelevantResults: skipping because no wiki content"
                   + " (wiki-Document or wiki-Doc-Attachment).");
             }
           } catch (IOException ioe) {
-            LOGGER.error("Error getting result doc '" + scoreDoc + "' from searcher", ioe);
+            LOGGER.error("Error getting result doc '{}' from searcher", scoreDoc, ioe);
           }
         }
       } finally {
@@ -132,11 +135,20 @@ public class SearchResults extends Api {
         }
       }
     } else {
-      LOGGER.debug("getRelevantResults: returning cached relevantResults [" + relevantResults.size()
-          + "].");
+      LOGGER.debug("getRelevantResults: returning cached relevantResults [{}].",
+          relevantResults.size());
     }
 
     return this.relevantResults;
+  }
+
+  private TopDocs getTopDocs(Integer offset, Integer limit) {
+    final int start = (offset != null) ? offset : 0;
+    if (limit != null) {
+      return this.results.topDocs(start, limit);
+    } else {
+      return this.results.topDocs(start);
+    }
   }
 
   private boolean check(DocumentReference docRef) throws XWikiException {
@@ -218,14 +230,7 @@ public class SearchResults extends Api {
    */
   public List<SearchResult> getResults(int beginIndex, int items) {
     int listStartIndex = Math.max(beginIndex - 1, 0);
-    int listEndIndex = listStartIndex + items;
-    int resultcount = getRelevantResults().size();
-    listEndIndex = listEndIndex < resultcount ? listEndIndex : resultcount;
-    if (listStartIndex <= listEndIndex) {
-      return getRelevantResults().subList(listStartIndex, listEndIndex);
-    } else {
-      return Collections.emptyList();
-    }
+    return getRelevantResults(listStartIndex, items);
   }
 
   /**
@@ -251,13 +256,13 @@ public class SearchResults extends Api {
 
   @Override
   protected void finalize() throws Throwable {
-    LOGGER.debug("finalize SearchResults for [" + System.identityHashCode(this)
-        + "], isMarkedClose [" + searcherProvider.isMarkedToClose() + "], "
-        + searcherProvider.isClosed() + "], isIdle [" + searcherProvider.isIdle() + "].");
+    LOGGER.debug("finalize SearchResults for [{}], isMarkedClose [{}], searcherProvider.isClosed[{"
+        + "}], isIdle [{}].", System.identityHashCode(this), searcherProvider.isMarkedToClose(),
+        searcherProvider.isClosed(), searcherProvider.isIdle());
     searcherProvider.cleanUpSearchResults(this);
-    LOGGER.debug("finalize SearchResults for [" + System.identityHashCode(this)
-        + "], isMarkedClose [" + searcherProvider.isMarkedToClose() + "], "
-        + searcherProvider.isClosed() + "], isIdle [" + searcherProvider.isIdle() + "].");
+    LOGGER.debug("finalize SearchResults for [{}], isMarkedClose [{}], searcherProvider.isClosed [{"
+        + "}], isIdle [{}].", System.identityHashCode(this), searcherProvider.isMarkedToClose(),
+        searcherProvider.isClosed(), searcherProvider.isIdle());
   }
 
   private IRightsAccessFacadeRole getRightsAccess() {
