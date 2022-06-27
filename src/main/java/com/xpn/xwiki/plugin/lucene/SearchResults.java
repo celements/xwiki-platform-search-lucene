@@ -99,11 +99,13 @@ public class SearchResults extends Api {
   private List<SearchResult> getRelevantResults() {
     if (this.relevantResults == null) {
       this.relevantResults = new ArrayList<>();
+      getBenchService().bench("SearchResults.getRelevantResults before topDocs");
       try {
         TopDocs docs = this.results.topDocs();
-        LOGGER.debug("getRelevantResults: checking access to scoreDocs [" + docs.scoreDocs.length
-            + "] for results [" + results.getTotalHits() + "] with class [" + results.getClass()
-            + "] and id-Hash [" + System.identityHashCode(results) + "].");
+        getBenchService().bench("SearchResults.getRelevantResults after topDocs");
+        LOGGER.debug("getRelevantResults: checking access to scoreDocs [{}] for results ["
+            + "{}] with class [{}] and id-Hash [{}].", docs.scoreDocs.length,
+            results.getTotalHits(), results.getClass(), System.identityHashCode(results));
         for (ScoreDoc scoreDoc : docs.scoreDocs) {
           try {
             SearchResult result = new SearchResult(searcher.doc(scoreDoc.doc), scoreDoc.score,
@@ -114,17 +116,17 @@ public class SearchResults extends Api {
                   this.relevantResults.add(result);
                 } else {
                   LOGGER.debug("getRelevantResults: skipping because checks failed for "
-                      + "result [" + result.getDocumentReference() + "].");
+                      + "result {}].", result.getDocumentReference());
                 }
               } catch (XWikiException xwe) {
-                LOGGER.error("Error checking result: " + result.getFullName(), xwe);
+                LOGGER.error("Error checking result: {}", result.getFullName(), xwe);
               }
             } else {
               LOGGER.debug("getRelevantResults: skipping because no wiki content"
                   + " (wiki-Document or wiki-Doc-Attachment).");
             }
           } catch (IOException ioe) {
-            LOGGER.error("Error getting result doc '" + scoreDoc + "' from searcher", ioe);
+            LOGGER.error("Error getting result doc '{}' from searcher", scoreDoc, ioe);
           }
         }
       } finally {
@@ -135,8 +137,8 @@ public class SearchResults extends Api {
         }
       }
     } else {
-      LOGGER.debug("getRelevantResults: returning cached relevantResults [" + relevantResults.size()
-          + "].");
+      LOGGER.debug("getRelevantResults: returning cached relevantResults [{}].",
+          relevantResults.size());
     }
 
     return this.relevantResults;
