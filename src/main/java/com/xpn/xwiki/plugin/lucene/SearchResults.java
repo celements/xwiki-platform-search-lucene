@@ -33,6 +33,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.xwiki.model.reference.DocumentReference;
 
+import com.celements.performance.BenchmarkRole;
 import com.celements.rights.access.EAccessLevel;
 import com.celements.rights.access.IRightsAccessFacadeRole;
 import com.xpn.xwiki.XWikiContext;
@@ -220,6 +221,7 @@ public class SearchResults extends Api {
     int listStartIndex = Math.max(beginIndex - 1, 0);
     int listEndIndex = listStartIndex + items;
     int resultcount = getRelevantResults().size();
+    getBenchService().bench("SearchResults.getResults after getRelevantResults");
     listEndIndex = listEndIndex < resultcount ? listEndIndex : resultcount;
     if (listStartIndex <= listEndIndex) {
       return getRelevantResults().subList(listStartIndex, listEndIndex);
@@ -265,6 +267,13 @@ public class SearchResults extends Api {
       rightsAccess = Utils.getComponent(IRightsAccessFacadeRole.class);
     }
     return rightsAccess;
+  }
+
+  private BenchmarkRole getBenchService() {
+    if (benchService == null) {
+      benchService = Utils.getComponent(BenchmarkRole.class);
+    }
+    return benchService;
   }
 
   @Override
