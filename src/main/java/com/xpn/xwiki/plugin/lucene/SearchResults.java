@@ -21,7 +21,6 @@ package com.xpn.xwiki.plugin.lucene;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 import org.apache.lucene.search.Query;
@@ -97,11 +96,15 @@ public class SearchResults extends Api {
   }
 
   private List<SearchResult> getRelevantResults() {
+    return getRelevantResults(null, null);
+  }
+
+  private List<SearchResult> getRelevantResults(Integer offset, Integer limit) {
     if (this.relevantResults == null) {
       this.relevantResults = new ArrayList<>();
       getBenchService().bench("SearchResults.getRelevantResults before topDocs");
       try {
-        TopDocs docs = this.results.topDocs();
+        TopDocs docs = getTopDocs(offset, limit);
         getBenchService().bench("SearchResults.getRelevantResults after topDocs");
         LOGGER.debug("getRelevantResults: checking access to scoreDocs [{}] for results ["
             + "{}] with class [{}] and id-Hash [{}].", docs.scoreDocs.length,
@@ -143,6 +146,14 @@ public class SearchResults extends Api {
     }
 
     return this.relevantResults;
+  }
+
+  private TopDocs getTopDocs(Integer offset, Integer limit) {
+    if (limit != null) {
+      return this.results.topDocs(offset != null ? offset : 0, limit);
+    } else {
+      return this.results.topDocs(offset != null ? offset : 0);
+    }
   }
 
   private boolean check(DocumentReference docRef) throws XWikiException {
@@ -225,15 +236,17 @@ public class SearchResults extends Api {
   public List<SearchResult> getResults(int beginIndex, int items) {
     int listStartIndex = Math.max(beginIndex - 1, 0);
     int listEndIndex = listStartIndex + items;
-    int resultcount = getRelevantResults().size();
+    List<SearchResult> resultList = getRelevantResults(listStartIndex, items);
+    int resultcount = resultList.size();
     listEndIndex = listEndIndex < resultcount ? listEndIndex : resultcount;
     getBenchService().bench("SearchResults.getResults after getRelevantResults size:"
         + resultcount + " startIndex: " + listStartIndex + " endIndex: " + listEndIndex);
-    if (listStartIndex <= listEndIndex) {
-      return getRelevantResults().subList(listStartIndex, listEndIndex);
-    } else {
-      return Collections.emptyList();
-    }
+    // if (listStartIndex <= listEndIndex) {
+    // return getRelevantResults().subList(listStartIndex, listEndIndex);
+    // } else {
+    // return Collections.emptyList();
+    // }
+    return resultList;
   }
 
   /**
