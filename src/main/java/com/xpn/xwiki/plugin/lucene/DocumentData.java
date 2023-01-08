@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import org.apache.commons.lang3.StringUtils;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.jsoup.Jsoup;
@@ -70,7 +69,7 @@ public class DocumentData extends AbstractDocumentData {
 
   @Override
   public String getFullText(XWikiDocument doc) {
-    return StringUtils.lowerCase(Jsoup.parse(doc.getContent()).text());
+    return Jsoup.parse(doc.getContent()).text().toLowerCase();
   }
 
   private void getObjectContentAsText(StringBuilder contentText, BaseObject baseObject,
