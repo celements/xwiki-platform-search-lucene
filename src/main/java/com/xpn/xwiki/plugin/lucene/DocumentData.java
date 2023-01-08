@@ -70,21 +70,16 @@ public class DocumentData extends AbstractDocumentData {
 
   @Override
   public String getFullText(XWikiDocument doc) {
-    // XXX removing xwiki adding all properties to fulltext. What should it be good for?
-    // getObjectFullText(sb, doc, context);
-    // TODO should it be rendered maybe by plainPageType view?
     return StringUtils.lowerCase(Jsoup.parse(doc.getContent()).text());
   }
 
   private void getObjectContentAsText(StringBuilder contentText, BaseObject baseObject,
       String property) {
     BaseProperty baseProperty = (BaseProperty) baseObject.getField(property);
-    // FIXME Can baseProperty really be null?
-    if ((baseProperty != null) && (baseProperty.getValue() != null)) {
-      if (!(baseObject.getXClass(getContext().getXWikiContext()).getField(
-          property) instanceof PasswordClass)) {
-        contentText.append(Jsoup.parse(baseProperty.getValue().toString()).text().toLowerCase());
-      }
+    if ((baseProperty != null) && (baseProperty.getValue() != null)
+        && !(baseObject.getXClass(getContext().getXWikiContext())
+            .getField(property) instanceof PasswordClass)) {
+      contentText.append(Jsoup.parse(baseProperty.getValue().toString()).text().toLowerCase());
     }
   }
 
