@@ -20,7 +20,6 @@ import org.apache.lucene.document.Field.Index;
 import org.apache.lucene.document.Fieldable;
 import org.jsoup.Jsoup;
 
-import com.google.common.primitives.Doubles;
 import com.xpn.xwiki.plugin.lucene.IndexFields;
 
 import one.util.streamex.EntryStream;
@@ -84,7 +83,7 @@ public class IndexExtensionField {
     private Field.Store store;
     private Field.Index index;
     private Float boost;
-    private String value;
+    private String value = "";
 
     public Builder(@NotBlank String name) {
       this.name = asNonBlank(name).orElseThrow(IllegalArgumentException::new);
@@ -160,7 +159,7 @@ public class IndexExtensionField {
 
     private Field.Index determineIndexByNameOrValue() {
       String name = this.name.toLowerCase();
-      return name.endsWith("_s") || name.endsWith("_fullname") || (Doubles.tryParse(value) != null)
+      return name.endsWith("_s") || name.endsWith("_fullname")
           ? Field.Index.NOT_ANALYZED
           : Field.Index.ANALYZED;
     }
