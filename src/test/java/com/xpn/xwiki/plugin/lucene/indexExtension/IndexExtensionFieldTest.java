@@ -117,5 +117,13 @@ public class IndexExtensionFieldTest {
         .getLuceneField().isTokenized());
     assertFalse(new IndexExtensionField.Builder("afield_fullname").build()
         .getLuceneField().isTokenized());
+    assertFalse(new IndexExtensionField.Builder("afield").value("true").build()
+        .getLuceneField().isTokenized());
+    assertFalse(new IndexExtensionField.Builder("afield").value("false").build()
+        .getLuceneField().isTokenized());
+    assertFalse(new IndexExtensionField.Builder("afield").value("123").build()
+        .getLuceneField().isTokenized());
+    assertFalse(new IndexExtensionField.Builder("afield").value("123.456").build()
+        .getLuceneField().isTokenized());
   }
 }
