@@ -152,7 +152,7 @@ public class IndexExtensionField {
     public IndexExtensionField build() {
       ExtensionType extType = Optional.ofNullable(extensionType).orElse(ExtensionType.REPLACE);
       Fieldable field = new Field(name, value,
-          Optional.ofNullable(store).orElse(Field.Store.NO),
+          Optional.ofNullable(store).orElse(Field.Store.YES),
           Optional.ofNullable(index).orElseGet(this::determineIndexByNameOrValue));
       field.setBoost(Optional.ofNullable(boost).orElse(1.0f));
       return new IndexExtensionField(extType, field);
@@ -192,8 +192,8 @@ public class IndexExtensionField {
 
   public static IndexExtensionField createRemove(String name) {
     return new IndexExtensionField.Builder(name)
-        .index(Index.NOT_ANALYZED)
         .extensionType(ExtensionType.REMOVE)
+        .index(Index.NOT_ANALYZED)
         .value("")
         .build();
   }
