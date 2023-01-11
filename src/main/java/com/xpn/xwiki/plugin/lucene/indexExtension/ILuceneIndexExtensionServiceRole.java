@@ -13,20 +13,42 @@ import com.xpn.xwiki.plugin.lucene.indexExtension.IndexExtensionField.ExtensionT
 @ComponentRole
 public interface ILuceneIndexExtensionServiceRole {
 
-  public void extend(AbstractIndexData data, Document luceneDoc);
+  void extend(AbstractIndexData data, Document luceneDoc);
 
-  public IndexExtensionField createField(String name, String value, Index indexType,
+  void extend(IndexExtensionField field, Document luceneDoc);
+
+  /**
+   * @deprecated since 5.9, instead use {@link IndexExtensionField.Builder}
+   */
+  @Deprecated
+  IndexExtensionField createField(String name, String value, Index indexType,
       ExtensionType extensionType);
 
-  public IndexExtensionField createField(String name, Number value, ExtensionType extensionType)
+  /**
+   * @deprecated since 5.9, instead use {@link IndexExtensionField.Builder}
+   */
+  @Deprecated
+  IndexExtensionField createField(String name, Number value, ExtensionType extensionType)
       throws IllegalArgumentException;
 
-  public Collection<IndexExtensionField> createFields(String name, Object value,
+  /**
+   * @deprecated since 5.9, instead use {@link IndexExtensionField#createFromValue}
+   */
+  @Deprecated
+  Collection<IndexExtensionField> createFields(String name, Object value,
       ExtensionType defaultExtType) throws IllegalArgumentException;
 
-  public Collection<IndexExtensionField> createFields(Map<String, Object> fieldMap,
+  /**
+   * @deprecated since 5.9, instead use {@link IndexExtensionField#createFromMap}
+   */
+  @Deprecated
+  Collection<IndexExtensionField> createFields(Map<String, Object> fieldMap,
       ExtensionType defaultExtType) throws IllegalArgumentException;
 
-  public IndexExtensionField createRemoveField(String name);
+  /**
+   * @deprecated since 5.9, instead use {@link IndexExtensionField#createRemove}
+   */
+  @Deprecated
+  IndexExtensionField createRemoveField(String name);
 
 }

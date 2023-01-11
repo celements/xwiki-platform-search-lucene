@@ -24,16 +24,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import org.apache.commons.lang3.StringUtils;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
+import org.jsoup.Jsoup;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.celements.search.lucene.LuceneDocType;
-import com.celements.web.plugin.cmd.ConvertToPlainTextException;
-import com.celements.web.plugin.cmd.PlainTextCommand;
-import com.xpn.xwiki.XWikiContext;
 import com.xpn.xwiki.doc.XWikiDocument;
 import com.xpn.xwiki.objects.BaseObject;
 import com.xpn.xwiki.objects.BaseProperty;
@@ -62,8 +59,6 @@ public class DocumentData extends AbstractDocumentData {
   /** The importance of an object property. **/
   private static final float OBJECT_PROPERTY_BOOST = 0.75f;
 
-  private final PlainTextCommand plainTextCmd = new PlainTextCommand();
-
   public DocumentData(XWikiDocument doc, boolean deleted) {
     super(LuceneDocType.wikipage, doc, deleted);
     setAuthor(doc.getAuthor());
@@ -74,63 +69,16 @@ public class DocumentData extends AbstractDocumentData {
 
   @Override
   public String getFullText(XWikiDocument doc) {
-    // XXX removing xwiki adding all properties to fulltext. What should it be good for?
-    // getObjectFullText(sb, doc, context);
-    // TODO should it be rendered maybe by plainPageType view?
-    return StringUtils.lowerCase(convertHtmlToPlainText(doc.getContent()));
-  }
-
-  private String convertHtmlToPlainText(String htmlContent) {
-    try {
-      return plainTextCmd.convertHtmlToPlainText(htmlContent);
-    } catch (ConvertToPlainTextException exp) {
-      LOGGER.error("Failed to convert html content to plain text.", exp);
-    }
-    return "";
-  }
-
-  /**
-   * Add to the string builder, the result of
-   * {@link AbstractIndexData#getFullText(XWikiDocument,XWikiContext)}plus the full text
-   * content (values of title,category,content and extract ) XWiki.ArticleClass Object, as
-   * far as it could be extracted.
-   */
-  private void getObjectFullText(StringBuilder sb, XWikiDocument doc) {
-    getObjectContentAsText(sb, doc);
-  }
-
-  /**
-   * Add to the string builder the value of title,category,content and extract of
-   * XWiki.ArticleClass
-   */
-  private void getObjectContentAsText(StringBuilder sb, XWikiDocument doc) {
-    for (List<BaseObject> objects : doc.getXObjects().values()) {
-      for (BaseObject obj : objects) {
-        extractObjectContent(sb, obj);
-      }
-    }
+    return Jsoup.parse(doc.getContent()).text().toLowerCase();
   }
 
   private void getObjectContentAsText(StringBuilder contentText, BaseObject baseObject,
       String property) {
     BaseProperty baseProperty = (BaseProperty) baseObject.getField(property);
-    // FIXME Can baseProperty really be null?
-    if ((baseProperty != null) && (baseProperty.getValue() != null)) {
-      if (!(baseObject.getXClass(getContext().getXWikiContext()).getField(
-          property) instanceof PasswordClass)) {
-        contentText.append(convertHtmlToPlainText(
-            baseProperty.getValue().toString()).toLowerCase());
-      }
-    }
-  }
-
-  private void extractObjectContent(StringBuilder contentText, BaseObject baseObject) {
-    if (baseObject != null) {
-      String[] propertyNames = baseObject.getPropertyNames();
-      for (String propertyName : propertyNames) {
-        getObjectContentAsText(contentText, baseObject, propertyName);
-        contentText.append(" ");
-      }
+    if ((baseProperty != null) && (baseProperty.getValue() != null)
+        && !(baseObject.getXClass(getContext().getXWikiContext())
+            .getField(property) instanceof PasswordClass)) {
+      contentText.append(Jsoup.parse(baseProperty.getValue().toString()).text().toLowerCase());
     }
   }
 
