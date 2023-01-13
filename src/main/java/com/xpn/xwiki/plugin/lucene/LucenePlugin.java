@@ -66,6 +66,7 @@ import org.slf4j.LoggerFactory;
 import org.xwiki.context.Execution;
 
 import com.celements.search.lucene.LuceneDocType;
+import com.celements.search.lucene.RandomFieldComparator.RandomFieldComparatorSource;
 import com.celements.search.lucene.index.queue.IndexQueuePriority;
 import com.celements.search.lucene.index.rebuild.LuceneIndexRebuildService;
 import com.google.common.base.Strings;
@@ -97,6 +98,7 @@ public class LucenePlugin extends XWikiDefaultPlugin {
   public static final Version VERSION = Version.LUCENE_34;
 
   public static final String SORT_FIELD_SCORE = "score";
+  public static final String SORT_FIELD_RANDOM = "random";
 
   @Deprecated
   public static final String DOCTYPE_WIKIPAGE = LuceneDocType.wikipage.name();
@@ -365,9 +367,11 @@ public class LucenePlugin extends XWikiDefaultPlugin {
   private SortField getSortField(String sortField) {
     SortField sort = null;
     if (!StringUtils.isEmpty(sortField)) {
-      if (sortField.equals(SORT_FIELD_SCORE)) {
+      if (sortField.equalsIgnoreCase(SORT_FIELD_SCORE)) {
         LOGGER.debug("getSortField: is field score");
         sort = SortField.FIELD_SCORE;
+      } else if (sortField.equalsIgnoreCase(SORT_FIELD_RANDOM)) {
+        sort = new SortField("", new RandomFieldComparatorSource());
       } else {
         // For the moment assuming everything is a String is enough, since we
         // don't usually want to sort documents
