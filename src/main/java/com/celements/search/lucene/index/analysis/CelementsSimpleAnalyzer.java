@@ -1,8 +1,11 @@
 package com.celements.search.lucene.index.analysis;
 
+import static com.google.common.base.Strings.*;
+
 import java.io.Reader;
 import java.util.Set;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.lucene.analysis.ASCIIFoldingFilter;
 import org.apache.lucene.analysis.LowerCaseFilter;
 import org.apache.lucene.analysis.StopFilter;
@@ -21,11 +24,12 @@ import com.google.common.collect.ImmutableSet;
  * LowerCaseFilter}, {@link StopFilter} and {@link ASCIIFoldingFilter}, using a list of
  * English+German stop words.
  */
-public class CelementsSimpleAnalyzer extends StopwordAnalyzerBase {
+public class CelementsSimpleAnalyzer extends StopwordAnalyzerBase implements CelAnalyzer {
 
   public static final ImmutableSet<?> STOP_WORDS = ImmutableSet.builder()
-      .addAll(StandardAnalyzer.STOP_WORDS_SET)
+      .addAll(StandardAnalyzer.STOP_WORDS_SET.stream().map(c -> new String((char[]) c)).iterator())
       .addAll(GermanAnalyzer.getDefaultStopSet())
+      .add("dass") // swiss german daß
       .build();
 
   public CelementsSimpleAnalyzer(Version matchVersion) {
@@ -45,4 +49,14 @@ public class CelementsSimpleAnalyzer extends StopwordAnalyzerBase {
     tok = new ASCIIFoldingFilter(tok);
     return new TokenStreamComponents(src, tok);
   }
+
+  @Override
+  public String filterToken(String token) {
+    token = nullToEmpty(token).toLowerCase();
+    if (STOP_WORDS.contains(token.replace("*", ""))) {
+      return "";
+    }
+    return StringUtils.stripAccents(token);
+  }
+
 }
