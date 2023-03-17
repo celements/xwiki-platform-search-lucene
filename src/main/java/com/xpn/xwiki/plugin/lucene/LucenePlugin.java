@@ -697,20 +697,13 @@ public class LucenePlugin extends XWikiDefaultPlugin {
   }
 
   private Analyzer getConfiguredAnalyzer() {
-    Analyzer ret;
     String analyzerClassName = getContext().getWiki().Param(PROP_ANALYZER, DEFAULT_ANALYZER);
     try {
       LOGGER.info("Instantiating analyzer '{}'", analyzerClassName);
-      ret = getAnalyzerInternal(analyzerClassName);
+      return getAnalyzerInternal(analyzerClassName);
     } catch (ReflectiveOperationException exc) {
-      LOGGER.warn("Unable to instantiate analyzer '{}', using default instead ", analyzerClassName);
-      try {
-        ret = getAnalyzerInternal(DEFAULT_ANALYZER);
-      } catch (ReflectiveOperationException exc2) {
-        throw new RuntimeException("Unable to instantiate default analyzer", exc2);
-      }
+      throw new IllegalArgumentException("Unable to instantiate analyzer", exc);
     }
-    return ret;
   }
 
   private XWikiContext getContext() {
