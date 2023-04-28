@@ -1,6 +1,5 @@
 package com.xpn.xwiki.plugin.lucene.indexExtension;
 
-import static com.celements.common.test.CelementsTestUtils.*;
 import static org.junit.Assert.*;
 
 import org.junit.Before;
@@ -15,9 +14,7 @@ public class LuceneIndexExtensionServiceTest extends AbstractComponentTest {
   private LuceneIndexExtensionService indexExtService;
 
   @Before
-  @Override
-  public void setUp() throws Exception {
-    super.setUp();
+  public void prepare() throws Exception {
     indexExtService = (LuceneIndexExtensionService) Utils.getComponent(
         ILuceneIndexExtensionServiceRole.class);
   }
