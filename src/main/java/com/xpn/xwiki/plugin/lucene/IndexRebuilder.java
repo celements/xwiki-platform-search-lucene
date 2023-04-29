@@ -60,14 +60,13 @@ import org.xwiki.model.reference.SpaceReference;
 import org.xwiki.model.reference.WikiReference;
 
 import com.celements.common.date.DateUtil;
-import com.celements.model.access.ContextExecutor;
 import com.celements.model.access.IModelAccessFacade;
 import com.celements.model.access.exception.DocumentLoadException;
 import com.celements.model.access.exception.DocumentNotExistsException;
+import com.celements.model.context.Contextualiser;
 import com.celements.model.context.ModelContext;
 import com.celements.model.metadata.DocumentMetaData;
 import com.celements.model.util.ModelUtils;
-import com.celements.model.util.References;
 import com.celements.search.lucene.index.queue.IndexQueuePriority;
 import com.celements.search.lucene.index.rebuild.LuceneIndexRebuildService;
 import com.celements.store.DocumentCacheStore;
@@ -207,8 +206,8 @@ public class IndexRebuilder implements LuceneIndexRebuildService {
   protected void rebuildIndexAsync(final IndexRebuildFuture future) {
     final EntityReference filterRef = future.getReference();
     final Directory directory = expectIndexUpdater().getDirectory();
-    WikiReference wikiRef = References.extractRef(filterRef, WikiReference.class).get();
-    ContextExecutor.executeInWiki(wikiRef, () -> CompletableFuture.runAsync(
+    final WikiReference wikiRef = filterRef.extractRef(WikiReference.class).get();
+    new Contextualiser().withWiki(wikiRef).execute(() -> CompletableFuture.runAsync(
         new AbstractXWikiRunnable(XWikiContext.EXECUTIONCONTEXT_KEY, createJobContext()) {
 
           @Override
@@ -317,7 +316,7 @@ public class IndexRebuilder implements LuceneIndexRebuildService {
       XWikiDocument doc = modelAccess.getDocument(metaData.getDocRef(), metaData.getLanguage());
       queue(new DocumentData(doc, false));
       ++retval;
-      if (!modelAccess.isTranslation(doc)) {
+      if (!doc.isTrans()) {
         for (XWikiAttachment att : doc.getAttachmentList()) {
           queue(new AttachmentData(att, false));
           ++retval;
@@ -395,13 +394,13 @@ public class IndexRebuilder implements LuceneIndexRebuildService {
 
   private BooleanQuery getLuceneSearchRefQuery(@NotNull EntityReference ref) {
     BooleanQuery query = new BooleanQuery();
-    References.extractRef(ref, DocumentReference.class).toJavaUtil()
+    ref.extractRef(DocumentReference.class)
         .ifPresent(docRef -> query.add(new TermQuery(new Term(IndexFields.DOCUMENT_NAME_S,
             docRef.getName().toLowerCase())), BooleanClause.Occur.MUST));
-    References.extractRef(ref, SpaceReference.class).toJavaUtil()
+    ref.extractRef(SpaceReference.class)
         .ifPresent(spaceRef -> query.add(new TermQuery(new Term(IndexFields.DOCUMENT_SPACE_S,
             spaceRef.getName().toLowerCase())), BooleanClause.Occur.MUST));
-    WikiReference wikiRef = References.extractRef(ref, WikiReference.class).get();
+    WikiReference wikiRef = ref.extractRef(WikiReference.class).get();
     query.add(new TermQuery(new Term(IndexFields.DOCUMENT_WIKI, wikiRef.getName().toLowerCase())),
         BooleanClause.Occur.MUST);
     return query;
